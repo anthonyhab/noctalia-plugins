@@ -34,6 +34,28 @@
       "minNoctaliaVersion": "3.6.0",
       "license": "MIT",
       "lastUpdated": "2025-12-18T23:50:00Z"
+    },
+    {
+      "id": "waybar-update",
+      "name": "Waybar Update",
+      "version": "1.0.0",
+      "author": "waybar-converter",
+      "description": "Converted from Waybar custom/update module - checks for Omarchy updates",
+      "repository": "https://github.com/habibe/bibe-plugins",
+      "minNoctaliaVersion": "3.6.0",
+      "license": "MIT",
+      "lastUpdated": "2025-12-18T09:06:00Z"
+    },
+    {
+      "id": "waybar-screenrecording-indicator",
+      "name": "Waybar Screen Recording Indicator",
+      "version": "1.0.0",
+      "author": "waybar-converter",
+      "description": "Converted from Waybar custom/screenrecording-indicator module - shows recording status",
+      "repository": "https://github.com/habibe/bibe-plugins",
+      "minNoctaliaVersion": "3.6.0",
+      "license": "MIT",
+      "lastUpdated": "2025-12-18T09:06:00Z"
     }
   ]
 }
