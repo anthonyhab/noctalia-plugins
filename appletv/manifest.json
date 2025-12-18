@@ -22,6 +22,8 @@
       "deviceIdentifier": "",
       "deviceAddress": "",
       "deviceName": "",
+      "useUvHelper": true,
+      "uvPath": "uv",
       "pythonPath": "python3",
       "helperScriptPath": "",
       "mrpCredentials": "",

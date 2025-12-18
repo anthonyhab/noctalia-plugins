@@ -9,7 +9,11 @@ Item {
   property var pluginApi: null
 
   readonly property string pythonPath: pluginApi?.pluginSettings?.pythonPath || "python3"
-  readonly property string helperScriptPath: pluginApi?.pluginSettings?.helperScriptPath || (pluginApi?.pluginDir ? pluginApi.pluginDir + "/helper/appletv_helper.py" : "")
+  readonly property string bundledHelperScript: pluginApi?.pluginDir ? pluginApi.pluginDir + "/helper/appletv_helper.py" : ""
+  readonly property string helperScriptPath: pluginApi?.pluginSettings?.helperScriptPath || bundledHelperScript
+  readonly property string helperProjectDir: pluginApi?.pluginDir ? pluginApi.pluginDir + "/helper" : ""
+  readonly property bool useUvHelper: pluginApi?.pluginSettings?.useUvHelper !== false
+  readonly property string uvPath: pluginApi?.pluginSettings?.uvPath || "uv"
   readonly property string deviceIdentifier: pluginApi?.pluginSettings?.deviceIdentifier || ""
   readonly property string deviceAddress: pluginApi?.pluginSettings?.deviceAddress || ""
   readonly property string deviceName: pluginApi?.pluginSettings?.deviceName || ""
@@ -20,7 +24,9 @@ Item {
   readonly property int pollInterval: Math.max(2000, pluginApi?.pluginSettings?.pollInterval || 5000)
   readonly property int scanTimeout: pluginApi?.pluginSettings?.scanTimeout || 8
 
-  readonly property bool helperConfigured: pythonPath !== "" && helperScriptPath !== "" && (deviceIdentifier !== "" || deviceAddress !== "" || deviceName !== "")
+  readonly property bool helperRuntimeReady: useUvHelper ? (uvPath !== "" && helperProjectDir !== "") : (pythonPath !== "" && helperScriptPath !== "")
+
+  readonly property bool helperConfigured: helperRuntimeReady && (deviceIdentifier !== "" || deviceAddress !== "" || deviceName !== "")
 
   property bool connecting: false
   property bool connected: false
@@ -130,8 +136,16 @@ Item {
     isVolumeMuted = state.is_muted || false;
   }
 
+  function buildBaseHelperArgs() {
+    if (useUvHelper && helperProjectDir) {
+      return [uvPath, "run", "--project", helperProjectDir, "appletv-helper"];
+    }
+    return [pythonPath || "python3", helperScriptPath || bundledHelperScript];
+  }
+
   function buildCommonArgs(command) {
-    var args = [pythonPath, helperScriptPath, "--command", command, "--scan-timeout", String(scanTimeout)];
+    var args = buildBaseHelperArgs();
+    args.push("--command", command, "--scan-timeout", String(scanTimeout));
     if (deviceIdentifier)
       args.push("--identifier", deviceIdentifier);
     if (deviceAddress)

@@ -16,9 +16,10 @@ state refreshes and transport controls.
 
 ## Requirements
 
-1. Install `pyatv` inside a Python environment that Noctalia can access:
+1. Install [`uv`](https://github.com/astral-sh/uv) once so the helper can
+   bootstrap `pyatv` automatically:
    ```bash
-   pip install --upgrade pyatv
+   curl -LsSf https://astral.sh/uv/install.sh | sh
    ```
 2. Pair your machine with the Apple TV/HomePod using `atvremote`:
    ```bash
@@ -36,8 +37,11 @@ Open *Settings → Plugins → Apple TV Direct* and fill out:
 - **Display name** – label shown in UI.
 - **Device identifier / IP / name** – at least one is required so the helper can
   discover the device.
-- **Python executable / helper script path** – defaults to `python3` and the
-  bundled helper.
+- **uv executable** – usually `uv`; used to run the helper in an isolated
+  environment. Disable this if you prefer to call a specific Python interpreter
+  and manage dependencies manually.
+- **Python executable / helper script path** – only needed when uv support is
+  disabled. Defaults to `python3` and the bundled helper.
 - **Credentials** – paste strings from `atvremote pair`.
 - **Polling / scan interval** – adjust to taste.
 

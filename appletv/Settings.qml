@@ -17,11 +17,14 @@ ColumnLayout {
   Layout.preferredWidth: implicitWidth
 
   readonly property string bundledHelper: pluginApi?.pluginDir ? pluginApi.pluginDir + "/helper/appletv_helper.py" : ""
+  readonly property string bundledHelperProject: pluginApi?.pluginDir ? pluginApi.pluginDir + "/helper" : ""
 
   property string valueFriendlyName: pluginApi?.pluginSettings?.displayName || ""
   property string valueDeviceIdentifier: pluginApi?.pluginSettings?.deviceIdentifier || ""
   property string valueDeviceAddress: pluginApi?.pluginSettings?.deviceAddress || ""
   property string valueDeviceName: pluginApi?.pluginSettings?.deviceName || ""
+  property bool valueUseUvHelper: pluginApi?.pluginSettings?.useUvHelper !== false
+  property string valueUvPath: pluginApi?.pluginSettings?.uvPath || "uv"
   property string valuePythonPath: pluginApi?.pluginSettings?.pythonPath || "python3"
   property string valueHelperPath: pluginApi?.pluginSettings?.helperScriptPath || bundledHelper
   property string valueMrpCredentials: pluginApi?.pluginSettings?.mrpCredentials || ""
@@ -43,6 +46,8 @@ ColumnLayout {
     pluginApi.pluginSettings.deviceIdentifier = valueDeviceIdentifier.trim();
     pluginApi.pluginSettings.deviceAddress = valueDeviceAddress.trim();
     pluginApi.pluginSettings.deviceName = valueDeviceName.trim();
+    pluginApi.pluginSettings.useUvHelper = valueUseUvHelper;
+    pluginApi.pluginSettings.uvPath = valueUvPath.trim() || "uv";
     pluginApi.pluginSettings.pythonPath = valuePythonPath.trim();
     pluginApi.pluginSettings.helperScriptPath = valueHelperPath.trim() || bundledHelper;
     pluginApi.pluginSettings.mrpCredentials = valueMrpCredentials.trim();
@@ -55,7 +60,12 @@ ColumnLayout {
   }
 
   function buildHelperArgs() {
-    var args = [valuePythonPath, valueHelperPath || bundledHelper, "--command", "state", "--scan-timeout", String(valueScanTimeout)];
+    var args = [];
+    if (valueUseUvHelper) {
+      args = [valueUvPath || "uv", "run", "--project", bundledHelperProject, "appletv-helper", "--command", "state", "--scan-timeout", String(valueScanTimeout)];
+    } else {
+      args = [valuePythonPath || "python3", valueHelperPath || bundledHelper, "--command", "state", "--scan-timeout", String(valueScanTimeout)];
+    }
     if (valueDeviceIdentifier)
       args.push("--identifier", valueDeviceIdentifier.trim());
     if (valueDeviceAddress)
@@ -72,7 +82,12 @@ ColumnLayout {
   }
 
   function testHelper() {
-    if (!valuePythonPath || !(valueHelperPath || bundledHelper)) {
+    if (valueUseUvHelper && !(valueUvPath && bundledHelperProject)) {
+      testResult = "Set uv path or disable uv usage.";
+      testSuccess = false;
+      return;
+    }
+    if (!valueUseUvHelper && (!valuePythonPath || !(valueHelperPath || bundledHelper))) {
       testResult = "Set python path and helper script first.";
       testSuccess = false;
       return;
@@ -114,10 +129,24 @@ ColumnLayout {
   }
 
   NText {
-    text: pluginApi?.tr("settings.helper-hint") || "Install pyatv (pip install pyatv) and pair your Apple TV. The bundled helper script expects valid MRP credentials."
+    text: pluginApi?.tr("settings.helper-hint") || "Install uv (https://github.com/astral-sh/uv) once, then Noctalia will automatically manage the helper environment and pyatv dependency."
     wrapMode: Text.WordWrap
     color: Color.mOnSurfaceVariant
     pointSize: Style.fontSizeS
+  }
+
+  NCheckBox {
+    text: "Use uv helper runtime (recommended)"
+    checked: valueUseUvHelper
+    onToggled: valueUseUvHelper = checked
+  }
+
+  NTextInput {
+    visible: valueUseUvHelper
+    label: "uv executable"
+    placeholderText: "uv"
+    text: valueUvPath
+    onTextChanged: valueUvPath = text
   }
 
   NTextInput {
@@ -148,18 +177,23 @@ ColumnLayout {
     onTextChanged: valueDeviceName = text
   }
 
-  NTextInput {
-    label: "Python executable"
-    placeholderText: "python3"
-    text: valuePythonPath
-    onTextChanged: valuePythonPath = text
-  }
+  ColumnLayout {
+    visible: !valueUseUvHelper
+    spacing: Style.marginS
 
-  NTextInput {
-    label: "Helper script path"
-    placeholderText: bundledHelper
-    text: valueHelperPath
-    onTextChanged: valueHelperPath = text
+    NTextInput {
+      label: "Python executable"
+      placeholderText: "python3"
+      text: valuePythonPath
+      onTextChanged: valuePythonPath = text
+    }
+
+    NTextInput {
+      label: "Helper script path"
+      placeholderText: bundledHelper
+      text: valueHelperPath
+      onTextChanged: valueHelperPath = text
+    }
   }
 
   NTextInput {
