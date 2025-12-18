@@ -1,0 +1,10 @@
+[project]
+name = "noctalia-appletv-helper"
+version = "0.1.0"
+description = "PyATV helper for the Noctalia Apple TV plugin"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = ["pyatv>=0.14.0"]
+
+[project.scripts]
+appletv-helper = "appletv_helper:main"

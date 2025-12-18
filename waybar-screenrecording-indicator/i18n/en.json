@@ -1,0 +1,8 @@
+{
+  "title": "Waybar Screenrecording Indicator",
+  "description": "Converted from Waybar custom/screenrecording-indicator",
+  "settings": {
+    "textCommand": "Text Command",
+    "interval": "Update Interval"
+  }
+}
