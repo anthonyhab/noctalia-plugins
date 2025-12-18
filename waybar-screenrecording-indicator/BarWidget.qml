@@ -49,8 +49,6 @@ Item {
     tooltipText: _displayTooltip || _displayText
     forceOpen: !isBarVertical && _displayText !== ""
     onClicked: Quickshell.execDetached(['sh', '-c', 'omarchy-cmd-screenrecord'])
-    onRightClicked: // No right-click action
-    onMiddleClicked: // No middle-click action
   }
 
   SplitParser {
