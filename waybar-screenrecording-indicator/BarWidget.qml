@@ -48,7 +48,7 @@ Item {
     text: pillText
     tooltipText: _displayTooltip || _displayText
     forceOpen: !isBarVertical && _displayText !== ""
-    onClicked: Quickshell.execDetached(['sh', '-c', 'omarchy-cmd-screenrecord'])
+    onClicked: Quickshell.execDetached(["sh", "-c", "omarchy-cmd-screenrecord"])
   }
 
   SplitParser {

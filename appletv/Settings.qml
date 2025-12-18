@@ -9,6 +9,7 @@ ColumnLayout {
   id: root
 
   property var pluginApi: null
+  readonly property var defaultSettings: pluginApi?.manifest?.metadata?.defaultSettings || ({})
 
   spacing: Style.marginL
   implicitWidth: Math.round(520 * Style.uiScaleRatio)
@@ -19,19 +20,19 @@ ColumnLayout {
   readonly property string bundledHelper: pluginApi?.pluginDir ? pluginApi.pluginDir + "/helper/appletv_helper.py" : ""
   readonly property string bundledHelperProject: pluginApi?.pluginDir ? pluginApi.pluginDir + "/helper" : ""
 
-  property string valueFriendlyName: pluginApi?.pluginSettings?.displayName || ""
-  property string valueDeviceIdentifier: pluginApi?.pluginSettings?.deviceIdentifier || ""
-  property string valueDeviceAddress: pluginApi?.pluginSettings?.deviceAddress || ""
-  property string valueDeviceName: pluginApi?.pluginSettings?.deviceName || ""
-  property bool valueUseUvHelper: pluginApi?.pluginSettings?.useUvHelper !== false
-  property string valueUvPath: pluginApi?.pluginSettings?.uvPath || "uv"
-  property string valuePythonPath: pluginApi?.pluginSettings?.pythonPath || "python3"
-  property string valueHelperPath: pluginApi?.pluginSettings?.helperScriptPath || bundledHelper
-  property string valueMrpCredentials: pluginApi?.pluginSettings?.mrpCredentials || ""
-  property string valueCompanionCredentials: pluginApi?.pluginSettings?.companionCredentials || ""
-  property string valueAirplayCredentials: pluginApi?.pluginSettings?.airplayCredentials || ""
-  property int valuePollInterval: pluginApi?.pluginSettings?.pollInterval || 5000
-  property int valueScanTimeout: pluginApi?.pluginSettings?.scanTimeout || 8
+  property string valueFriendlyName: ""
+  property string valueDeviceIdentifier: ""
+  property string valueDeviceAddress: ""
+  property string valueDeviceName: ""
+  property bool valueUseUvHelper: true
+  property string valueUvPath: "uv"
+  property string valuePythonPath: "python3"
+  property string valueHelperPath: ""
+  property string valueMrpCredentials: ""
+  property string valueCompanionCredentials: ""
+  property string valueAirplayCredentials: ""
+  property int valuePollInterval: 5000
+  property int valueScanTimeout: 8
 
   property bool testingHelper: false
   property string testResult: ""
@@ -39,22 +40,74 @@ ColumnLayout {
 
   readonly property var pluginMain: pluginApi?.mainInstance
 
+  function getSetting(key, fallback) {
+    if (pluginApi?.pluginSettings && pluginApi.pluginSettings[key] !== undefined && pluginApi.pluginSettings[key] !== null)
+      return pluginApi.pluginSettings[key];
+    if (defaultSettings && defaultSettings[key] !== undefined && defaultSettings[key] !== null)
+      return defaultSettings[key];
+    return fallback;
+  }
+
+  function syncFromPlugin() {
+    if (!pluginApi)
+      return;
+    valueFriendlyName = getSetting("displayName", "") || "";
+    valueDeviceIdentifier = getSetting("deviceIdentifier", "") || "";
+    valueDeviceAddress = getSetting("deviceAddress", "") || "";
+    valueDeviceName = getSetting("deviceName", "") || "";
+    valueUseUvHelper = getSetting("useUvHelper", true) !== false;
+    valueUvPath = getSetting("uvPath", "uv") || "uv";
+    valuePythonPath = getSetting("pythonPath", "python3") || "python3";
+    valueHelperPath = getSetting("helperScriptPath", bundledHelper) || bundledHelper;
+    valueMrpCredentials = getSetting("mrpCredentials", "") || "";
+    valueCompanionCredentials = getSetting("companionCredentials", "") || "";
+    valueAirplayCredentials = getSetting("airplayCredentials", "") || "";
+    valuePollInterval = getSetting("pollInterval", 5000) || 5000;
+    valueScanTimeout = getSetting("scanTimeout", 8) || 8;
+  }
+
+  onPluginApiChanged: syncFromPlugin()
+  Component.onCompleted: syncFromPlugin()
+
+  Connections {
+    target: pluginApi
+    function onPluginSettingsChanged() {
+      syncFromPlugin();
+    }
+  }
+
   function saveSettings() {
     if (!pluginApi)
       return;
-    pluginApi.pluginSettings.displayName = valueFriendlyName.trim();
-    pluginApi.pluginSettings.deviceIdentifier = valueDeviceIdentifier.trim();
-    pluginApi.pluginSettings.deviceAddress = valueDeviceAddress.trim();
-    pluginApi.pluginSettings.deviceName = valueDeviceName.trim();
-    pluginApi.pluginSettings.useUvHelper = valueUseUvHelper;
-    pluginApi.pluginSettings.uvPath = valueUvPath.trim() || "uv";
-    pluginApi.pluginSettings.pythonPath = valuePythonPath.trim();
-    pluginApi.pluginSettings.helperScriptPath = valueHelperPath.trim() || bundledHelper;
-    pluginApi.pluginSettings.mrpCredentials = valueMrpCredentials.trim();
-    pluginApi.pluginSettings.companionCredentials = valueCompanionCredentials.trim();
-    pluginApi.pluginSettings.airplayCredentials = valueAirplayCredentials.trim();
-    pluginApi.pluginSettings.pollInterval = valuePollInterval;
-    pluginApi.pluginSettings.scanTimeout = valueScanTimeout;
+
+    var settings = pluginApi.pluginSettings || {};
+    var changed = false;
+
+    function updateSetting(key, newValue) {
+      if (settings[key] !== newValue) {
+        settings[key] = newValue;
+        changed = true;
+      }
+    }
+
+    updateSetting("displayName", valueFriendlyName.trim());
+    updateSetting("deviceIdentifier", valueDeviceIdentifier.trim());
+    updateSetting("deviceAddress", valueDeviceAddress.trim());
+    updateSetting("deviceName", valueDeviceName.trim());
+    updateSetting("useUvHelper", !!valueUseUvHelper);
+    updateSetting("uvPath", (valueUvPath || "").trim() || "uv");
+    updateSetting("pythonPath", (valuePythonPath || "").trim() || "python3");
+    updateSetting("helperScriptPath", (valueHelperPath || "").trim() || bundledHelper);
+    updateSetting("mrpCredentials", valueMrpCredentials.trim());
+    updateSetting("companionCredentials", valueCompanionCredentials.trim());
+    updateSetting("airplayCredentials", valueAirplayCredentials.trim());
+    updateSetting("pollInterval", Math.max(2000, Math.min(15000, Number(valuePollInterval) || 5000)));
+    updateSetting("scanTimeout", Math.max(3, Math.min(30, Number(valueScanTimeout) || 8)));
+
+    if (!changed)
+      return;
+
+    pluginApi.pluginSettings = settings;
     pluginApi.saveSettings();
     pluginMain?.refresh();
   }
@@ -223,24 +276,46 @@ ColumnLayout {
   RowLayout {
     spacing: Style.marginM
 
-    NNumberInput {
+    ColumnLayout {
       Layout.fillWidth: true
-      label: "Polling interval (ms)"
-      value: valuePollInterval
-      from: 2000
-      to: 15000
-      stepSize: 500
-      onValueChanged: valuePollInterval = value
+      spacing: Style.marginXS
+
+      NText {
+        text: "Polling interval (ms)"
+        color: Color.mOnSurface
+      }
+
+      SpinBox {
+        Layout.fillWidth: true
+        editable: true
+        inputMethodHints: Qt.ImhDigitsOnly
+        from: 2000
+        to: 15000
+        stepSize: 500
+        value: valuePollInterval
+        onValueChanged: valuePollInterval = value
+      }
     }
 
-    NNumberInput {
+    ColumnLayout {
       Layout.fillWidth: true
-      label: "Scan timeout (s)"
-      value: valueScanTimeout
-      from: 3
-      to: 30
-      stepSize: 1
-      onValueChanged: valueScanTimeout = value
+      spacing: Style.marginXS
+
+      NText {
+        text: "Scan timeout (s)"
+        color: Color.mOnSurface
+      }
+
+      SpinBox {
+        Layout.fillWidth: true
+        editable: true
+        inputMethodHints: Qt.ImhDigitsOnly
+        from: 3
+        to: 30
+        stepSize: 1
+        value: valueScanTimeout
+        onValueChanged: valueScanTimeout = value
+      }
     }
   }
 
