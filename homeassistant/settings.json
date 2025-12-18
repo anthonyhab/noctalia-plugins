@@ -1,5 +1,146 @@
 {
   "haUrl": "http://192.168.8.123:8123",
   "haToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiI1OGZkNTJlNTZlNTk0ZjRjODk2ZWRiMDI4YjJiYjRlYyIsImlhdCI6MTc2NTk5NDU1MSwiZXhwIjoyMDgxMzU0NTUxfQ.HiHyM2zNXS_dM8JUor2QONVG706OVIRXf0JSZlDnumM",
-  "defaultMediaPlayer": "media_player.anttv"
+  "defaultMediaPlayer": "media_player.anttv",
+  "stateCache": {
+    "currentState": {
+      "media_player.anttv": {
+        "entity_id": "media_player.anttv",
+        "state": "playing",
+        "attributes": {
+          "source_list": [
+            "App Store",
+            "Arcade",
+            "Computers",
+            "Disney+",
+            "FaceTime",
+            "Fitness",
+            "Hulu",
+            "Infuse",
+            "IPTVX",
+            "Jellyfin",
+            "KaraFun",
+            "Katamari Damacy Rolling LIVE",
+            "Moonlight",
+            "Movies",
+            "Music",
+            "Netflix",
+            "Paramount+",
+            "Peacock",
+            "Photos",
+            "Plex",
+            "Pluto TV",
+            "Podcasts",
+            "Prime Video",
+            "Proton VPN",
+            "RetroArch",
+            "Search",
+            "Settings",
+            "Sling",
+            "Steam Link",
+            "Taiko Pop Tap",
+            "Tailscale",
+            "TiviMax (Lite)",
+            "Tubi",
+            "TV",
+            "TV Shows",
+            "Twitch",
+            "UHF",
+            "VidHub",
+            "VLC",
+            "YouTube",
+            "YouTube TV"
+          ],
+          "media_position": 0,
+          "media_position_updated_at": "2025-12-18T13:16:27.195833+00:00",
+          "media_title": "019 - Skrillex - Rumble",
+          "app_id": "com.firecore.infuse",
+          "app_name": "Infuse",
+          "entity_picture": "/api/media_player_proxy/media_player.anttv?token=aaf5ccab5e4bb95d619e8662dd49843a0d30ee5cb2da0fa5763ec33959c75500&cache=c6f4d7fe3b031bcb",
+          "friendly_name": "AntTV",
+          "supported_features": 450487
+        },
+        "last_changed": "2025-12-18T13:16:27.196018+00:00",
+        "last_reported": "2025-12-18T13:16:27.196018+00:00",
+        "last_updated": "2025-12-18T13:16:27.196018+00:00",
+        "context": {
+          "id": "01KCRSNK5WEE8B1MD5K4XMPE5M",
+          "parent_id": null,
+          "user_id": null
+        }
+      },
+      "media_player.bedroom": {
+        "entity_id": "media_player.bedroom",
+        "state": "on",
+        "attributes": {
+          "source_list": [
+            "3",
+            "4",
+            "AV",
+            "Amazon Alexa",
+            "Apple TV",
+            "Art Gallery",
+            "Custom Screensaver",
+            "Disney+",
+            "HBO Max",
+            "HDMI 1",
+            "HDMI 2",
+            "Home Dashboard",
+            "Homebrew Channel",
+            "Hulu",
+            "Jellyfin",
+            "LG Channels",
+            "LG Content Store",
+            "LG Fitness",
+            "Live TV",
+            "Music",
+            "Netflix",
+            "Paramount+",
+            "Photo & Video",
+            "Plex",
+            "Pluto TV",
+            "Prime Video",
+            "Room to Room Share",
+            "Shop Time",
+            "Sling TV",
+            "Sports Alert",
+            "Stremio",
+            "Tubi: Free Movies & TV",
+            "Web Browser",
+            "YouTube"
+          ],
+          "volume_level": 0.1,
+          "is_volume_muted": false,
+          "source": "HDMI 2",
+          "sound_output": "external_arc",
+          "assumed_state": true,
+          "device_class": "tv",
+          "friendly_name": "Bedroom",
+          "supported_features": 24381
+        },
+        "last_changed": "2025-12-18T12:28:15.911300+00:00",
+        "last_reported": "2025-12-18T12:28:15.911300+00:00",
+        "last_updated": "2025-12-18T12:28:15.911300+00:00",
+        "context": {
+          "id": "01KCRPXBN7VHJSHG903DV8W7HW",
+          "parent_id": null,
+          "user_id": null
+        }
+      }
+    },
+    "mediaPlayers": [
+      {
+        "entity_id": "media_player.anttv",
+        "friendly_name": "AntTV",
+        "state": "playing"
+      },
+      {
+        "entity_id": "media_player.bedroom",
+        "friendly_name": "Bedroom",
+        "state": "on"
+      }
+    ],
+    "selectedMediaPlayer": "media_player.anttv",
+    "timestamp": 1766063895100
+  }
 }

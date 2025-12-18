@@ -25,6 +25,10 @@ Item {
   property var mediaPlayers: []
   property string selectedMediaPlayer: defaultMediaPlayer
   property var currentState: null
+  property bool cacheHydrated: false
+  property bool settingsReady: false
+  readonly property var stickyAttributeKeys: ["media_title", "media_artist", "media_album_name", "entity_picture", "media_duration", "media_position", "media_position_updated_at", "volume_level", "is_volume_muted", "shuffle", "repeat", "friendly_name"]
+  property var volumeOverrides: ({})
 
   // Computed properties for current media player
   readonly property var selectedPlayerState: {
@@ -188,12 +192,16 @@ Item {
   }
 
   function processStates(states) {
+    const previousState = currentState || {};
     const newState = {};
     const players = [];
 
     for (const entity of states) {
       if (entity.entity_id.startsWith("media_player.")) {
-        newState[entity.entity_id] = entity;
+        const mergedEntity = Object.assign({}, entity);
+        mergedEntity.attributes = mergePlayerAttributes(previousState, entity.entity_id, entity.attributes);
+        maybeStoreVolumeOverride(entity.entity_id, mergedEntity.attributes);
+        newState[entity.entity_id] = mergedEntity;
         players.push({
                        entity_id: entity.entity_id,
                        friendly_name: entity.attributes?.friendly_name || entity.entity_id,
@@ -216,6 +224,7 @@ Item {
     }
 
     Logger.d("HomeAssistant", "Found", players.length, "media players");
+    saveCachedState();
   }
 
   function handleStateChange(data) {
@@ -223,7 +232,14 @@ Item {
       return;
 
     const newState = Object.assign({}, currentState);
-    newState[data.entity_id] = data.new_state;
+    if (data.new_state) {
+      const mergedState = Object.assign({}, data.new_state);
+      mergedState.attributes = mergePlayerAttributes(currentState, data.entity_id, data.new_state?.attributes);
+      maybeStoreVolumeOverride(data.entity_id, mergedState.attributes);
+      newState[data.entity_id] = mergedState;
+    } else {
+      newState[data.entity_id] = data.new_state;
+    }
     currentState = newState;
 
     // Update media players list if this is a new entity
@@ -248,6 +264,7 @@ Item {
                                         return p;
                                       });
     }
+    saveCachedState();
   }
 
   function callService(domain, service, entityId, serviceData) {
@@ -303,7 +320,7 @@ Item {
     callService("media_player", "media_previous_track", selectedMediaPlayer);
   }
 
-  function updateSelectedPlayerAttribute(attrName, value) {
+  function updateSelectedPlayerAttribute(attrNameOrMap, value) {
     if (!selectedMediaPlayer || !currentState)
       return;
     const playerState = currentState[selectedMediaPlayer];
@@ -313,9 +330,20 @@ Item {
     const newState = Object.assign({}, currentState);
     const newPlayerState = Object.assign({}, playerState);
     newPlayerState.attributes = Object.assign({}, playerState.attributes || {});
-    newPlayerState.attributes[attrName] = value;
+    let updates = {};
+    if (attrNameOrMap && typeof attrNameOrMap === "object") {
+      updates = attrNameOrMap;
+    } else if (typeof attrNameOrMap === "string") {
+      updates[attrNameOrMap] = value;
+    }
+    for (const key in updates) {
+      if (updates.hasOwnProperty(key)) {
+        newPlayerState.attributes[key] = updates[key];
+      }
+    }
     newState[selectedMediaPlayer] = newPlayerState;
     currentState = newState;
+    saveCachedState();
   }
 
   function setVolume(level) {
@@ -324,6 +352,9 @@ Item {
     callService("media_player", "volume_set", selectedMediaPlayer, {
                   volume_level: level
                 });
+    maybeStoreVolumeOverride(selectedMediaPlayer, {
+                               volume_level: level
+                             });
     updateSelectedPlayerAttribute("volume_level", level);
   }
 
@@ -354,6 +385,10 @@ Item {
     callService("media_player", "media_seek", selectedMediaPlayer, {
                   seek_position: position
                 });
+    updateSelectedPlayerAttribute({
+                                    "media_position": position,
+                                    "media_position_updated_at": new Date().toISOString()
+                                  });
   }
 
   function toggleShuffle() {
@@ -379,6 +414,7 @@ Item {
 
   function selectMediaPlayer(entityId) {
     selectedMediaPlayer = entityId;
+    saveCachedState();
   }
 
   function disconnect() {
@@ -402,6 +438,44 @@ Item {
     }
   }
 
+  function loadCachedStateIfAvailable() {
+    if (cacheHydrated)
+      return;
+    if (!pluginApi || !pluginApi.pluginSettings)
+      return;
+    settingsReady = true;
+    const cache = pluginApi.pluginSettings.stateCache;
+    if (cache) {
+      const cachedEntities = cache.entities || cache.currentState;
+      if (cachedEntities)
+        currentState = cachedEntities;
+      if (cache.mediaPlayers)
+        mediaPlayers = cache.mediaPlayers;
+      if (cache.selectedMediaPlayer)
+        selectedMediaPlayer = cache.selectedMediaPlayer;
+      Logger.d("HomeAssistant", "Loaded cached Home Assistant player state from settings");
+    }
+    if (pluginApi.pluginSettings.volumeOverrides)
+      volumeOverrides = pluginApi.pluginSettings.volumeOverrides;
+    cacheHydrated = true;
+  }
+
+  function saveCachedState() {
+    if (!settingsReady || !pluginApi)
+      return;
+    if (!pluginApi.pluginSettings) {
+      pluginApi.pluginSettings = {};
+    }
+    pluginApi.pluginSettings.stateCache = {
+      entities: buildCachedEntities(),
+      mediaPlayers: mediaPlayers,
+      selectedMediaPlayer: selectedMediaPlayer,
+      timestamp: Date.now()
+    };
+    pluginApi.pluginSettings.volumeOverrides = volumeOverrides || {};
+    pluginApi.saveSettings();
+  }
+
   // Auto-connect when URL/token are configured
   onHaUrlChanged: {
     if (haUrl && haToken) {
@@ -419,9 +493,98 @@ Item {
     }
   }
 
+  Connections {
+    target: pluginApi
+    function onPluginSettingsChanged() {
+      loadCachedStateIfAvailable();
+    }
+  }
+
   Component.onCompleted: {
+    loadCachedStateIfAvailable();
     if (haUrl && haToken) {
       testConnection();
     }
+  }
+
+  function hasValidAttribute(attributes, key) {
+    if (!attributes)
+      return false;
+    if (!Object.prototype.hasOwnProperty.call(attributes, key))
+      return false;
+    const value = attributes[key];
+    return value !== null && value !== undefined;
+  }
+
+  function mergePlayerAttributes(previousState, entityId, incomingAttributes) {
+    const merged = Object.assign({}, incomingAttributes || {});
+    const priorState = previousState && previousState[entityId] ? previousState[entityId] : null;
+    const priorAttributes = priorState?.attributes || {};
+    for (let i = 0; i < stickyAttributeKeys.length; i++) {
+      const key = stickyAttributeKeys[i];
+      if (!hasValidAttribute(merged, key) && hasValidAttribute(priorAttributes, key)) {
+        merged[key] = priorAttributes[key];
+      }
+    }
+    if (!hasValidAttribute(merged, "volume_level")) {
+      const override = getVolumeOverride(entityId);
+      if (override !== null && override !== undefined) {
+        merged.volume_level = override;
+      }
+    }
+    return merged;
+  }
+
+  function pickCachedAttributes(attributes) {
+    const picked = {};
+    if (!attributes)
+      return picked;
+    for (let i = 0; i < stickyAttributeKeys.length; i++) {
+      const key = stickyAttributeKeys[i];
+      if (hasValidAttribute(attributes, key)) {
+        picked[key] = attributes[key];
+      }
+    }
+    return picked;
+  }
+
+  function buildCachedEntities() {
+    const cache = {};
+    if (!currentState)
+      return cache;
+    for (const entityId in currentState) {
+      if (!Object.prototype.hasOwnProperty.call(currentState, entityId))
+        continue;
+      const entity = currentState[entityId];
+      if (!entity)
+        continue;
+      cache[entityId] = {
+        entity_id: entity.entity_id || entityId,
+        state: entity.state || "unknown",
+        attributes: pickCachedAttributes(entity.attributes || {})
+      };
+    }
+    return cache;
+  }
+
+  function getVolumeOverride(entityId) {
+    if (!volumeOverrides || !entityId)
+      return undefined;
+    return volumeOverrides[entityId];
+  }
+
+  function maybeStoreVolumeOverride(entityId, attributes) {
+    if (!entityId || !attributes)
+      return;
+    const level = attributes.volume_level;
+    if (level === null || level === undefined)
+      return;
+    if (!volumeOverrides)
+      volumeOverrides = {};
+    if (volumeOverrides[entityId] === level)
+      return;
+    const overrides = Object.assign({}, volumeOverrides);
+    overrides[entityId] = level;
+    volumeOverrides = overrides;
   }
 }
