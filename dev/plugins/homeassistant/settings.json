@@ -1,0 +1,5 @@
+{
+  "haUrl": "http://192.168.8.123:8123",
+  "haToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiI1OGZkNTJlNTZlNTk0ZjRjODk2ZWRiMDI4YjJiYjRlYyIsImlhdCI6MTc2NTk5NDU1MSwiZXhwIjoyMDgxMzU0NTUxfQ.HiHyM2zNXS_dM8JUor2QONVG706OVIRXf0JSZlDnumM",
+  "defaultMediaPlayer": "media_player.anttv"
+}
