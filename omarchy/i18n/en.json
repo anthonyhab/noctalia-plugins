@@ -1,0 +1,66 @@
+{
+  "title": "Omarchy",
+  "status": {
+    "available": "Omarchy detected",
+    "not-available": "Omarchy not found",
+    "active": "Active",
+    "inactive": "Inactive",
+    "applying": "Applying…"
+  },
+  "actions": {
+    "refresh": "Refresh",
+    "activate": "Activate",
+    "deactivate": "Deactivate",
+    "apply": "Apply current theme",
+    "open": "Open",
+    "cycle": "Cycle theme",
+    "random": "Random theme"
+  },
+  "fields": {
+    "config-dir": "Omarchy config dir",
+    "theme-set-command": "Theme-set command",
+    "theme": {
+      "label": "Theme",
+      "placeholder": "Select…",
+      "available": "Available themes"
+    },
+    "use-theme-surface": {
+      "label": "Use theme background for UI surfaces",
+      "desc": "If disabled, surfaces stay neutral and theme colors are used as accents."
+    },
+    "show-theme-name": {
+      "label": "Show theme name in bar widget",
+      "desc": "If disabled, only the Omarchy icon is shown in the bar."
+    }
+  },
+  "tooltips": {
+    "inactive": "Omarchy (inactive)\nClick to open settings",
+    "not-available": "Omarchy not available\nInstall omarchy and configure themes",
+    "active": "Theme: {theme}\nLeft: Panel | Right: Settings | Middle: Random",
+    "random-theme": "Random theme",
+    "widget-settings": "Widget settings"
+  },
+  "errors": {
+    "missing-config": "Omarchy config not found",
+    "failed-read": "Failed to read theme colors",
+    "failed-apply": "Failed to apply scheme",
+    "failed-theme-set": "Failed to switch theme",
+    "no-themes": "No themes found",
+    "theme-not-found": "Theme not found: {theme}"
+  },
+  "notices": {
+    "applied": "Omarchy scheme applied",
+    "theme-switched": "Switched to theme: {theme}",
+    "auto-applying": "Auto-applying Omarchy theme"
+  },
+  "panel": {
+    "settings-hint": "Configure Omarchy paths via Settings → Plugins → Omarchy."
+  },
+  "settings": {
+    "description": "Set how Noctalia locates Omarchy and whether its colors replace shell surfaces.",
+    "paths-hint": "Point the fields below at your Omarchy install; leave blank to use the defaults.",
+    "controls": {
+      "title": "Plugin controls"
+    }
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "id": "omarchy",
+  "name": "Omarchy Integration",
+  "version": "0.1.1",
+  "author": "habibe",
+  "description": "Sync Noctalia colors from Omarchy themes.",
+  "entryPoints": {
+    "main": "Main.qml",
+    "panel": "Panel.qml",
+    "barWidget": "BarWidget.qml",
+    "settings": "Settings.qml"
+  },
+  "metadata": {
+    "allowUserSettings": true,
+    "defaultSettings": {
+      "active": false,
+      "themeSetCommand": "",
+      "omarchyConfigDir": "",
+      "useThemeSurface": true,
+      "showThemeName": true
+    }
+  }
+}

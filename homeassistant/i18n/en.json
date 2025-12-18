@@ -1,0 +1,60 @@
+{
+  "title": "Home Assistant",
+  "status": {
+    "connected": "Connected",
+    "disconnected": "Disconnected",
+    "connecting": "Connecting..."
+  },
+  "media": {
+    "now-playing": "Now Playing",
+    "no-media": "Nothing playing",
+    "unknown-title": "Unknown",
+    "idle": "Idle",
+    "paused": "Paused",
+    "playing": "Playing"
+  },
+  "actions": {
+    "play": "Play",
+    "pause": "Pause",
+    "stop": "Stop",
+    "next": "Next",
+    "previous": "Previous",
+    "shuffle": "Shuffle",
+    "repeat-off": "Repeat: Off",
+    "repeat-all": "Repeat: All",
+    "repeat-one": "Repeat: One",
+    "mute": "Mute",
+    "unmute": "Unmute",
+    "refresh": "Refresh"
+  },
+  "settings": {
+    "description": "Connect to your Home Assistant instance to control media players.",
+    "url": "Home Assistant URL",
+    "url-placeholder": "http://homeassistant.local:8123",
+    "token": "Access Token",
+    "token-hint": "Create a Long-Lived Access Token at Profile > Security in Home Assistant.",
+    "default-player": "Default Media Player",
+    "default-player-hint": "Select the media player to control by default.",
+    "no-players": "No media players found",
+    "test-connection": "Test Connection",
+    "connection-success": "Connected successfully",
+    "connection-failed": "Connection failed"
+  },
+  "errors": {
+    "no-url": "Please configure Home Assistant URL",
+    "no-token": "Please configure access token",
+    "auth-invalid": "Invalid access token",
+    "fetch-failed": "Failed to fetch devices",
+    "service-failed": "Service call failed"
+  },
+  "tooltips": {
+    "connected": "Home Assistant\n{count} devices available",
+    "disconnected": "Home Assistant (disconnected)\nClick to configure",
+    "now-playing": "Now playing: {title}",
+    "click-hint": "Click to control",
+    "widget-settings": "Widget settings"
+  },
+  "panel": {
+    "settings-hint": "Configure connection in Settings > Plugins > Home Assistant"
+  }
+}

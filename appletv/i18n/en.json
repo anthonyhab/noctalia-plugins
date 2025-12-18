@@ -1,0 +1,26 @@
+{
+  "title": "Apple TV Direct",
+  "status": {
+    "connecting": "Connecting...",
+    "connected": "Connected",
+    "disconnected": "Disconnected"
+  },
+  "actions": {
+    "play": "Play",
+    "pause": "Pause",
+    "next": "Next",
+    "previous": "Previous",
+    "mute": "Mute",
+    "unmute": "Unmute"
+  },
+  "media": {
+    "no-media": "Nothing playing"
+  },
+  "panel": {
+    "settings-hint": "Configure helper path, identifier and credentials in plugin settings"
+  },
+  "settings": {
+    "description": "Control Apple TV devices directly via pyatv",
+    "helper-hint": "Install pyatv (pip install pyatv) and pair via atvremote"
+  }
+}
