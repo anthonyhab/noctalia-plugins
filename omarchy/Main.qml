@@ -397,8 +397,8 @@ Item {
     const baseSurface = useThemeSurface ? colors.background : colorToHex(Color.mSurface);
     const baseOnSurface = useThemeSurface ? colors.foreground : colorToHex(Color.mOnSurface);
     const isDarkMode = useThemeSurface ? (ColorsConvert.getLuminance(baseSurface) < 0.5) : (Settings.data.colorSchemes.darkMode === true);
+
     Logger.d("Omarchy", "Detected mode:", isDarkMode ? "dark" : "light");
-    Logger.d("Omarchy", "Colors available:", Object.keys(colors).join(","));
 
     // Auto-sync dark mode setting
     if (Settings.data.colorSchemes.darkMode !== isDarkMode) {
@@ -406,91 +406,67 @@ Item {
       Settings.data.colorSchemes.darkMode = isDarkMode;
     }
 
-    const mSurface = baseSurface || "#000000";
-    const baseForeground = baseOnSurface || "#ffffff";
-    const mOnSurface = ensureContrast(
-          ColorsConvert.adjustLightness(baseForeground, isDarkMode ? 6 : -6),
-          mSurface,
-          4.5,
-          4
-        );
-
-    const contrastRatio = ColorsConvert.getContrastRatio(mSurface, mOnSurface);
-    Logger.d("Omarchy", "Contrast ratio:", contrastRatio.toFixed(2) + ":1");
-
+    // Accent colors from theme
     const accents = selectBestAccentColors(colors);
     const mPrimary = accents.primary;
     const mSecondary = accents.secondary;
     const mTertiary = accents.tertiary;
-    const mError = colors.red || "#ff0000";
+    const mError = colors.red || "#f7768e";
 
-    // Generate container colors (lighter/darker variants)
+    // Base surface - use raw surface without tinting
+    const mSurface = baseSurface || (isDarkMode ? "#1a1b26" : "#ffffff");
+
+    // Use theme's brightWhite if available (closer to native's brighter text)
+    // Fall back to foreground, then to default
+    const textColor = colors.brightWhite || baseOnSurface || (isDarkMode ? "#c0caf5" : "#1a1b26");
+    const mOnSurface = ensureContrast(textColor, mSurface, 4.5, 4);
+
+    // Surface variants
+    const mSurfaceVariant = ColorsConvert.generateSurfaceVariant(mSurface, isDarkMode);
+    const mOnSurfaceVariant = ColorsConvert.generateOnSurfaceVariant(mSurface, mOnSurface, isDarkMode);
+
+    // Surface container levels
+    const mSurfaceContainerLowest = ColorsConvert.generateSurfaceLevel(mSurface, 1, isDarkMode);
+    const mSurfaceContainerLow = ColorsConvert.generateSurfaceLevel(mSurface, 2, isDarkMode);
+    const mSurfaceContainer = ColorsConvert.generateSurfaceLevel(mSurface, 3, isDarkMode);
+    const mSurfaceContainerHigh = ColorsConvert.generateSurfaceLevel(mSurface, 4, isDarkMode);
+    const mSurfaceContainerHighest = ColorsConvert.generateSurfaceLevel(mSurface, 5, isDarkMode);
+    const mSurfaceBright = ColorsConvert.generateSurfaceLevel(mSurface, 4.5, isDarkMode);
+    const mSurfaceDim = ColorsConvert.adjustLightness(mSurface, isDarkMode ? -3 : 3);
+
+    // Outline colors
+    const mOutline = ColorsConvert.generateOutline(mSurface, isDarkMode);
+    const mOutlineVariant = ColorsConvert.generateOutlineVariant(mSurface, isDarkMode);
+
+    // Shadow
+    const mShadow = ColorsConvert.generateShadow(mSurface, isDarkMode);
+
+    // "On" colors for accents - use slightly darker than surface (native uses #16161e vs surface #1a1b26)
+    const darkOnColor = ColorsConvert.adjustLightness(mSurface, -2);
+    const mOnPrimary = ColorsConvert.getContrastRatio(darkOnColor, mPrimary) >= 4.5
+      ? darkOnColor : ColorsConvert.generateOnColor(mPrimary, isDarkMode);
+    const mOnSecondary = ColorsConvert.getContrastRatio(darkOnColor, mSecondary) >= 4.5
+      ? darkOnColor : ColorsConvert.generateOnColor(mSecondary, isDarkMode);
+    const mOnTertiary = ColorsConvert.getContrastRatio(darkOnColor, mTertiary) >= 4.5
+      ? darkOnColor : ColorsConvert.generateOnColor(mTertiary, isDarkMode);
+    const mOnError = ColorsConvert.getContrastRatio(darkOnColor, mError) >= 4.5
+      ? darkOnColor : ColorsConvert.generateOnColor(mError, isDarkMode);
+
+    // Container colors
     const mPrimaryContainer = ColorsConvert.generateContainerColor(mPrimary, isDarkMode);
     const mSecondaryContainer = ColorsConvert.generateContainerColor(mSecondary, isDarkMode);
     const mTertiaryContainer = ColorsConvert.generateContainerColor(mTertiary, isDarkMode);
     const mErrorContainer = ColorsConvert.generateContainerColor(mError, isDarkMode);
 
-    // Generate "on container" colors (ensure proper contrast)
+    // On container colors
     const mOnPrimaryContainer = ColorsConvert.generateOnColor(mPrimaryContainer, isDarkMode);
     const mOnSecondaryContainer = ColorsConvert.generateOnColor(mSecondaryContainer, isDarkMode);
     const mOnTertiaryContainer = ColorsConvert.generateOnColor(mTertiaryContainer, isDarkMode);
     const mOnErrorContainer = ColorsConvert.generateOnColor(mErrorContainer, isDarkMode);
 
-    // Generate surface container variants (5 levels)
-    function surfaceTone(delta) {
-      return ColorsConvert.adjustLightness(mSurface, isDarkMode ? delta : -delta);
-    }
-
-    const surfaceVariantSeed = isDarkMode ? (colors.brightBlack || colors.black) : (colors.black || colors.brightBlack);
-    const outlineSeed = (colors.black && colors.brightBlack)
-      ? ColorsConvert.mixColors(colors.black, colors.brightBlack, 0.3)
-      : surfaceVariantSeed;
-
-    function mixSurface(weight, fallbackDelta) {
-      if (surfaceVariantSeed)
-        return ColorsConvert.mixColors(mSurface, surfaceVariantSeed, weight);
-      return surfaceTone(fallbackDelta);
-    }
-
-    const mSurfaceContainerLowest = mixSurface(isDarkMode ? 0.15 : 0.1, 4);
-    const mSurfaceContainerLow = mixSurface(isDarkMode ? 0.25 : 0.2, 8);
-    const mSurfaceContainer = mixSurface(isDarkMode ? 0.35 : 0.3, 12);
-    const mSurfaceContainerHigh = mixSurface(isDarkMode ? 0.45 : 0.4, 16);
-    const mSurfaceContainerHighest = mixSurface(isDarkMode ? 0.55 : 0.5, 20);
-
-    // Generate bright and dim surface variants
-    const mSurfaceBright = mixSurface(isDarkMode ? 0.45 : 0.35, 16);
-    const mSurfaceDim = surfaceTone(-6);
-
-    const mSurfaceVariant = mixSurface(isDarkMode ? 0.25 : 0.2, 6);
-    let mOnSurfaceVariant = ColorsConvert.adjustLightness(mOnSurface, isDarkMode ? -14 : 14);
-    if (ColorsConvert.getContrastRatio(mOnSurfaceVariant, mSurfaceVariant) < 3.0)
-      mOnSurfaceVariant = mOnSurface;
-
-    const mOutline = ensureContrast(
-          outlineSeed ? ColorsConvert.mixColors(mSurface, outlineSeed, isDarkMode ? 0.6 : 0.4)
-                      : ColorsConvert.adjustLightness(mSurfaceVariant, isDarkMode ? 10 : -10),
-          mSurface,
-          2.0,
-          3
-        );
-    const mOutlineVariant = ensureContrast(
-          outlineSeed ? ColorsConvert.mixColors(mSurface, outlineSeed, isDarkMode ? 0.45 : 0.3)
-                      : ColorsConvert.adjustLightness(mSurfaceVariant, isDarkMode ? 5 : -5),
-          mSurface,
-          1.6,
-          2
-        );
-
-    // Simple "on" colors: use surface for accent "on" colors like the old implementation
-    const onSurfaceAccent = ColorsConvert.adjustLightness(mSurface, isDarkMode ? -2 : 2);
-    const mOnPrimary = ColorsConvert.getContrastRatio(onSurfaceAccent, mPrimary) >= 4.5 ? onSurfaceAccent : ColorsConvert.generateOnColor(mPrimary, isDarkMode);
-    const mOnSecondary = ColorsConvert.getContrastRatio(onSurfaceAccent, mSecondary) >= 4.5 ? onSurfaceAccent : ColorsConvert.generateOnColor(mSecondary, isDarkMode);
-    const mOnTertiary = ColorsConvert.getContrastRatio(onSurfaceAccent, mTertiary) >= 4.5 ? onSurfaceAccent : ColorsConvert.generateOnColor(mTertiary, isDarkMode);
-    const mOnError = ColorsConvert.getContrastRatio(onSurfaceAccent, mError) >= 4.5 ? onSurfaceAccent : ColorsConvert.generateOnColor(mError, isDarkMode);
-
+    // Hover colors
     const mHover = mTertiary;
-    const mOnHover = ColorsConvert.adjustLightness(mSurface, isDarkMode ? -2 : 2);
+    const mOnHover = ColorsConvert.generateOnColor(mHover, isDarkMode);
 
     const palette = {
       "mPrimary": mPrimary,
@@ -524,19 +500,17 @@ Item {
       "mSurfaceDim": mSurfaceDim,
       "mOutline": mOutline,
       "mOutlineVariant": mOutlineVariant,
-      "mShadow": "#000000",
+      "mShadow": mShadow,
       "mHover": mHover,
       "mOnHover": mOnHover
     };
 
-    // Return palette plus mode info so we can wrap it for Noctalia's expectations
     return {
       "mode": isDarkMode ? "dark" : "light",
       "palette": palette
     };
   }
 
-  // Note: removed buildScheme - now using generateScheme directly which generates a single mode-appropriate scheme
   function writeSchemeFile(result) {
     const mode = result?.mode;
     const scheme = result?.palette;
@@ -551,12 +525,13 @@ Item {
       return;
     }
 
-    // Wrap scheme in dark/light structure so TemplateProcessor can treat it like predefined schemes
-    const wrappedScheme = mode === "dark" ? {
-                                              "dark": scheme
-                                            } : {
+    // Include both dark and light keys (native schemes have both)
+    // Use the generated scheme for the active mode, copy it for the other mode as fallback
+    const wrappedScheme = {
+      "dark": scheme,
       "light": scheme
     };
+
     const jsonContent = JSON.stringify(wrappedScheme, null, 2);
     Logger.d("Omarchy", "Writing scheme JSON, length:", jsonContent.length);
     const dirEsc = schemeOutputDir.replace(/'/g, "'\\''");
