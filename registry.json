@@ -23,39 +23,5 @@
       "license": "MIT",
       "lastUpdated": "2025-12-17T23:50:00Z"
     }
-    ,
-    {
-      "id": "appletv",
-      "name": "Apple TV Direct",
-      "version": "0.1.10",
-      "author": "habibe",
-      "description": "Direct Apple TV/HomePod controls powered by pyatv",
-      "repository": "https://github.com/habibe/noctalia-shell",
-      "minNoctaliaVersion": "3.6.0",
-      "license": "MIT",
-      "lastUpdated": "2025-12-20T00:22:31Z"
-    },
-    {
-      "id": "waybar-update",
-      "name": "Waybar Update",
-      "version": "1.0.0",
-      "author": "waybar-converter",
-      "description": "Converted from Waybar custom/update module - checks for Omarchy updates",
-      "repository": "https://github.com/habibe/bibe-plugins",
-      "minNoctaliaVersion": "3.6.0",
-      "license": "MIT",
-      "lastUpdated": "2025-12-18T09:06:00Z"
-    },
-    {
-      "id": "waybar-screenrecording-indicator",
-      "name": "Waybar Screen Recording Indicator",
-      "version": "1.0.0",
-      "author": "waybar-converter",
-      "description": "Converted from Waybar custom/screenrecording-indicator module - shows recording status",
-      "repository": "https://github.com/habibe/bibe-plugins",
-      "minNoctaliaVersion": "3.6.0",
-      "license": "MIT",
-      "lastUpdated": "2025-12-18T09:06:00Z"
-    }
   ]
 }
