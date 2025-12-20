@@ -27,13 +27,13 @@
     {
       "id": "appletv",
       "name": "Apple TV Direct",
-      "version": "0.1.0",
+      "version": "0.1.10",
       "author": "habibe",
       "description": "Direct Apple TV/HomePod controls powered by pyatv",
       "repository": "https://github.com/habibe/noctalia-shell",
       "minNoctaliaVersion": "3.6.0",
       "license": "MIT",
-      "lastUpdated": "2025-12-18T23:50:00Z"
+      "lastUpdated": "2025-12-20T00:22:31Z"
     },
     {
       "id": "waybar-update",

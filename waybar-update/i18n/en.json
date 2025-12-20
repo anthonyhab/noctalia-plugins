@@ -1,8 +1,0 @@
-{
-  "title": "Waybar Update",
-  "description": "Converted from Waybar custom/update",
-  "settings": {
-    "textCommand": "Text Command",
-    "interval": "Update Interval"
-  }
-}

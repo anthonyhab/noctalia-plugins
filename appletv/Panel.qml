@@ -10,6 +10,10 @@ Item {
   property var pluginApi: null
   property var screen: null
 
+  readonly property bool allowAttach: true
+  readonly property int contentPreferredWidth: Math.round(340 * Style.uiScaleRatio)
+  readonly property int contentPreferredHeight: Math.round(500 * Style.uiScaleRatio)
+
   readonly property var pluginMain: pluginApi?.mainInstance
 
   readonly property bool connected: pluginMain?.connected || false
@@ -106,7 +110,7 @@ Item {
 
           NText {
             Layout.fillWidth: true
-            text: pluginMain?.mediaTitle || (pluginApi?.tr("media.no-media") || "Nothing playing")
+            text: pluginMain?.displayTitle || (pluginApi?.tr("media.no-media") || "Nothing playing")
             font.weight: Style.fontWeightBold
             pointSize: Style.fontSizeM
             color: Color.mOnSurface

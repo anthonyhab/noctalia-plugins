@@ -1,0 +1,6 @@
+.DS_Store
+**/__pycache__/
+*.pyc
+appletv/helper/.venv/
+appletv/settings.json
+homeassistant/settings.json

@@ -27,16 +27,20 @@ state refreshes and transport controls.
    atvremote --id <identifier> pair
    ```
    Copy the generated credentials strings for the protocols you paired
-   (MRP is required, Companion/AirPlay optional) into the plugin settings.
+   (Companion recommended, AirPlay optional) into the plugin settings.
 3. Ensure the helper script is executable (`chmod +x helper/appletv_helper.py`).
 
 ## Configuration
 
 Open *Settings → Plugins → Apple TV Direct* and fill out:
 
+- **Quick setup** – run “Scan for devices” to auto-fill device identifier,
+  name, and IP address before entering credentials.
 - **Display name** – label shown in UI.
 - **Device identifier / IP / name** – at least one is required so the helper can
   discover the device.
+- **Pairing** – enter the on-screen PIN and pair Companion (recommended) or
+  optional AirPlay credentials directly in Settings.
 - **uv executable** – usually `uv`; used to run the helper in an isolated
   environment. Disable this if you prefer to call a specific Python interpreter
   and manage dependencies manually.

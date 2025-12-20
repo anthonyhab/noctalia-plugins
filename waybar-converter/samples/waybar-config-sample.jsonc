@@ -1,0 +1,83 @@
+{
+  // Sample Waybar configuration for testing the converter
+  // This demonstrates various custom module patterns
+
+  "layer": "top",
+  "position": "top",
+  "modules-left": ["custom/media", "custom/weather"],
+  "modules-center": ["custom/spotify"],
+  "modules-right": ["custom/updates", "custom/power-menu"],
+
+  // Simple polling module with plain text output
+  "custom/updates": {
+    "exec": "checkupdates | wc -l",
+    "interval": 3600,
+    "format": "{} updates",
+    "on-click": "kitty -e sudo pacman -Syu",
+    "tooltip": true
+  },
+
+  // JSON output module with tooltip
+  "custom/weather": {
+    "exec": "~/.config/waybar/scripts/weather.sh",
+    "return-type": "json",
+    "interval": 1800,
+    "format": "{text}",
+    "on-click": "xdg-open 'https://weather.com'"
+  },
+
+  // Streaming/continuous module (no interval)
+  "custom/spotify": {
+    "exec": "playerctl metadata --format '{\"text\": \"{{artist}} - {{title}}\", \"tooltip\": \"{{album}}\", \"class\": \"{{status}}\"}' --follow",
+    "return-type": "json",
+    "max-length": 40,
+    "on-click": "playerctl play-pause",
+    "on-click-right": "playerctl next",
+    "on-scroll-up": "playerctl volume 0.05+",
+    "on-scroll-down": "playerctl volume 0.05-"
+  },
+
+  // Module with format-icons based on percentage
+  "custom/battery-external": {
+    "exec": "~/.config/waybar/scripts/battery-external.sh",
+    "return-type": "json",
+    "interval": 30,
+    "format": "{icon} {text}",
+    "format-icons": ["", "", "", "", ""],
+    "on-click": "notify-send 'Battery Status' \"$(cat /sys/class/power_supply/BAT1/status)\""
+  },
+
+  // Simple module with multiple click handlers
+  "custom/power-menu": {
+    "format": "",
+    "on-click": "wlogout",
+    "on-click-right": "systemctl suspend",
+    "on-click-middle": "systemctl hibernate",
+    "tooltip": false
+  },
+
+  // Module with exec-if conditional
+  "custom/vpn": {
+    "exec": "echo 'VPN Active'",
+    "exec-if": "pgrep -x openvpn",
+    "interval": 5,
+    "format": " {}",
+    "on-click": "sudo systemctl stop openvpn"
+  },
+
+  // Streaming module with restart-interval
+  "custom/media": {
+    "exec": "~/.config/waybar/scripts/media-monitor.sh",
+    "return-type": "json",
+    "restart-interval": 3,
+    "on-click": "playerctl play-pause"
+  },
+
+  // Module using signal for updates
+  "custom/recorder": {
+    "exec": "~/.config/waybar/scripts/recorder-status.sh",
+    "return-type": "json",
+    "signal": 8,
+    "on-click": "~/.config/waybar/scripts/toggle-recorder.sh"
+  }
+}

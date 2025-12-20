@@ -1,7 +1,7 @@
 {
   "id": "appletv",
   "name": "Apple TV Direct",
-  "version": "0.1.0",
+  "version": "0.1.10",
   "minNoctaliaVersion": "3.6.0",
   "author": "habibe",
   "license": "MIT",
@@ -26,7 +26,6 @@
       "uvPath": "uv",
       "pythonPath": "python3",
       "helperScriptPath": "",
-      "mrpCredentials": "",
       "companionCredentials": "",
       "airplayCredentials": "",
       "pollInterval": 5000,

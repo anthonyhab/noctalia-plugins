@@ -55,9 +55,7 @@ Item {
     if (!isAvailable)
       return pluginApi?.tr("tooltips.not-available") || "Omarchy not available\nInstall omarchy and configure themes";
     const currentTheme = pluginMain?.themeName || "";
-    return pluginApi?.tr("tooltips.active", {
-                           "theme": currentTheme
-                         }) || ("Theme: " + currentTheme);
+    return pluginApi?.tr("tooltips.active", { "theme": currentTheme }) || ("Theme: " + currentTheme);
   }
   readonly property var palette: typeof Color !== "undefined" ? Color : null
   readonly property color fallbackSurfaceLow: "#1f1f1f"

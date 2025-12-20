@@ -3,7 +3,8 @@
   "status": {
     "connecting": "Connecting...",
     "connected": "Connected",
-    "disconnected": "Disconnected"
+    "disconnected": "Disconnected",
+    "connected-to": "Connected: {title}"
   },
   "actions": {
     "play": "Play",
@@ -11,16 +12,82 @@
     "next": "Next",
     "previous": "Previous",
     "mute": "Mute",
-    "unmute": "Unmute"
+    "unmute": "Unmute",
+    "refresh": "Refresh"
+  },
+  "tooltips": {
+    "widget-settings": "Widget settings"
+  },
+  "errors": {
+    "not-configured": "Helper not configured",
+    "command-failed": "Helper command failed",
+    "helper-failed": "Helper failed",
+    "scan-failed": "Scan failed",
+    "pair-failed": "Pairing failed",
+    "pair-pin-missing": "Pairing pin is required.",
+    "uv-missing": "Set uv path or disable uv usage.",
+    "python-missing": "Set python path and helper script first."
   },
   "media": {
-    "no-media": "Nothing playing"
+    "no-media": "Nothing playing",
+    "playing": "Playing"
   },
   "panel": {
     "settings-hint": "Configure helper path, identifier and credentials in plugin settings"
   },
   "settings": {
-    "description": "Control Apple TV devices directly via pyatv",
-    "helper-hint": "Install pyatv (pip install pyatv) and pair via atvremote"
+    "description": "Control Apple TV devices directly via pyatv.",
+    "helper-hint": "Install uv (https://github.com/astral-sh/uv) once, then Noctalia will automatically manage the helper environment and pyatv dependency.",
+    "use-uv": "Use uv helper runtime (recommended)",
+    "uv-executable": "uv executable",
+    "uv-executable.placeholder": "uv",
+    "display-name": "Display name",
+    "display-name.placeholder": "Living Room Apple TV",
+    "device-identifier": "Device identifier",
+    "device-identifier.placeholder": "0x0000000000000000",
+    "device-address": "Device IP address",
+    "device-address.placeholder": "192.168.1.50",
+    "device-name": "Device name",
+    "device-name.placeholder": "Apple TV",
+    "python-executable": "Python executable",
+    "python-executable.placeholder": "python3",
+    "helper-script-path": "Helper script path",
+    "companion-credentials": "Companion credentials",
+    "airplay-credentials": "AirPlay credentials",
+    "optional": "Optional",
+    "polling-interval": "Polling interval (ms)",
+    "scan-timeout": "Scan timeout (s)",
+    "test-helper": "Test helper",
+    "section": {
+      "connection": "Connection",
+      "connection-hint": "Helper runtime and advanced options.",
+      "device": "Device",
+      "device-hint": "Scan to find devices or enter details manually.",
+      "credentials": "Credentials",
+      "credentials-hint": "Companion is recommended. AirPlay is optional.",
+      "advanced": "Advanced"
+    },
+    "scan": {
+      "label": "Scan for devices",
+      "in-progress": "Scanning...",
+      "no-devices": "No devices found",
+      "found": "Found {count} devices",
+      "apply": "Use selected device"
+    },
+    "pair": {
+      "title": "Pairing",
+      "hint": "Enter the PIN shown on your Apple TV and pair the selected protocol.",
+      "start": "Start pairing",
+      "submit": "Submit PIN",
+      "in-progress": "Pairing...",
+      "waiting": "Waiting for PIN...",
+      "success": "Pairing complete. Credentials saved.",
+      "pin": "Pairing PIN",
+      "pin.placeholder": "1234",
+      "protocol": {
+        "companion": "Companion (recommended)",
+        "airplay": "AirPlay (optional)"
+      }
+    }
   }
 }

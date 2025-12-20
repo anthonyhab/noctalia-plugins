@@ -21,14 +21,19 @@ Item {
   property int sectionWidgetsCount: 0
   property real scaling: 1.0
 
+  readonly property string barPosition: Settings.data.bar.position
+  readonly property bool isBarVertical: barPosition === "left" || barPosition === "right"
+
   readonly property var pluginMain: pluginApi?.mainInstance
   readonly property bool connected: pluginMain?.connected || false
   readonly property bool connecting: pluginMain?.connecting || false
 
   readonly property string pillText: {
+    if (isBarVertical)
+      return "";
     if (!connected)
       return pluginApi?.tr("title") || "Apple TV";
-    const title = pluginMain?.mediaTitle || "";
+    const title = pluginMain?.displayTitle || "";
     if (title)
       return title;
     return pluginMain?.deviceLabel || (pluginApi?.tr("title") || "Apple TV");
@@ -115,6 +120,9 @@ Item {
     return null;
   }
 
+  implicitWidth: pill.width
+  implicitHeight: pill.height
+
   BarPill {
     id: pill
     screen: root.screen
@@ -123,6 +131,8 @@ Item {
     icon: iconName
     text: pillText
     tooltipText: connected ? pillText : (pluginApi?.tr("status.disconnected") || "Not connected")
+    forceOpen: !isBarVertical && connected && pillText !== ""
+    forceClose: isBarVertical || pillText === ""
     onClicked: openPanel()
     onMiddleClicked: pluginMain?.togglePlayPause()
     onRightClicked: {

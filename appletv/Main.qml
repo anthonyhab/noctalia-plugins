@@ -18,7 +18,6 @@ Item {
   readonly property string deviceAddress: pluginApi?.pluginSettings?.deviceAddress || ""
   readonly property string deviceName: pluginApi?.pluginSettings?.deviceName || ""
   readonly property string deviceLabel: pluginApi?.pluginSettings?.displayName || deviceName || deviceIdentifier || "Apple TV"
-  readonly property string mrpCredentials: pluginApi?.pluginSettings?.mrpCredentials || ""
   readonly property string companionCredentials: pluginApi?.pluginSettings?.companionCredentials || ""
   readonly property string airplayCredentials: pluginApi?.pluginSettings?.airplayCredentials || ""
   readonly property int pollInterval: Math.max(2000, pluginApi?.pluginSettings?.pollInterval || 5000)
@@ -46,6 +45,15 @@ Item {
 
   readonly property bool isPlaying: playbackState === "playing"
   readonly property bool isPaused: playbackState === "paused"
+  readonly property string displayTitle: {
+    if (mediaTitle !== "")
+      return mediaTitle;
+    if (nowPlayingApp !== "")
+      return nowPlayingApp;
+    if (isPlaying)
+      return pluginApi?.tr("media.playing") || "Playing";
+    return "";
+  }
 
   property var volumeOverrides: ({})
   property string selectedDeviceKey: deviceIdentifier || deviceAddress || deviceName || ""
@@ -138,7 +146,7 @@ Item {
 
   function buildBaseHelperArgs() {
     if (useUvHelper && helperProjectDir) {
-      return [uvPath, "run", "--project", helperProjectDir, "appletv-helper"];
+      return [uvPath, "run", "--project", helperProjectDir, "--", "python", bundledHelperScript];
     }
     return [pythonPath || "python3", helperScriptPath || bundledHelperScript];
   }
@@ -152,8 +160,6 @@ Item {
       args.push("--address", deviceAddress);
     if (deviceName)
       args.push("--name", deviceName);
-    if (mrpCredentials)
-      args.push("--mrp-credentials", mrpCredentials);
     if (companionCredentials)
       args.push("--companion-credentials", companionCredentials);
     if (airplayCredentials)
@@ -187,7 +193,7 @@ Item {
       }
       const success = payload && payload.hasOwnProperty("success") ? payload.success : exitCode === 0;
       if (!success) {
-        connectionError = payload?.error || err || "Helper command failed";
+        connectionError = payload?.error || err || (pluginApi?.tr("errors.command-failed") || "Helper command failed");
         Logger.e("AppleTV", "Helper command failed", command, connectionError);
       } else {
         connectionError = "";
