@@ -76,7 +76,7 @@ Item {
   ColumnLayout {
     anchors.fill: parent
     anchors.margins: Style.marginM
-    spacing: Style.marginS
+    spacing: Style.marginM
 
     // Header
     NBox {
@@ -125,8 +125,8 @@ Item {
 
       ColumnLayout {
         anchors.fill: parent
-        anchors.margins: Style.marginS
-        spacing: Style.marginS
+        anchors.margins: Style.marginM
+        spacing: Style.marginM
 
         // Album art
         Rectangle {
@@ -164,6 +164,7 @@ Item {
         // Track info
         ColumnLayout {
           Layout.fillWidth: true
+          Layout.topMargin: Style.marginS
           spacing: Style.marginXS
 
           NText {
@@ -201,6 +202,7 @@ Item {
         // Progress bar
         ColumnLayout {
           Layout.fillWidth: true
+          Layout.topMargin: Style.marginS
           spacing: Style.marginXS
           visible: mediaDuration > 0
 
@@ -244,7 +246,8 @@ Item {
         RowLayout {
           Layout.fillWidth: true
           Layout.alignment: Qt.AlignHCenter
-          spacing: Style.marginM
+          Layout.topMargin: Style.marginS
+          spacing: Style.marginS
 
           NIconButton {
             icon: "arrows-shuffle"
@@ -302,10 +305,16 @@ Item {
           }
         }
 
+        // Spacer to push volume and device selector to bottom
+        Item {
+          Layout.fillHeight: true
+          Layout.fillWidth: true
+        }
+
         // Volume control
         RowLayout {
           Layout.fillWidth: true
-          spacing: Style.marginS
+          spacing: Style.marginM
 
           NIconButton {
             icon: isVolumeMuted ? "volume-off" : (volumeLevel > 0.5 ? "volume" : "volume-2")
