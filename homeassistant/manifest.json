@@ -20,7 +20,10 @@
     "defaultSettings": {
       "haUrl": "",
       "haToken": "",
-      "defaultMediaPlayer": ""
+      "defaultMediaPlayer": "",
+      "barWidgetMaxWidth": 200,
+      "barWidgetUseFixedWidth": false,
+      "barWidgetScrollingMode": "hover"
     }
   }
 }

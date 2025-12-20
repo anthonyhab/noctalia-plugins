@@ -38,7 +38,30 @@
     "no-players": "No media players found",
     "test-connection": "Test Connection",
     "connection-success": "Connected successfully",
-    "connection-failed": "Connection failed"
+    "connection-failed": "Connection failed",
+    "bar-widget": {
+      "title": "Bar widget",
+      "description": "Adjust how the bar widget displays long titles.",
+      "max-width": {
+        "label": "Maximum width",
+        "description": "Sets the maximum horizontal size of the widget. The widget will shrink to fit shorter content."
+      },
+      "use-fixed-width": {
+        "label": "Use fixed width",
+        "description": "When enabled, the widget will always use the maximum width instead of dynamically adjusting to content."
+      },
+      "scrolling-mode": {
+        "label": "Scrolling mode",
+        "description": "Control when text scrolling is enabled for long titles."
+      }
+    }
+  },
+  "options": {
+    "scrolling-modes": {
+      "always": "Always scroll",
+      "hover": "Scroll on hover",
+      "never": "Never scroll"
+    }
   },
   "errors": {
     "no-url": "Please configure Home Assistant URL",

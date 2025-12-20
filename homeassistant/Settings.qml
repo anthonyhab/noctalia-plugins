@@ -19,6 +19,9 @@ ColumnLayout {
   property string valueHaUrl: pluginApi?.pluginSettings?.haUrl || pluginApi?.manifest?.metadata?.defaultSettings?.haUrl || ""
   property string valueHaToken: pluginApi?.pluginSettings?.haToken || pluginApi?.manifest?.metadata?.defaultSettings?.haToken || ""
   property string valueDefaultMediaPlayer: pluginApi?.pluginSettings?.defaultMediaPlayer || pluginApi?.manifest?.metadata?.defaultSettings?.defaultMediaPlayer || ""
+  property string valueBarWidgetMaxWidth: (pluginApi?.pluginSettings?.barWidgetMaxWidth ?? pluginApi?.manifest?.metadata?.defaultSettings?.barWidgetMaxWidth ?? 200).toString()
+  property bool valueBarWidgetUseFixedWidth: pluginApi?.pluginSettings?.barWidgetUseFixedWidth ?? pluginApi?.manifest?.metadata?.defaultSettings?.barWidgetUseFixedWidth ?? false
+  property string valueBarWidgetScrollingMode: pluginApi?.pluginSettings?.barWidgetScrollingMode || pluginApi?.manifest?.metadata?.defaultSettings?.barWidgetScrollingMode || "hover"
   property bool testingConnection: false
   property string testResult: ""
   property bool testSuccess: true
@@ -40,6 +43,9 @@ ColumnLayout {
     pluginApi.pluginSettings.haUrl = root.valueHaUrl.trim().replace(/\/+$/, ""); // Remove trailing slashes
     pluginApi.pluginSettings.haToken = root.valueHaToken.trim();
     pluginApi.pluginSettings.defaultMediaPlayer = root.valueDefaultMediaPlayer;
+    pluginApi.pluginSettings.barWidgetMaxWidth = parseInt(root.valueBarWidgetMaxWidth, 10) || pluginApi?.manifest?.metadata?.defaultSettings?.barWidgetMaxWidth || 200;
+    pluginApi.pluginSettings.barWidgetUseFixedWidth = root.valueBarWidgetUseFixedWidth;
+    pluginApi.pluginSettings.barWidgetScrollingMode = root.valueBarWidgetScrollingMode;
 
     // Save to disk
     pluginApi.saveSettings();
@@ -190,6 +196,61 @@ ColumnLayout {
     onSelected: key => {
                   root.valueDefaultMediaPlayer = key;
                 }
+  }
+
+  NDivider {
+    Layout.fillWidth: true
+  }
+
+  NText {
+    text: pluginApi?.tr("settings.bar-widget.title") || "Bar widget"
+    color: Color.mOnSurface
+    pointSize: Style.fontSizeM
+    font.weight: Style.fontWeightMedium
+  }
+
+  NText {
+    text: pluginApi?.tr("settings.bar-widget.description") || "Adjust how the bar widget displays long titles."
+    wrapMode: Text.WordWrap
+    color: Color.mOnSurfaceVariant
+    pointSize: Style.fontSizeS
+  }
+
+  NTextInput {
+    label: pluginApi?.tr("settings.bar-widget.max-width.label") || "Maximum width"
+    description: pluginApi?.tr("settings.bar-widget.max-width.description") || "Sets the maximum horizontal size of the widget. The widget will shrink to fit shorter content."
+    placeholderText: pluginApi?.manifest?.metadata?.defaultSettings?.barWidgetMaxWidth?.toString() || "200"
+    text: root.valueBarWidgetMaxWidth
+    inputItem.inputMethodHints: Qt.ImhDigitsOnly
+    onTextChanged: root.valueBarWidgetMaxWidth = text
+  }
+
+  NToggle {
+    label: pluginApi?.tr("settings.bar-widget.use-fixed-width.label") || "Use fixed width"
+    description: pluginApi?.tr("settings.bar-widget.use-fixed-width.description") || "When enabled, the widget will always use the maximum width instead of dynamically adjusting to content."
+    checked: root.valueBarWidgetUseFixedWidth
+    onToggled: checked => root.valueBarWidgetUseFixedWidth = checked
+  }
+
+  NComboBox {
+    label: pluginApi?.tr("settings.bar-widget.scrolling-mode.label") || "Scrolling mode"
+    description: pluginApi?.tr("settings.bar-widget.scrolling-mode.description") || "Control when text scrolling is enabled for long titles."
+    model: [
+      {
+        "key": "always",
+        "name": pluginApi?.tr("options.scrolling-modes.always") || "Always scroll"
+      },
+      {
+        "key": "hover",
+        "name": pluginApi?.tr("options.scrolling-modes.hover") || "Scroll on hover"
+      },
+      {
+        "key": "never",
+        "name": pluginApi?.tr("options.scrolling-modes.never") || "Never scroll"
+      }
+    ]
+    currentKey: root.valueBarWidgetScrollingMode
+    onSelected: key => root.valueBarWidgetScrollingMode = key
   }
 
   Item {

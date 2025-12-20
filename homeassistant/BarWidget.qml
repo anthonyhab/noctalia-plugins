@@ -75,6 +75,18 @@ Item {
                          }) || "Home Assistant\n" + (pluginMain?.mediaPlayers?.length || 0) + " devices available";
   }
 
+  readonly property var defaultSettings: pluginApi?.manifest?.metadata?.defaultSettings || ({})
+  readonly property int maxWidthSetting: {
+    const settingValue = pluginApi?.pluginSettings?.barWidgetMaxWidth;
+    const fallbackValue = defaultSettings.barWidgetMaxWidth;
+    const value = settingValue !== undefined ? settingValue : fallbackValue;
+    return value !== undefined ? value : 200;
+  }
+  readonly property bool useFixedWidth: pluginApi?.pluginSettings?.barWidgetUseFixedWidth !== undefined
+                                       ? pluginApi?.pluginSettings?.barWidgetUseFixedWidth
+                                       : (defaultSettings.barWidgetUseFixedWidth || false)
+  readonly property string scrollingMode: pluginApi?.pluginSettings?.barWidgetScrollingMode || defaultSettings.barWidgetScrollingMode || "hover"
+
   NPopupContextMenu {
     id: contextMenu
 
@@ -141,8 +153,47 @@ Item {
 
   property var settingsPopupComponent: null
 
-  implicitWidth: pill.width
-  implicitHeight: pill.height
+  readonly property real capsuleHeight: Style.capsuleHeight
+  readonly property real iconSize: {
+    switch (Settings.data.bar.density) {
+    case "compact":
+      return Math.max(1, Math.round(capsuleHeight * 0.65));
+    default:
+      return Math.max(1, Math.round(capsuleHeight * 0.48));
+    }
+  }
+  readonly property real textSize: {
+    switch (Settings.data.bar.density) {
+    case "compact":
+      return Math.max(1, Math.round(capsuleHeight * 0.45));
+    default:
+      return Math.max(1, Math.round(capsuleHeight * 0.33));
+    }
+  }
+  readonly property bool showText: !isBarVertical && pillText !== ""
+  property bool hovered: false
+
+  function calculateContentWidth() {
+    if (!showText) {
+      return capsuleHeight;
+    }
+    var contentWidth = capsuleHeight;
+    contentWidth += Style.marginS * 3;
+    contentWidth += Math.ceil(fullTitleMetrics.contentWidth || 0);
+    contentWidth += Style.marginXXS * 2;
+    return Math.ceil(contentWidth);
+  }
+
+  readonly property real dynamicWidth: {
+    if (!showText)
+      return capsuleHeight;
+    if (useFixedWidth)
+      return maxWidthSetting;
+    return Math.min(calculateContentWidth(), maxWidthSetting);
+  }
+
+  implicitWidth: dynamicWidth
+  implicitHeight: capsuleHeight
 
   function popupWindow() {
     if (!screen)
@@ -150,46 +201,218 @@ Item {
     return PanelService.getPopupMenuWindow(screen);
   }
 
-  BarPill {
+  TextMetrics {
+    id: fullTitleMetrics
+    font.family: Settings.data.ui.fontFixed
+    font.weight: Style.fontWeightBold
+    font.pointSize: textSize * Settings.data.ui.fontFixedScale
+    text: pillText
+  }
+
+  Rectangle {
     id: pill
 
-    screen: root.screen
-    density: Settings.data.bar.density
-    oppositeDirection: BarService.getPillDirection(root)
-    icon: iconName
-    text: pillText
-    tooltipText: root.tooltipText
-    forceOpen: !isBarVertical && isConnected && pillText !== ""
-    forceClose: !isConnected && pillText === ""
-    customBackgroundColor: pillBackgroundColor
-    customTextIconColor: pillTextIconColor
-    onClicked: {
-      TooltipService.hide();
-      openPanel();
-    }
-    onRightClicked: {
-      TooltipService.hide();
-      var popupMenuWindow = popupWindow();
-      if (popupMenuWindow) {
-        popupMenuWindow.showContextMenu(contextMenu);
-        contextMenu.openAtItem(pill, screen);
+    width: dynamicWidth
+    height: capsuleHeight
+    radius: Style.radiusM
+    color: hovered ? Color.mHover : (pillBackgroundColor.a > 0 ? pillBackgroundColor : Style.capsuleColor)
+    border.color: Style.capsuleBorderColor
+    border.width: Style.capsuleBorderWidth
+
+    Behavior on color {
+      ColorAnimation {
+        duration: Style.animationFast
+        easing.type: Easing.InOutQuad
       }
     }
-    onMiddleClicked: {
-      TooltipService.hide();
-      pluginMain?.mediaPlayPause();
+
+    Rectangle {
+      id: iconCircle
+      width: capsuleHeight
+      height: capsuleHeight
+      radius: Math.min(Style.radiusL, width / 2)
+      color: Color.transparent
+      anchors.verticalCenter: parent.verticalCenter
+      x: BarService.getPillDirection(root) ? 0 : (parent.width - width)
+
+      NIcon {
+        icon: iconName
+        pointSize: iconSize
+        applyUiScale: false
+        color: hovered ? Color.mOnHover : (pillTextIconColor.a > 0 ? pillTextIconColor : Color.mOnSurface)
+        x: (iconCircle.width - width) / 2
+        y: (iconCircle.height - height) / 2 + (height - contentHeight) / 2
+      }
     }
-    onWheel: delta => {
-               TooltipService.hide();
-               if (!isConnected)
-               return;
-               // delta > 0 means scroll up (volume up), delta < 0 means scroll down (volume down)
-               if (delta > 0) {
-                 pluginMain?.volumeUp();
-               } else {
-                 pluginMain?.volumeDown();
+
+    Item {
+      id: titleContainer
+      width: Math.max(0, pill.width - capsuleHeight - (Style.marginS * 3))
+      height: textSize
+      visible: showText
+      clip: true
+      anchors.verticalCenter: parent.verticalCenter
+      x: BarService.getPillDirection(root) ? (capsuleHeight + Style.marginS) : Style.marginS
+
+      property bool isScrolling: false
+      property bool isResetting: false
+      property real textWidth: Math.ceil(fullTitleMetrics.contentWidth || 0)
+      property real containerWidth: width
+      property bool needsScrolling: textWidth > containerWidth
+
+      Timer {
+        id: scrollStartTimer
+        interval: 1000
+        repeat: false
+        onTriggered: {
+          if (scrollingMode === "always" && titleContainer.needsScrolling) {
+            titleContainer.isScrolling = true;
+            titleContainer.isResetting = false;
+          }
+        }
+      }
+
+      property var updateScrollingState: function () {
+        if (scrollingMode === "never") {
+          isScrolling = false;
+          isResetting = false;
+        } else if (scrollingMode === "always") {
+          if (needsScrolling) {
+            if (mouseArea.containsMouse) {
+              isScrolling = false;
+              isResetting = true;
+            } else {
+              scrollStartTimer.restart();
+            }
+          } else {
+            scrollStartTimer.stop();
+            isScrolling = false;
+            isResetting = false;
+          }
+        } else if (scrollingMode === "hover") {
+          if (mouseArea.containsMouse && needsScrolling) {
+            isScrolling = true;
+            isResetting = false;
+          } else {
+            isScrolling = false;
+            if (needsScrolling) {
+              isResetting = true;
+            }
+          }
+        }
+      }
+
+      onWidthChanged: updateScrollingState()
+      Component.onCompleted: updateScrollingState()
+
+      Connections {
+        target: mouseArea
+        function onContainsMouseChanged() {
+          titleContainer.updateScrollingState();
+        }
+      }
+
+      Item {
+        id: scrollContainer
+        height: parent.height
+        width: childrenRect.width
+
+        property real scrollX: 0
+        x: scrollX
+
+        RowLayout {
+          spacing: 50
+
+          NText {
+            id: titleText
+            text: pillText
+            pointSize: textSize
+            applyUiScale: false
+            font.weight: Style.fontWeightBold
+            verticalAlignment: Text.AlignVCenter
+            color: hovered ? Color.mOnHover : (pillTextIconColor.a > 0 ? pillTextIconColor : Color.mOnSurface)
+            onTextChanged: {
+              if (scrollingMode === "always") {
+                titleContainer.isScrolling = false;
+                titleContainer.isResetting = false;
+                scrollContainer.scrollX = 0;
+                scrollStartTimer.restart();
+              }
+            }
+          }
+
+          NText {
+            text: pillText
+            font: titleText.font
+            pointSize: textSize
+            applyUiScale: false
+            verticalAlignment: Text.AlignVCenter
+            color: hovered ? Color.mOnHover : (pillTextIconColor.a > 0 ? pillTextIconColor : Color.mOnSurface)
+            visible: titleContainer.needsScrolling && titleContainer.isScrolling
+          }
+        }
+
+        NumberAnimation on scrollX {
+          running: titleContainer.isResetting
+          to: 0
+          duration: 300
+          easing.type: Easing.OutQuad
+          onFinished: {
+            titleContainer.isResetting = false;
+          }
+        }
+
+        NumberAnimation on scrollX {
+          id: infiniteScroll
+          running: titleContainer.isScrolling && !titleContainer.isResetting
+          from: 0
+          to: -(titleContainer.textWidth + 50)
+          duration: Math.max(4000, pillText.length * 100)
+          loops: Animation.Infinite
+          easing.type: Easing.Linear
+        }
+      }
+    }
+
+    MouseArea {
+      id: mouseArea
+      anchors.fill: parent
+      hoverEnabled: true
+      acceptedButtons: Qt.LeftButton | Qt.RightButton | Qt.MiddleButton
+      cursorShape: Qt.PointingHandCursor
+      onEntered: {
+        hovered = true;
+        TooltipService.show(root, tooltipText, BarService.getTooltipDirection(), Style.tooltipDelayLong);
+      }
+      onExited: {
+        hovered = false;
+        TooltipService.hide();
+      }
+      onClicked: mouse => {
+                   TooltipService.hide();
+                   if (mouse.button === Qt.LeftButton) {
+                     openPanel();
+                   } else if (mouse.button === Qt.RightButton) {
+                     var popupMenuWindow = popupWindow();
+                     if (popupMenuWindow) {
+                       popupMenuWindow.showContextMenu(contextMenu);
+                       contextMenu.openAtItem(pill, screen);
+                     }
+                   } else if (mouse.button === Qt.MiddleButton) {
+                     pluginMain?.mediaPlayPause();
+                   }
+                 }
+      onWheel: wheel => {
+                 TooltipService.hide();
+                 if (!isConnected)
+                   return;
+                 if (wheel.angleDelta.y > 0) {
+                   pluginMain?.volumeUp();
+                 } else {
+                   pluginMain?.volumeDown();
+                 }
                }
-             }
+    }
   }
 
   function openPanel() {
