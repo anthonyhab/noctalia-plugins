@@ -4,3 +4,4 @@
 appletv/helper/.venv/
 appletv/settings.json
 homeassistant/settings.json
+*.mp4
