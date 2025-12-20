@@ -1,0 +1,9 @@
+{
+  "active": true,
+  "themeSetCommand": "~/.local/bin/theme-set",
+  "omarchyConfigDir": "",
+  "useThemeSurface": true,
+  "showThemeName": true,
+  "_prevUseWallpaperColors": false,
+  "_prevPredefinedScheme": "Tokyo Night"
+}
