@@ -29,7 +29,6 @@ Item {
 
   readonly property string titleText: trOrDefault("title", "Omarchy")
   readonly property string settingsHintText: trOrDefault("panel.settings-hint", "Configure Omarchy paths from Settings → Plugins → Omarchy.")
-  readonly property string availableThemesLabel: trOrDefault("fields.theme.available", trOrDefault("fields.theme.label", "Available themes"))
   readonly property string noThemesText: trOrDefault("errors.no-themes", "No themes found")
 
   readonly property bool isActive: pluginApi?.pluginSettings?.active || false
@@ -71,9 +70,9 @@ Item {
           width: Style.fontSizeM
           height: Style.fontSizeM
           radius: width / 2
-          color: isActive ? "#4ade80" : "#f87171"
+          color: isActive ? Color.mPrimary : Color.mError
           border.width: Style.borderS
-          border.color: isActive ? "#22c55e" : "#ef4444"
+          border.color: Color.mOutline
 
           MouseArea {
             anchors.fill: parent
@@ -89,10 +88,10 @@ Item {
         }
 
         NIconButton {
-          icon: "x"
+          icon: "close"
           baseSize: Style.baseWidgetSize * 0.8
-          tooltipText: trOrDefault("actions.close", "Close")
-          onClicked: pluginApi?.closePanel()
+          tooltipText: trOrDefault("tooltips.close", "Close")
+          onClicked: pluginApi?.closePanel(root.screen)
         }
       }
     }
@@ -100,7 +99,7 @@ Item {
     // Theme list
     NBox {
       Layout.fillWidth: true
-      Layout.preferredHeight: themeScrollView.implicitHeight + (Style.marginM * 2)
+      Layout.preferredHeight: Math.min(themeListLayout.implicitHeight + (Style.marginM * 2), maxListHeight)
 
       NScrollView {
         id: themeScrollView
@@ -114,14 +113,6 @@ Item {
           id: themeListLayout
           width: parent.width
           spacing: Style.marginS
-
-          NText {
-            Layout.fillWidth: true
-            text: availableThemesLabel
-            font.pointSize: Style.fontSizeS
-            font.weight: Style.fontWeightMedium
-            color: Color.mOnSurface
-          }
 
           Repeater {
             model: pluginMain?.availableThemes || []
@@ -138,24 +129,24 @@ Item {
               readonly property bool hovered: hoverArea.containsMouse
 
               Layout.fillWidth: true
-              Layout.preferredHeight: Style.baseWidgetSize * 0.85
-              radius: Style.radiusS
-              color: isCurrentTheme ? Qt.alpha(secondaryColor, 0.4) : (hovered ? Qt.alpha(Color.mPrimary, 0.15) : Color.mSurface)
+              implicitHeight: rowLayout.implicitHeight + (Style.marginS * 2)
+              radius: Style.radiusM
+              color: isCurrentTheme ? Qt.rgba(Color.mPrimary.r, Color.mPrimary.g, Color.mPrimary.b, 0.08) : (hovered ? Qt.rgba(Color.mPrimary.r, Color.mPrimary.g, Color.mPrimary.b, 0.05) : Color.mSurface)
               border.width: Style.borderS
-              border.color: isCurrentTheme ? secondaryColor : (hovered ? Color.mPrimary : Color.mOutline)
+              border.color: isCurrentTheme ? Color.mPrimary : (hovered ? Color.mPrimary : Color.mOutline)
 
               RowLayout {
+                id: rowLayout
                 anchors.fill: parent
-                anchors.leftMargin: Style.marginM
-                anchors.rightMargin: Style.marginM
+                anchors.margins: Style.marginS
                 spacing: Style.marginM
 
                 NText {
                   Layout.fillWidth: true
-                  color: isCurrentTheme ? Color.mOnSurface : (hovered ? Color.mPrimary : Color.mOnSurface)
+                  color: Color.mOnSurface
                   text: entry.themeName
                   pointSize: Style.fontSizeM
-                  font.weight: isCurrentTheme ? Style.fontWeightBold : Font.Normal
+                  font.weight: isCurrentTheme ? Style.fontWeightBold : Style.fontWeightMedium
                   verticalAlignment: Text.AlignVCenter
                   elide: Text.ElideRight
                 }

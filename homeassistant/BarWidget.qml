@@ -110,7 +110,10 @@ Item {
     ]
 
     onTriggered: action => {
-                   contextMenu.close();
+                   var popupMenuWindow = popupWindow();
+                   if (popupMenuWindow) {
+                     popupMenuWindow.close();
+                   }
                    if (action === "play-pause") {
                      pluginMain?.mediaPlayPause();
                    } else if (action === "next") {
@@ -142,15 +145,9 @@ Item {
   implicitHeight: pill.height
 
   function popupWindow() {
-    if (screen) {
-      var window = PanelService.getPopupMenuWindow(screen);
-      if (window)
-        return window;
-    }
-    if (Quickshell.screens.length > 0) {
-      return PanelService.getPopupMenuWindow(Quickshell.screens[0]);
-    }
-    return null;
+    if (!screen)
+      return null;
+    return PanelService.getPopupMenuWindow(screen);
   }
 
   BarPill {
@@ -166,19 +163,24 @@ Item {
     forceClose: !isConnected && pillText === ""
     customBackgroundColor: pillBackgroundColor
     customTextIconColor: pillTextIconColor
-    onClicked: openPanel()
+    onClicked: {
+      TooltipService.hide();
+      openPanel();
+    }
     onRightClicked: {
+      TooltipService.hide();
       var popupMenuWindow = popupWindow();
       if (popupMenuWindow) {
         popupMenuWindow.showContextMenu(contextMenu);
-        const pos = BarService.getContextMenuPosition(pill, contextMenu.implicitWidth, contextMenu.implicitHeight);
-        contextMenu.openAtItem(pill, pos.x, pos.y);
-      } else {
-        openPluginSettings();
+        contextMenu.openAtItem(pill, screen);
       }
     }
-    onMiddleClicked: pluginMain?.mediaPlayPause()
+    onMiddleClicked: {
+      TooltipService.hide();
+      pluginMain?.mediaPlayPause();
+    }
     onWheel: delta => {
+               TooltipService.hide();
                if (!isConnected)
                return;
                // delta > 0 means scroll up (volume up), delta < 0 means scroll down (volume down)
@@ -218,6 +220,7 @@ Item {
 
       if (popupMenuWindow) {
         popupMenuWindow.hasDialog = true;
+        popupMenuWindow.open();
         dialog.closed.connect(() => {
                                 popupMenuWindow.hasDialog = false;
                                 popupMenuWindow.close();

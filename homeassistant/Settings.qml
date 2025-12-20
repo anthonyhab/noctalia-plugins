@@ -143,10 +143,8 @@ ColumnLayout {
     }
   }
 
-  Rectangle {
+  NDivider {
     Layout.fillWidth: true
-    Layout.preferredHeight: 1
-    color: Color.mOutline
   }
 
   NText {

@@ -34,6 +34,7 @@
     }
   },
   "tooltips": {
+    "close": "Close",
     "inactive": "Omarchy (inactive)\nClick to open settings",
     "not-available": "Omarchy not available\nInstall omarchy and configure themes",
     "active": "Theme: {theme}\nLeft: Panel | Right: Settings | Middle: Random",

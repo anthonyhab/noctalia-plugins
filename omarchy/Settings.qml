@@ -120,7 +120,7 @@ ColumnLayout {
     text: pluginApi?.tr("settings.paths-hint") || "Set the executable and config directory Omarchy should use."
     wrapMode: Text.WordWrap
     color: Color.mOnSurfaceVariant
-    font.pointSize: Style.fontSizeS
+    pointSize: Style.fontSizeS
   }
 
   NTextInput {
@@ -169,7 +169,7 @@ ColumnLayout {
 
     NText {
       text: pluginApi?.tr("settings.controls.title") || "Plugin controls"
-      font.pointSize: Style.fontSizeM
+      pointSize: Style.fontSizeM
       font.weight: Style.fontWeightMedium
       color: Color.mOnSurface
     }

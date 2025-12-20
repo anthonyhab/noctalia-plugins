@@ -1,5 +1,5 @@
 function hexToRgb(hex) {
-  const result = /^#?([a-f\\d]{2})([a-f\\d]{2})([a-f\\d]{2})$/i.exec(hex);
+  const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
   return result ? {
     r: parseInt(result[1], 16),
     g: parseInt(result[2], 16),
@@ -12,6 +12,26 @@ function rgbToHex(r, g, b) {
     const hex = Math.round(Math.max(0, Math.min(255, x))).toString(16);
     return hex.length === 1 ? "0" + hex : hex;
   }).join("");
+}
+
+function clamp(value, min, max) {
+  return Math.max(min, Math.min(max, value));
+}
+
+function mixColors(hexA, hexB, weightB) {
+  const a = hexToRgb(hexA);
+  const b = hexToRgb(hexB);
+  if (!a && !b)
+    return hexA || hexB || "#000000";
+  if (!a)
+    return hexB;
+  if (!b)
+    return hexA;
+  const w = clamp(weightB, 0, 1);
+  const r = a.r * (1 - w) + b.r * w;
+  const g = a.g * (1 - w) + b.g * w;
+  const bch = a.b * (1 - w) + b.b * w;
+  return rgbToHex(r, g, bch);
 }
 
 function rgbToHsl(r, g, b) {
@@ -134,9 +154,9 @@ function generateSurfaceVariant(backgroundColor, step, isDarkMode) {
   const hsl = rgbToHsl(rgb.r, rgb.g, rgb.b);
 
   if (isDarkMode) {
-    hsl.l = Math.min(100, hsl.l + (step * 3));
+    hsl.l = clamp(hsl.l + (step * 6), 0, 100);
   } else {
-    hsl.l = Math.max(0, hsl.l - (step * 2));
+    hsl.l = clamp(hsl.l - (step * 6), 0, 100);
   }
 
   const newRgb = hslToRgb(hsl.h, hsl.s, hsl.l);
@@ -187,4 +207,3 @@ function generateContainerColor(baseColor, isDarkMode) {
   const newRgb = hslToRgb(hsl.h, hsl.s, hsl.l);
   return rgbToHex(newRgb.r, newRgb.g, newRgb.b);
 }
-

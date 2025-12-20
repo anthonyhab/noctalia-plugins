@@ -3,7 +3,7 @@
   "themeSetCommand": "~/.local/bin/theme-set",
   "omarchyConfigDir": "",
   "useThemeSurface": true,
-  "showThemeName": true,
+  "showThemeName": false,
   "_prevUseWallpaperColors": false,
   "_prevPredefinedScheme": "Tokyo Night"
 }

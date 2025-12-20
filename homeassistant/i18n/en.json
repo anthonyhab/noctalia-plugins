@@ -48,6 +48,7 @@
     "service-failed": "Service call failed"
   },
   "tooltips": {
+    "close": "Close",
     "connected": "Home Assistant\n{count} devices available",
     "disconnected": "Home Assistant (disconnected)\nClick to configure",
     "now-playing": "Now playing: {title}",

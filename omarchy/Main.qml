@@ -85,6 +85,27 @@ Item {
     return path;
   }
 
+  function colorToHex(color) {
+    if (!color)
+      return "#000000";
+    const r = Math.round(color.r * 255);
+    const g = Math.round(color.g * 255);
+    const b = Math.round(color.b * 255);
+    return ColorsConvert.rgbToHex(r, g, b).toLowerCase();
+  }
+
+  function ensureContrast(foreground, background, minRatio, step) {
+    let result = foreground;
+    const direction = ColorsConvert.getLuminance(background) < 0.5 ? 1 : -1;
+    const stepSize = step || 4;
+    for (let i = 0; i < 12; i++) {
+      if (ColorsConvert.getContrastRatio(result, background) >= minRatio)
+        break;
+      result = ColorsConvert.adjustLightness(result, direction * stepSize);
+    }
+    return result;
+  }
+
   function mutatePluginSettings(mutator) {
     if (!pluginApi)
       return null;
@@ -241,9 +262,9 @@ Item {
   }
 
   function selectBestAccentColors(colors) {
-    const primary = colors.green || colors.blue || colors.cyan || "#4CAF50";
-    const secondary = colors.yellow || colors.red || colors.magenta || "#FFC107";
-    const tertiary = colors.blue || colors.cyan || colors.magenta || "#2196F3";
+    const primary = colors.blue || colors.brightBlue || colors.cyan || "#4CAF50";
+    const secondary = colors.magenta || colors.brightMagenta || colors.red || "#FFC107";
+    const tertiary = colors.green || colors.brightGreen || colors.yellow || "#2196F3";
 
     Logger.d("Omarchy", "Selected accents: primary=" + primary + " secondary=" + secondary + " tertiary=" + tertiary);
 
@@ -287,6 +308,10 @@ Item {
       } else if (line.startsWith("[colors.bright]")) {
         currentSection = "bright";
         Logger.d("Omarchy", "Entered [colors.bright] section");
+        continue;
+      } else if (line.startsWith("[colors.selection]")) {
+        currentSection = "selection";
+        Logger.d("Omarchy", "Entered [colors.selection] section");
         continue;
       } else if (line.startsWith("[")) {
         if (currentSection) {
@@ -341,6 +366,14 @@ Item {
             break;
           }
         }
+      } else if (currentSection === "selection") {
+        if (line.includes("background")) {
+          const color = extractColorFromLine(line);
+          if (color) {
+            colors.selectionBackground = color;
+            Logger.d("Omarchy", "Found selection background:", color);
+          }
+        }
       }
     }
 
@@ -361,7 +394,9 @@ Item {
   }
 
   function generateScheme(colors) {
-    const isDarkMode = ColorsConvert.getLuminance(colors.background) < 0.5;
+    const baseSurface = useThemeSurface ? colors.background : colorToHex(Color.mSurface);
+    const baseOnSurface = useThemeSurface ? colors.foreground : colorToHex(Color.mOnSurface);
+    const isDarkMode = useThemeSurface ? (ColorsConvert.getLuminance(baseSurface) < 0.5) : (Settings.data.colorSchemes.darkMode === true);
     Logger.d("Omarchy", "Detected mode:", isDarkMode ? "dark" : "light");
     Logger.d("Omarchy", "Colors available:", Object.keys(colors).join(","));
 
@@ -371,8 +406,14 @@ Item {
       Settings.data.colorSchemes.darkMode = isDarkMode;
     }
 
-    const mSurface = colors.background || "#000000";
-    const mOnSurface = colors.foreground || "#ffffff";
+    const mSurface = baseSurface || "#000000";
+    const baseForeground = baseOnSurface || "#ffffff";
+    const mOnSurface = ensureContrast(
+          ColorsConvert.adjustLightness(baseForeground, isDarkMode ? 6 : -6),
+          mSurface,
+          4.5,
+          4
+        );
 
     const contrastRatio = ColorsConvert.getContrastRatio(mSurface, mOnSurface);
     Logger.d("Omarchy", "Contrast ratio:", contrastRatio.toFixed(2) + ":1");
@@ -396,32 +437,60 @@ Item {
     const mOnErrorContainer = ColorsConvert.generateOnColor(mErrorContainer, isDarkMode);
 
     // Generate surface container variants (5 levels)
-    const mSurfaceContainerLowest = ColorsConvert.generateSurfaceVariant(mSurface, 0, isDarkMode);
-    const mSurfaceContainerLow = ColorsConvert.generateSurfaceVariant(mSurface, 1, isDarkMode);
-    const mSurfaceContainer = ColorsConvert.generateSurfaceVariant(mSurface, 2, isDarkMode);
-    const mSurfaceContainerHigh = ColorsConvert.generateSurfaceVariant(mSurface, 3, isDarkMode);
-    const mSurfaceContainerHighest = ColorsConvert.generateSurfaceVariant(mSurface, 4, isDarkMode);
+    function surfaceTone(delta) {
+      return ColorsConvert.adjustLightness(mSurface, isDarkMode ? delta : -delta);
+    }
+
+    const surfaceVariantSeed = isDarkMode ? (colors.brightBlack || colors.black) : (colors.black || colors.brightBlack);
+    const outlineSeed = (colors.black && colors.brightBlack)
+      ? ColorsConvert.mixColors(colors.black, colors.brightBlack, 0.3)
+      : surfaceVariantSeed;
+
+    function mixSurface(weight, fallbackDelta) {
+      if (surfaceVariantSeed)
+        return ColorsConvert.mixColors(mSurface, surfaceVariantSeed, weight);
+      return surfaceTone(fallbackDelta);
+    }
+
+    const mSurfaceContainerLowest = mixSurface(isDarkMode ? 0.15 : 0.1, 4);
+    const mSurfaceContainerLow = mixSurface(isDarkMode ? 0.25 : 0.2, 8);
+    const mSurfaceContainer = mixSurface(isDarkMode ? 0.35 : 0.3, 12);
+    const mSurfaceContainerHigh = mixSurface(isDarkMode ? 0.45 : 0.4, 16);
+    const mSurfaceContainerHighest = mixSurface(isDarkMode ? 0.55 : 0.5, 20);
 
     // Generate bright and dim surface variants
-    const mSurfaceBright = ColorsConvert.adjustLightness(mSurface, isDarkMode ? 15 : 5);
-    const mSurfaceDim = ColorsConvert.adjustLightness(mSurface, isDarkMode ? -5 : -10);
+    const mSurfaceBright = mixSurface(isDarkMode ? 0.45 : 0.35, 16);
+    const mSurfaceDim = surfaceTone(-6);
 
-    const mSurfaceVariant = ColorsConvert.generateSurfaceVariant(mSurface, 1, isDarkMode);
-    let mOnSurfaceVariant = ColorsConvert.adjustLightness(mOnSurface, isDarkMode ? -22 : 22);
+    const mSurfaceVariant = mixSurface(isDarkMode ? 0.25 : 0.2, 6);
+    let mOnSurfaceVariant = ColorsConvert.adjustLightness(mOnSurface, isDarkMode ? -14 : 14);
     if (ColorsConvert.getContrastRatio(mOnSurfaceVariant, mSurfaceVariant) < 3.0)
       mOnSurfaceVariant = mOnSurface;
 
-    const mOutline = ColorsConvert.adjustLightnessAndSaturation(mOnSurface, isDarkMode ? -30 : 30, isDarkMode ? -30 : 30);
-    const mOutlineVariant = ColorsConvert.adjustLightness(mOutline, isDarkMode ? -20 : 20);
+    const mOutline = ensureContrast(
+          outlineSeed ? ColorsConvert.mixColors(mSurface, outlineSeed, isDarkMode ? 0.6 : 0.4)
+                      : ColorsConvert.adjustLightness(mSurfaceVariant, isDarkMode ? 10 : -10),
+          mSurface,
+          2.0,
+          3
+        );
+    const mOutlineVariant = ensureContrast(
+          outlineSeed ? ColorsConvert.mixColors(mSurface, outlineSeed, isDarkMode ? 0.45 : 0.3)
+                      : ColorsConvert.adjustLightness(mSurfaceVariant, isDarkMode ? 5 : -5),
+          mSurface,
+          1.6,
+          2
+        );
 
     // Simple "on" colors: use surface for accent "on" colors like the old implementation
-    const mOnPrimary = mSurface;
-    const mOnSecondary = mSurface;
-    const mOnTertiary = mSurface;
-    const mOnError = mSurface;
+    const onSurfaceAccent = ColorsConvert.adjustLightness(mSurface, isDarkMode ? -2 : 2);
+    const mOnPrimary = ColorsConvert.getContrastRatio(onSurfaceAccent, mPrimary) >= 4.5 ? onSurfaceAccent : ColorsConvert.generateOnColor(mPrimary, isDarkMode);
+    const mOnSecondary = ColorsConvert.getContrastRatio(onSurfaceAccent, mSecondary) >= 4.5 ? onSurfaceAccent : ColorsConvert.generateOnColor(mSecondary, isDarkMode);
+    const mOnTertiary = ColorsConvert.getContrastRatio(onSurfaceAccent, mTertiary) >= 4.5 ? onSurfaceAccent : ColorsConvert.generateOnColor(mTertiary, isDarkMode);
+    const mOnError = ColorsConvert.getContrastRatio(onSurfaceAccent, mError) >= 4.5 ? onSurfaceAccent : ColorsConvert.generateOnColor(mError, isDarkMode);
 
-    const mHover = mPrimary;
-    const mOnHover = mOnPrimary;
+    const mHover = mTertiary;
+    const mOnHover = ColorsConvert.adjustLightness(mSurface, isDarkMode ? -2 : 2);
 
     const palette = {
       "mPrimary": mPrimary,

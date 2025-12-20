@@ -76,15 +76,9 @@ Item {
   implicitHeight: pill.height
 
   function popupWindow() {
-    if (screen) {
-      var window = PanelService.getPopupMenuWindow(screen);
-      if (window)
-        return window;
-    }
-    if (Quickshell.screens.length > 0) {
-      return PanelService.getPopupMenuWindow(Quickshell.screens[0]);
-    }
-    return null;
+    if (!screen)
+      return null;
+    return PanelService.getPopupMenuWindow(screen);
   }
 
   NPopupContextMenu {
@@ -104,7 +98,10 @@ Item {
     ]
 
     onTriggered: action => {
-                   contextMenu.close();
+                   var popupMenuWindow = popupWindow();
+                   if (popupMenuWindow) {
+                     popupMenuWindow.close();
+                   }
                    if (action === "random") {
                      selectRandomTheme();
                    } else if (action === "settings") {
@@ -126,18 +123,22 @@ Item {
     forceClose: !isActive || (!isAvailable && pillText === "")
     customBackgroundColor: pillBackgroundColor
     customTextIconColor: pillTextIconColor
-    onClicked: openPanel()
+    onClicked: {
+      TooltipService.hide();
+      openPanel();
+    }
     onRightClicked: {
+      TooltipService.hide();
       var popupMenuWindow = popupWindow();
       if (popupMenuWindow) {
         popupMenuWindow.showContextMenu(contextMenu);
-        const pos = BarService.getContextMenuPosition(pill, contextMenu.implicitWidth, contextMenu.implicitHeight);
-        contextMenu.openAtItem(pill, pos.x, pos.y);
-      } else {
-        openPluginSettings();
+        contextMenu.openAtItem(pill, screen);
       }
     }
-    onMiddleClicked: selectRandomTheme()
+    onMiddleClicked: {
+      TooltipService.hide();
+      selectRandomTheme();
+    }
   }
 
   function pluginPanelForScreen(screen) {
@@ -153,15 +154,6 @@ Item {
     return null;
   }
 
-  function anchorPanel(screen) {
-    Qt.callLater(() => {
-                   var panel = pluginPanelForScreen(screen);
-                   if (panel && panel.isPanelOpen) {
-                     panel.open(pill);
-                   }
-                 });
-  }
-
   function openPanel() {
     if (!pluginApi)
       return;
@@ -171,9 +163,7 @@ Item {
                                     panel.toggle(pill);
                                     return;
                                   }
-                                  if (pluginApi.openPanel(screen)) {
-                                    anchorPanel(screen);
-                                  }
+                                  pluginApi.openPanel(screen, pill);
                                 });
   }
 
@@ -197,6 +187,7 @@ Item {
 
       if (popupMenuWindow) {
         popupMenuWindow.hasDialog = true;
+        popupMenuWindow.open();
         dialog.closed.connect(() => {
                                 popupMenuWindow.hasDialog = false;
                                 popupMenuWindow.close();
