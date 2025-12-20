@@ -13,7 +13,7 @@ Item {
 
   readonly property bool allowAttach: true
   readonly property int contentPreferredWidth: Math.round(340 * Style.uiScaleRatio)
-  readonly property int contentPreferredHeight: Math.round(500 * Style.uiScaleRatio)
+  readonly property int contentPreferredHeight: mainColumn.implicitHeight + (Style.marginL * 2)
   readonly property real maxListHeight: 300 * Style.uiScaleRatio
 
   readonly property var pluginMain: pluginApi?.mainInstance
@@ -37,22 +37,20 @@ Item {
   readonly property color secondaryColor: Color.mSecondary !== undefined ? Color.mSecondary : Color.mPrimary
 
   ColumnLayout {
+    id: mainColumn
     anchors.fill: parent
-    anchors.margins: Style.marginM
-    spacing: Style.marginS
+    anchors.margins: Style.marginL
+    spacing: Style.marginM
 
-    // Header card similar to legacy Omarchy panel
+    // Header card
     NBox {
       Layout.fillWidth: true
-      Layout.preferredHeight: headerRow.implicitHeight + Style.marginS * 2
+      Layout.preferredHeight: headerRow.implicitHeight + (Style.marginM * 2)
 
       RowLayout {
         id: headerRow
         anchors.fill: parent
-        anchors.leftMargin: Style.marginM
-        anchors.rightMargin: 0
-        anchors.topMargin: Style.marginS
-        anchors.bottomMargin: Style.marginS
+        anchors.margins: Style.marginM
         spacing: Style.marginM
 
         NIcon {
@@ -70,9 +68,8 @@ Item {
         }
 
         Rectangle {
-          Layout.rightMargin: Style.marginM
-          width: Style.fontSizeL
-          height: Style.fontSizeL
+          width: Style.fontSizeM
+          height: Style.fontSizeM
           radius: width / 2
           color: isActive ? "#4ade80" : "#f87171"
           border.width: Style.borderS
@@ -90,17 +87,25 @@ Item {
             }
           }
         }
+
+        NIconButton {
+          icon: "x"
+          baseSize: Style.baseWidgetSize * 0.8
+          tooltipText: trOrDefault("actions.close", "Close")
+          onClicked: pluginApi?.closePanel()
+        }
       }
     }
 
-    // Theme list block with compact margins
+    // Theme list
     NBox {
       Layout.fillWidth: true
-      Layout.fillHeight: true
+      Layout.preferredHeight: themeScrollView.implicitHeight + (Style.marginM * 2)
 
       NScrollView {
+        id: themeScrollView
         anchors.fill: parent
-        anchors.margins: Style.marginS
+        anchors.margins: Style.marginM
         horizontalPolicy: ScrollBar.AlwaysOff
         verticalPolicy: ScrollBar.AsNeeded
         clip: true

@@ -642,7 +642,6 @@ Item {
       if (Settings.data.colorSchemes.predefinedScheme !== schemeDisplayName) {
         Settings.data.colorSchemes.predefinedScheme = schemeDisplayName;
       }
-      ToastService.showNotice(pluginApi?.tr("title") || "Omarchy", pluginApi?.tr("notices.applied") || "Omarchy scheme applied");
     }
   }
 
@@ -661,7 +660,7 @@ Item {
       }
     }
 
-    function setTheme(themeName) {
+    function setTheme(themeName: string) {
       root.setTheme(themeName);
     }
 

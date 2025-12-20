@@ -13,7 +13,7 @@ Item {
 
   readonly property bool allowAttach: true
   readonly property int contentPreferredWidth: Math.round(340 * Style.uiScaleRatio)
-  readonly property int contentPreferredHeight: Math.round(500 * Style.uiScaleRatio)
+  readonly property int contentPreferredHeight: mainColumn.implicitHeight + (Style.marginL * 2)
 
   readonly property var pluginMain: pluginApi?.mainInstance
 
@@ -51,45 +51,51 @@ Item {
   Component.onCompleted: {
     // Refresh state when panel opens to ensure current values
     pluginMain?.refresh();
+    // Calculate position immediately after refresh
+    Qt.callLater(updateCalculatedPosition);
   }
 
   // Calculate current position based on last update time
   property real calculatedPosition: mediaPosition
+
+  function updateCalculatedPosition() {
+    if (mediaPositionUpdatedAt && mediaDuration > 0) {
+      const updatedAt = new Date(mediaPositionUpdatedAt);
+      const now = new Date();
+      const elapsed = (now - updatedAt) / 1000;
+      calculatedPosition = Math.min(mediaPosition + elapsed, mediaDuration);
+    } else {
+      calculatedPosition = mediaPosition;
+    }
+  }
+
   Timer {
     id: positionTimer
     interval: 1000
     repeat: true
     running: isPlaying && mediaDuration > 0
-    onTriggered: {
-      if (mediaPositionUpdatedAt) {
-        const updatedAt = new Date(mediaPositionUpdatedAt);
-        const now = new Date();
-        const elapsed = (now - updatedAt) / 1000;
-        calculatedPosition = Math.min(mediaPosition + elapsed, mediaDuration);
-      }
-    }
+    onTriggered: updateCalculatedPosition()
   }
 
-  // Reset calculated position when media position changes
-  onMediaPositionChanged: calculatedPosition = mediaPosition
+  // Recalculate when position data updates from Home Assistant
+  onMediaPositionChanged: updateCalculatedPosition()
+  onMediaPositionUpdatedAtChanged: updateCalculatedPosition()
 
   ColumnLayout {
+    id: mainColumn
     anchors.fill: parent
-    anchors.margins: Style.marginM
+    anchors.margins: Style.marginL
     spacing: Style.marginM
 
     // Header
     NBox {
       Layout.fillWidth: true
-      Layout.preferredHeight: headerRow.implicitHeight + Style.marginS * 2
+      Layout.preferredHeight: headerRow.implicitHeight + (Style.marginM * 2)
 
       RowLayout {
         id: headerRow
         anchors.fill: parent
-        anchors.leftMargin: Style.marginM
-        anchors.rightMargin: 0
-        anchors.topMargin: Style.marginS
-        anchors.bottomMargin: Style.marginS
+        anchors.margins: Style.marginM
         spacing: Style.marginM
 
         NIcon {
@@ -107,13 +113,19 @@ Item {
         }
 
         Rectangle {
-          Layout.rightMargin: Style.marginM
-          width: Style.fontSizeL
-          height: Style.fontSizeL
+          width: Style.fontSizeM
+          height: Style.fontSizeM
           radius: width / 2
           color: isConnected ? "#4ade80" : (isConnecting ? "#fbbf24" : "#f87171")
           border.width: Style.borderS
           border.color: isConnected ? "#22c55e" : (isConnecting ? "#f59e0b" : "#ef4444")
+        }
+
+        NIconButton {
+          icon: "x"
+          baseSize: Style.baseWidgetSize * 0.8
+          tooltipText: pluginApi?.tr("actions.close") || "Close"
+          onClicked: pluginApi?.closePanel()
         }
       }
     }
@@ -121,42 +133,37 @@ Item {
     // Media player controls
     NBox {
       Layout.fillWidth: true
-      Layout.fillHeight: true
+      Layout.preferredHeight: mediaControlsColumn.implicitHeight + (Style.marginM * 2)
 
       ColumnLayout {
+        id: mediaControlsColumn
         anchors.fill: parent
         anchors.margins: Style.marginM
         spacing: Style.marginM
 
         // Album art
         Rectangle {
+          id: albumArtContainer
           Layout.fillWidth: true
           Layout.preferredHeight: width
           Layout.maximumHeight: 180 * Style.uiScaleRatio
           color: Color.mSurface
-          radius: Style.radiusS
-          border.width: Style.borderS
-          border.color: Color.mOutline
+          radius: Style.radiusM
+          layer.enabled: true
 
           Image {
             id: albumArt
             anchors.fill: parent
-            anchors.margins: Style.marginXS
             source: entityPicture
             fillMode: Image.PreserveAspectCrop
             visible: status === Image.Ready
-
-            layer.enabled: true
-            layer.effect: ShaderEffect {
-              property real radius: Style.radiusM - Style.marginXS
-            }
           }
 
           NIcon {
             anchors.centerIn: parent
             visible: !albumArt.visible
             icon: isPlaying ? "music" : "music-off"
-            pointSize: 48
+            pointSize: Style.fontSizeXXXL
             color: Color.mOnSurfaceVariant
           }
         }
@@ -206,7 +213,7 @@ Item {
           spacing: Style.marginXS
           visible: mediaDuration > 0
 
-          Slider {
+          NSlider {
             id: progressSlider
             Layout.fillWidth: true
             from: 0
@@ -251,7 +258,7 @@ Item {
 
           NIconButton {
             icon: "arrows-shuffle"
-            baseSize: 20
+            baseSize: Style.baseWidgetSize * 0.6
             enabled: isConnected
             colorFg: shuffleEnabled ? Color.mSecondary : Color.mPrimary
             colorBg: shuffleEnabled ? Color.mSecondaryContainer : Color.mSurfaceVariant
@@ -261,7 +268,7 @@ Item {
 
           NIconButton {
             icon: "player-track-prev"
-            baseSize: 28
+            baseSize: Style.baseWidgetSize * 0.85
             enabled: isConnected
             tooltipText: pluginApi?.tr("actions.previous") || "Previous"
             onClicked: pluginMain?.mediaPrevious()
@@ -269,7 +276,7 @@ Item {
 
           NIconButton {
             icon: isPlaying ? "player-pause" : "player-play"
-            baseSize: 48
+            baseSize: Style.baseWidgetSize * 1.45
             enabled: isConnected
             tooltipText: isPlaying ? (pluginApi?.tr("actions.pause") || "Pause") : (pluginApi?.tr("actions.play") || "Play")
             onClicked: pluginMain?.mediaPlayPause()
@@ -277,7 +284,7 @@ Item {
 
           NIconButton {
             icon: "player-track-next"
-            baseSize: 28
+            baseSize: Style.baseWidgetSize * 0.85
             enabled: isConnected
             tooltipText: pluginApi?.tr("actions.next") || "Next"
             onClicked: pluginMain?.mediaNext()
@@ -285,7 +292,7 @@ Item {
 
           NIconButton {
             icon: repeatMode === "one" ? "repeat-1" : "repeat"
-            baseSize: 20
+            baseSize: Style.baseWidgetSize * 0.6
             enabled: isConnected
             colorFg: repeatMode !== "off" ? Color.mSecondary : Color.mPrimary
             colorBg: repeatMode !== "off" ? Color.mSecondaryContainer : Color.mSurfaceVariant
@@ -305,12 +312,6 @@ Item {
           }
         }
 
-        // Spacer to push volume and device selector to bottom
-        Item {
-          Layout.fillHeight: true
-          Layout.fillWidth: true
-        }
-
         // Volume control
         RowLayout {
           Layout.fillWidth: true
@@ -318,13 +319,13 @@ Item {
 
           NIconButton {
             icon: isVolumeMuted ? "volume-off" : (volumeLevel > 0.5 ? "volume" : "volume-2")
-            baseSize: 20
+            baseSize: Style.baseWidgetSize * 0.6
             enabled: isConnected
             tooltipText: isVolumeMuted ? (pluginApi?.tr("actions.unmute") || "Unmute") : (pluginApi?.tr("actions.mute") || "Mute")
             onClicked: pluginMain?.toggleMute()
           }
 
-          Slider {
+          NSlider {
             id: volumeSlider
             Layout.fillWidth: true
             from: 0
