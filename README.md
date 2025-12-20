@@ -1,16 +1,20 @@
-# Bibe Plugins Workspace
+# Bibe Plugins
 
-This directory mirrors the layout of `anthonyhab/noctalia-plugins`. Each plugin
-lives in its own folder (homeassistant, appletv, omarchy) with the exact files
-we ship to GitHub. The idea:
+This repo contains community plugins for Noctalia. Each plugin lives in its own
+folder (for example: `appletv`, `homeassistant`, `omarchy`). The top-level
+`registry.json` lists everything published here.
 
-1. Develop plugins inside `noctalia-shell/dev/plugins/<name>`.
-2. When ready to publish, copy/rsync that folder into `bibe-plugins/<name>`
-   (avoiding private `settings.json` etc.).
-3. Commit/push from the `bibe-plugins` repo (or copy these folders into your
-   checkout of `anthonyhab/noctalia-plugins`).
-4. Keep `registry.json` in sync with the plugins you expose.
+## Install
 
-Because this directory only contains distributable assets, you can safely run
-`git add . && git push github main` from inside `bibe-plugins` without pulling
-in the rest of the shell.
+1. Clone this repo.
+2. Symlink the plugins into Noctalia:
+   ```
+   mkdir -p ~/.config/noctalia/plugins
+   ln -sfn /path/to/bibe-plugins/* ~/.config/noctalia/plugins/
+   ```
+3. Restart Noctalia and enable the plugins in Settings.
+
+## Notes
+
+- Screenshots will be added per plugin.
+- Each plugin folder includes its own README with setup steps and requirements.
