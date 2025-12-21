@@ -209,7 +209,6 @@ Item {
     text: pillText
     pointSize: textPointSize
     applyUiScale: false
-    font.weight: Style.fontWeightBold
   }
 
   Rectangle {
@@ -343,7 +342,6 @@ Item {
                 text: pillText
                 pointSize: textPointSize
                 applyUiScale: false
-                font.weight: Style.fontWeightBold
                 verticalAlignment: Text.AlignVCenter
                 color: hovered ? Color.mOnHover : (pillTextIconColor.a > 0 ? pillTextIconColor : Color.mOnSurface)
                 onTextChanged: {
