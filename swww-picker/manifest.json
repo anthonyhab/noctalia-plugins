@@ -1,0 +1,27 @@
+{
+  "id": "swww-picker",
+  "name": "SWWW Wallpaper Picker",
+  "version": "0.1.0",
+  "author": "habibe",
+  "description": "Cycle wallpapers using swww with manual and automatic controls.",
+  "entryPoints": {
+    "main": "Main.qml",
+    "panel": "Panel.qml",
+    "barWidget": "BarWidget.qml",
+    "settings": "Settings.qml"
+  },
+  "metadata": {
+    "allowUserSettings": true,
+    "defaultSettings": {
+      "wallpapersDir": "~/Pictures/Wallpapers",
+      "autoCycleEnabled": false,
+      "autoCycleInterval": 30,
+      "transitionType": "grow",
+      "transitionDuration": 1,
+      "transitionFps": 60,
+      "transitionStep": 90,
+      "shuffleMode": false,
+      "showWallpaperName": true
+    }
+  }
+}

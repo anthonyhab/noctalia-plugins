@@ -29,6 +29,13 @@ Item {
   readonly property bool isConnected: pluginMain?.connected || false
   readonly property bool isConnecting: pluginMain?.connecting || false
   readonly property bool isPlaying: pluginMain?.isPlaying || false
+  property bool hasEverConnected: false
+
+  onIsConnectedChanged: {
+    if (isConnected) {
+      hasEverConnected = true;
+    }
+  }
 
   readonly property string mediaTitle: pluginMain?.mediaTitle || ""
   readonly property string mediaArtist: pluginMain?.mediaArtist || ""
@@ -145,11 +152,13 @@ Item {
   readonly property color fallbackOnSurface: "#f0f0f0"
 
   readonly property color pillBackgroundColor: {
-    if (!isConnected)
+    if (!isConnected && hasEverConnected)
       return palette?.mSurfaceContainerLow ?? fallbackSurfaceLow;
     return Qt.rgba(0, 0, 0, 0);
   }
-  readonly property color pillTextIconColor: !isConnected ? (palette?.mOnSurface ?? fallbackOnSurface) : Qt.rgba(0, 0, 0, 0)
+  readonly property color pillTextIconColor: !isConnected && hasEverConnected
+                                           ? (palette?.mOnSurface ?? fallbackOnSurface)
+                                           : Qt.rgba(0, 0, 0, 0)
 
   property var settingsPopupComponent: null
 

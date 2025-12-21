@@ -1,0 +1,60 @@
+{
+  "title": "Wallpaper Picker",
+  "actions": {
+    "next": "Next wallpaper",
+    "previous": "Previous wallpaper",
+    "random": "Random wallpaper",
+    "settings": "Settings",
+    "close": "Close",
+    "refresh": "Refresh",
+    "enable-auto": "Enable auto-cycle",
+    "disable-auto": "Disable auto-cycle",
+    "shuffle-on": "Shuffle mode (on)"
+  },
+  "tooltips": {
+    "unavailable": "swww daemon not available\nRun: swww-daemon",
+    "no-wallpaper": "No wallpaper set",
+    "auto-cycle": "Auto-cycling every {interval} min",
+    "shuffle-on": "Shuffle mode enabled"
+  },
+  "errors": {
+    "failed-set": "Failed to set wallpaper",
+    "daemon-not-running": "swww daemon not running\nRun: swww-daemon"
+  },
+  "status": {
+    "no-wallpapers": "No wallpapers found\nCheck your wallpapers directory in settings",
+    "wallpapers": "wallpapers",
+    "auto-cycle-on": "Auto-cycle on",
+    "daemon-running": "swww daemon running",
+    "daemon-stopped": "swww daemon not running"
+  },
+  "settings": {
+    "description": "Configure wallpaper cycling with swww.",
+    "wallpapers-dir": "Wallpapers directory",
+    "wallpapers-dir-desc": "Path to the directory containing your wallpaper images.",
+    "auto-cycle": {
+      "title": "Auto-cycle",
+      "enabled": "Enable auto-cycling",
+      "enabled-desc": "Automatically change wallpaper at regular intervals.",
+      "interval": "Interval (minutes)",
+      "interval-desc": "How often to change the wallpaper when auto-cycling is enabled."
+    },
+    "shuffle-mode": "Shuffle mode",
+    "shuffle-desc": "Pick random wallpapers instead of sequential order.",
+    "transitions": {
+      "title": "Transitions",
+      "type": "Transition type",
+      "duration": "Duration (seconds)",
+      "fps": "FPS",
+      "step": "Step"
+    },
+    "bar-widget": {
+      "title": "Bar widget"
+    },
+    "show-name": "Show wallpaper name",
+    "show-name-desc": "Display the current wallpaper filename in the bar.",
+    "status": {
+      "title": "Status"
+    }
+  }
+}
