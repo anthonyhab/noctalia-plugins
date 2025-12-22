@@ -39,6 +39,8 @@
     "auto-close-success": "Close on success",
     "auto-close-success-desc": "Close the panel after a successful authentication.",
     "auto-close-cancel": "Close on cancel",
-    "auto-close-cancel-desc": "Close the panel when a request is cancelled."
+    "auto-close-cancel-desc": "Close the panel when a request is cancelled.",
+    "display-mode": "Display mode",
+    "display-mode-desc": "How the authentication dialog appears"
   }
 }

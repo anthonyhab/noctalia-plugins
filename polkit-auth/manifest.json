@@ -17,6 +17,7 @@
     "defaultSettings": {
       "helperPath": "",
       "pollInterval": 100,
+      "displayMode": "floating",
       "autoOpenPanel": true,
       "autoCloseOnSuccess": true,
       "autoCloseOnCancel": true

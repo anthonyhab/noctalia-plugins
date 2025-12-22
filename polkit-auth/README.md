@@ -1,62 +1,48 @@
-# Polkit Authentication (Noctalia)
+# Polkit Authentication
 
-This plugin lets Noctalia act as the Polkit Authentication Agent. When polkit
-prompts for authentication, a Noctalia panel opens so you can enter your
-password.
+Use Noctalia as your Polkit authentication agent. When an app requests elevated privileges, a Noctalia panel opens for password entry.
 
-## Requirements
+## Setup
 
-- A running helper daemon (`noctalia-polkit-agent`).
-- The daemon must be registered as the active polkit agent for the user session.
+### 1. Install dependencies
 
-## Setup (systemd --user)
+```bash
+# Arch
+sudo pacman -S qt6-base polkit-qt6 hyprutils cmake
 
-1. Build or install the helper binary (see `helper/README.md`).
-   - Example:
-     ```
-     cd polkit-auth/helper
-     make
-     sudo make install
-     ```
-   - Make sure the `polkit-agent-1` development headers are installed.
-2. Copy the unit file and enable it:
+# Fedora
+sudo dnf install qt6-qtbase-devel polkit-qt6-1-devel hyprutils-devel cmake
 
-```
-mkdir -p ~/.config/systemd/user
-cp helper/noctalia-polkit-agent.service ~/.config/systemd/user/
-# edit ExecStart to point to your installed helper binary
-systemctl --user daemon-reload
-systemctl --user enable --now noctalia-polkit-agent.service
+# Debian/Ubuntu
+sudo apt install qt6-base-dev libpolkit-qt6-1-dev cmake
+# hyprutils may need to be built from source
 ```
 
-3. Disable other polkit agents so only Noctalia handles prompts. If you were
-   starting GNOME's agent on login, remove it:
+### 2. Build and install noctalia-polkit
 
+```bash
+git clone https://github.com/anthonyhab/noctalia-polkit.git
+cd noctalia-polkit
+cmake -B build
+cmake --build build
+sudo cmake --install build
 ```
-# Example: remove from your session autostart/exec-once
+
+### 3. Disable other polkit agents
+
+Remove any existing polkit agent from your session autostart. For example, in Hyprland:
+
+```bash
+# Remove this line from ~/.config/hypr/hyprland.conf if present:
 # exec-once = /usr/lib/polkit-gnome/polkit-gnome-authentication-agent-1
 ```
 
-## Plugin configuration
+### 4. Enable the systemd service
 
-Open the plugin settings and set:
+```bash
+systemctl --user enable --now hyprpolkitagent.service
+```
 
-- Helper binary path: the absolute path to `noctalia-polkit-agent`.
-- Poll interval: how quickly Noctalia checks for requests (ms).
+### 5. Configure the plugin
 
-## Protocol notes
-
-The helper should expose a CLI that supports:
-
-- `--ping`: exit 0 when the daemon is running and registered.
-- `--next`: print a JSON request (or nothing) for the next pending auth prompt.
-- `--respond <id>`: send the password via stdin.
-- `--cancel <id>`: cancel the request.
-
-For security, the plugin writes the password to stdin.
-
-## Security
-
-- Passwords are never stored in plugin settings.
-- Avoid logging stdout/stderr that could contain password data.
-- Prefer stdin for password transport (see helper TODO).
+In Noctalia's plugin settings, set the helper path to the installed binary (typically `/usr/local/libexec/hyprpolkitagent`).

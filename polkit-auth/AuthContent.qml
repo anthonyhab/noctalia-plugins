@@ -232,7 +232,7 @@ Item {
         spacing: Style.marginXS
 
         NIcon {
-          icon: showDetails ? "chevron-up" : "info"
+          icon: showDetails ? "chevron-up" : "chevron-down"
           pointSize: Style.fontSizeXS
           color: Color.mOnSurfaceVariant
           opacity: detailsHover.hovered ? 0.9 : 0.5

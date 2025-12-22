@@ -370,8 +370,8 @@ Item {
     visible: false
     color: Color.mSurface
 
-    implicitWidth: Math.round(420 * Style.uiScaleRatio)
-    implicitHeight: Math.round(400 * Style.uiScaleRatio)
+    width: Math.round(420 * Style.uiScaleRatio)
+    height: Math.round(480 * Style.uiScaleRatio)
 
     AuthContent {
       id: floatingAuthContent

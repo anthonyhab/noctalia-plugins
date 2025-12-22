@@ -73,8 +73,8 @@ ColumnLayout {
 
   NComboBox {
     Layout.fillWidth: true
-    label: pluginApi?.tr("settings.display-mode") || "Display mode"
-    description: pluginApi?.tr("settings.display-mode-desc") || "How the authentication dialog appears"
+    label: pluginApi?.tr("settings.display-mode") ?? "Display mode"
+    description: pluginApi?.tr("settings.display-mode-desc") ?? "How the authentication dialog appears"
     model: [
       { key: "floating", name: "Floating window" },
       { key: "panel", name: "Panel (attached to bar)" }
