@@ -170,7 +170,9 @@ function generateSurfaceLevel(baseSurface, level, isDarkMode) {
   // Simple HSL surface level generation (fast runtime version)
   const lightnessStep = isDarkMode ? 3.5 : -2.5;
   hsl.l = clamp(hsl.l + (level * lightnessStep), 0, 100);
-  hsl.s = clamp(hsl.s + (level * 0.5), 0, 100);
+  if (isDarkMode) {
+    hsl.s = clamp(hsl.s + (level * 0.5), 0, 100);
+  }
   return hslToHex(hsl.h, hsl.s, hsl.l);
 }
 
@@ -329,12 +331,38 @@ function generateShadow(baseSurface, isDarkMode) {
 // ============================================
 
 function convertThemeToNoctalia(omarchyTheme, noctaliaReference) {
-  // This function is deprecated - use the pre-generated cache instead
-  // For development/regeneration, use: node generate-theme-cache.js
-  console.warn("convertThemeToNoctalia is deprecated - use cached themes");
+  // Deprecated in favor of ThemePipeline + SchemeCache.
   return omarchyTheme;
 }
 
 // ============================================
 // Export all functions (QML-style - functions are already accessible)
 // ============================================
+
+// Node.js compatibility for test tooling.
+if (typeof module !== "undefined") {
+  module.exports = {
+    hexToRgb,
+    rgbToHex,
+    clamp,
+    rgbToHsl,
+    hslToRgb,
+    hexToHSL,
+    hslToHex,
+    getLuminance,
+    getContrastRatio,
+    isLightColor,
+    mixColors,
+    adjustLightness,
+    adjustLightnessAndSaturation,
+    generateSurfaceLevel,
+    generateSurfaceVariant,
+    tintSurfaceWithAccent,
+    generateOnColor,
+    generateOnSurfaceVariant,
+    generateOutline,
+    generateOutlineVariant,
+    generateContainerColor,
+    generateShadow
+  };
+}

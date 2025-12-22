@@ -5,13 +5,14 @@ Fast color scheme conversion for QuickShell/Noctalia with CIELAB-optimized color
 ## Architecture
 
 ### Runtime (QuickShell)
-- **ColorsConvertCached.js** - Pre-computed CIELAB-optimized themes (instant lookup)
-- **ColorsConvert.js** - HSL utilities for dynamic adjustments (if needed)
-- Themes use advanced CIELAB color science, loaded instantly from cache
+- **SchemeCache.js** - Pre-computed Noctalia palettes (instant lookup)
+- **ThemePipeline.js** - Fast fallback when cache is missing or stale
+- **ColorsConvert.js** - Lightweight HSL utilities used by the pipeline
 
 ### Development (Node.js CLI)
-- **ColorAnalysis.js** - Advanced CIELAB color science for perceptually accurate conversions
-- **generate-theme-cache.js** - Generates CIELAB-optimized theme conversions
+- **ColorAnalysis.js** - Advanced CIELAB color science for perceptual analysis
+- **generate-scheme-cache.js** - Generates the runtime scheme cache
+- **update-scheme-cache-embedded.js** - Embeds the cache + pipeline version
 - **color_analysis_report.js** - Analyzes color relationships between themes
 
 ## The Magic: CIELAB Color Science
@@ -22,19 +23,16 @@ All cached themes use **CIELAB color space** for:
 - More accurate contrast calculations
 - Professional-grade color conversions
 
-**Runtime** just loads these pre-computed perfect colors = instant + beautiful!
+**Runtime** prefers pre-computed schemes and only falls back to live conversion if the cache is missing or stale.
 
 ## Workflow
 
 ### Using Themes at Runtime (QuickShell)
 ```javascript
-.import "ColorsConvertCached.js" as ThemeCache
+.import "SchemeCache.js" as SchemeCache
 
-// Get CIELAB-optimized theme (instant lookup)
-const theme = ThemeCache.getConvertedTheme("catppuccin-mocha");
-
-// All colors are pre-computed with advanced color science
-console.log(theme.primary);  // "#89b4fa" - perfectly optimized
+const cached = SchemeCache.getScheme("catppuccin");
+console.log(cached?.palette?.mSurface);
 ```
 
 ### Developing Color Algorithm
@@ -48,16 +46,16 @@ When you want to improve the color conversion:
    Shows how different themes handle color relationships
 
 2. **Modify the algorithm:**
-   - Edit `generate-theme-cache.js` to improve conversion logic
-   - Uses CIELAB color space for perceptually accurate conversions
-   - Optimizes saturation, lightness, and color harmony
+   - Edit `ThemePipeline.js` to improve runtime conversion
+   - Uses fast HSL operations for instant response
 
 3. **Regenerate cache:**
    ```bash
-   node generate-theme-cache.js
-   node update-cache-embedded.js
+   node generate-scheme-cache.js
+   node update-scheme-cache-embedded.js
    ```
    First command generates JSON, second embeds it in the QML file
+   (Repo ships an empty cache; run these before release.)
 
 4. **Test in QuickShell:**
    - The updated CIELAB-optimized colors are immediately available
@@ -75,8 +73,8 @@ The script automatically:
 
 Then regenerate:
 ```bash
-node generate-theme-cache.js    # Scans all themes, generates with CIELAB
-node update-cache-embedded.js   # Embeds into QML file
+node generate-scheme-cache.js    # Scans all themes, builds palettes
+node update-scheme-cache-embedded.js
 ```
 
 **18 themes cached automatically!**
@@ -84,11 +82,12 @@ node update-cache-embedded.js   # Embeds into QML file
 ## Files
 
 - **ColorAnalysis.js** - Node.js only, CIELAB color space conversions
-- **ColorsConvertCached.js** - QuickShell runtime, pre-computed CIELAB themes
-- **ColorsConvert.js** - QuickShell runtime, HSL utilities for dynamic adjustments
-- **generate-theme-cache.js** - CLI tool using CIELAB to generate theme cache
-- **update-cache-embedded.js** - CLI tool to embed cache into QML file
-- **theme-cache.json** - Generated cache (auto-updated, don't edit)
+- **SchemeCache.js** - QuickShell runtime, pre-computed Noctalia palettes
+- **ThemePipeline.js** - Runtime conversion pipeline
+- **ColorsConvert.js** - Runtime HSL utilities
+- **generate-scheme-cache.js** - CLI tool to generate scheme cache
+- **update-scheme-cache-embedded.js** - CLI tool to embed cache + version
+- **scheme-cache.json** - Generated cache (auto-updated, don't edit)
 - **color_analysis_report.js** - CLI tool for analyzing themes
 
 ## Why This Architecture?

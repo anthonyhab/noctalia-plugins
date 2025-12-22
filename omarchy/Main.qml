@@ -2,6 +2,8 @@ import QtQuick
 import Quickshell
 import Quickshell.Io
 import "ColorsConvert.js" as ColorsConvert
+import "ThemePipeline.js" as ThemePipeline
+import "SchemeCache.js" as SchemeCache
 import qs.Commons
 import qs.Services.Theming
 import qs.Services.UI
@@ -73,40 +75,6 @@ Item {
     if (path.startsWith("~/"))
       return home + path.slice(1);
     return path;
-  }
-
-  function colorToHex(color) {
-    if (!color)
-      return "#000000";
-    const r = Math.round(color.r * 255);
-    const g = Math.round(color.g * 255);
-    const b = Math.round(color.b * 255);
-    return ColorsConvert.rgbToHex(r, g, b).toLowerCase();
-  }
-
-  function ensureContrast(foreground, background, minRatio, step) {
-    let result = foreground;
-    const direction = ColorsConvert.getLuminance(background) < 0.5 ? 1 : -1;
-    const stepSize = step || 4;
-    for (let i = 0; i < 12; i++) {
-      if (ColorsConvert.getContrastRatio(result, background) >= minRatio)
-        break;
-      result = ColorsConvert.adjustLightness(result, direction * stepSize);
-    }
-    return result;
-  }
-
-  function normalizeLightSurface(surface) {
-    const hsl = ColorsConvert.hexToHSL(surface);
-    if (!hsl)
-      return surface;
-    if (hsl.l < 85)
-      return surface;
-    const isWarmYellow = hsl.h >= 40 && hsl.h <= 70;
-    if (!isWarmYellow || hsl.s < 25)
-      return surface;
-    const neutralLightness = ColorsConvert.clamp(hsl.l, 88, 97);
-    return ColorsConvert.hslToHex(0, 0, neutralLightness);
   }
 
   function mutatePluginSettings(mutator) {
@@ -218,6 +186,24 @@ Item {
     Settings.data.colorSchemes.useWallpaperColors = false;
 
     applying = true;
+
+    const cacheCompatible = SchemeCache.isCompatible(ThemePipeline.PIPELINE_VERSION);
+    if (themeName && cacheCompatible) {
+      const cached = SchemeCache.getScheme(themeName);
+      if (cached?.palette && cached?.mode) {
+        Logger.i("Omarchy", "Using cached scheme for:", themeName);
+        const isDarkMode = cached.mode === "dark";
+        if (Settings.data.colorSchemes.darkMode !== isDarkMode) {
+          Logger.i("Omarchy", "Auto-switching Noctalia dark mode to:", isDarkMode);
+          Settings.data.colorSchemes.darkMode = isDarkMode;
+        }
+        writeSchemeFile(cached);
+        return true;
+      }
+    } else if (!cacheCompatible) {
+      Logger.w("Omarchy", "Scheme cache version mismatch; falling back to live conversion");
+    }
+
     alacrittyReadProcess.command = ["cat", omarchyConfigPath];
     alacrittyReadProcess.running = true;
     return true;
@@ -246,36 +232,6 @@ Item {
     themeSetProcess.command = [themeSetCommand, nextThemeName];
     themeSetProcess.running = true;
     return true;
-  }
-
-  function bestContrastColor(candidates, background) {
-    let best = null;
-    let bestRatio = -1;
-    for (var i = 0; i < candidates.length; i++) {
-      const candidate = candidates[i];
-      if (!candidate || typeof candidate !== "string")
-        continue;
-      const ratio = ColorsConvert.getContrastRatio(candidate, background);
-      if (ratio > bestRatio) {
-        bestRatio = ratio;
-        best = candidate;
-      }
-    }
-    return best;
-  }
-
-  function selectBestAccentColors(colors) {
-    const primary = colors.blue || colors.brightBlue || colors.cyan || "#4CAF50";
-    const secondary = colors.magenta || colors.brightMagenta || colors.red || "#FFC107";
-    const tertiary = colors.green || colors.brightGreen || colors.yellow || "#2196F3";
-
-    Logger.d("Omarchy", "Selected accents: primary=" + primary + " secondary=" + secondary + " tertiary=" + tertiary);
-
-    return {
-      "primary": primary,
-      "secondary": secondary,
-      "tertiary": tertiary
-    };
   }
 
   function parseAlacrittyToml(content) {
@@ -394,129 +350,6 @@ Item {
     if (!colors.background || !colors.foreground)
       return null;
     return colors;
-  }
-
-  function generateScheme(colors) {
-    const isDarkMode = ColorsConvert.getLuminance(colors.background || "#000000") < 0.5;
-    let baseSurface = colors.background || (isDarkMode ? "#1a1b26" : "#ffffff");
-    if (!isDarkMode) {
-      baseSurface = normalizeLightSurface(baseSurface);
-    }
-    const baseOnSurface = colors.foreground || (isDarkMode ? "#c0caf5" : "#1a1b26");
-
-    Logger.d("Omarchy", "Detected mode:", isDarkMode ? "dark" : "light");
-
-    // Auto-sync dark mode setting
-    if (Settings.data.colorSchemes.darkMode !== isDarkMode) {
-      Logger.i("Omarchy", "Auto-switching Noctalia dark mode to:", isDarkMode);
-      Settings.data.colorSchemes.darkMode = isDarkMode;
-    }
-
-    // Accent colors from theme
-    const accents = selectBestAccentColors(colors);
-    const mPrimary = accents.primary;
-    const mSecondary = accents.secondary;
-    const mTertiary = accents.tertiary;
-    const mError = colors.red || "#f7768e";
-
-    // Base surface - use raw surface without tinting
-    const mSurface = baseSurface || (isDarkMode ? "#1a1b26" : "#ffffff");
-
-    // Use theme's brightWhite if available (closer to native's brighter text)
-    // Fall back to foreground, then to default
-    const textColor = isDarkMode
-      ? (colors.brightWhite || baseOnSurface || "#c0caf5")
-      : (baseOnSurface || "#1a1b26");
-    const mOnSurface = ensureContrast(textColor, mSurface, 4.5, 4);
-
-    // Surface variants
-    const mSurfaceVariant = ColorsConvert.generateSurfaceVariant(mSurface, isDarkMode);
-    const mOnSurfaceVariant = ColorsConvert.generateOnSurfaceVariant(mSurface, mOnSurface, isDarkMode);
-
-    // Surface container levels
-    const mSurfaceContainerLowest = ColorsConvert.generateSurfaceLevel(mSurface, 1, isDarkMode);
-    const mSurfaceContainerLow = ColorsConvert.generateSurfaceLevel(mSurface, 2, isDarkMode);
-    const mSurfaceContainer = ColorsConvert.generateSurfaceLevel(mSurface, 3, isDarkMode);
-    const mSurfaceContainerHigh = ColorsConvert.generateSurfaceLevel(mSurface, 4, isDarkMode);
-    const mSurfaceContainerHighest = ColorsConvert.generateSurfaceLevel(mSurface, 5, isDarkMode);
-    const mSurfaceBright = ColorsConvert.generateSurfaceLevel(mSurface, 4.5, isDarkMode);
-    const mSurfaceDim = ColorsConvert.adjustLightness(mSurface, isDarkMode ? -3 : 3);
-
-    // Outline colors
-    const mOutline = ColorsConvert.generateOutline(mSurface, isDarkMode);
-    const mOutlineVariant = ColorsConvert.generateOutlineVariant(mSurface, isDarkMode);
-
-    // Shadow
-    const mShadow = ColorsConvert.generateShadow(mSurface, isDarkMode);
-
-    // "On" colors for accents - use slightly darker than surface (native uses #16161e vs surface #1a1b26)
-    const darkOnColor = ColorsConvert.adjustLightness(mSurface, -2);
-    const mOnPrimary = ColorsConvert.getContrastRatio(darkOnColor, mPrimary) >= 4.5
-      ? darkOnColor : ColorsConvert.generateOnColor(mPrimary, isDarkMode);
-    const mOnSecondary = ColorsConvert.getContrastRatio(darkOnColor, mSecondary) >= 4.5
-      ? darkOnColor : ColorsConvert.generateOnColor(mSecondary, isDarkMode);
-    const mOnTertiary = ColorsConvert.getContrastRatio(darkOnColor, mTertiary) >= 4.5
-      ? darkOnColor : ColorsConvert.generateOnColor(mTertiary, isDarkMode);
-    const mOnError = ColorsConvert.getContrastRatio(darkOnColor, mError) >= 4.5
-      ? darkOnColor : ColorsConvert.generateOnColor(mError, isDarkMode);
-
-    // Container colors
-    const mPrimaryContainer = ColorsConvert.generateContainerColor(mPrimary, isDarkMode);
-    const mSecondaryContainer = ColorsConvert.generateContainerColor(mSecondary, isDarkMode);
-    const mTertiaryContainer = ColorsConvert.generateContainerColor(mTertiary, isDarkMode);
-    const mErrorContainer = ColorsConvert.generateContainerColor(mError, isDarkMode);
-
-    // On container colors
-    const mOnPrimaryContainer = ColorsConvert.generateOnColor(mPrimaryContainer, isDarkMode);
-    const mOnSecondaryContainer = ColorsConvert.generateOnColor(mSecondaryContainer, isDarkMode);
-    const mOnTertiaryContainer = ColorsConvert.generateOnColor(mTertiaryContainer, isDarkMode);
-    const mOnErrorContainer = ColorsConvert.generateOnColor(mErrorContainer, isDarkMode);
-
-    // Hover colors
-    const mHover = mTertiary;
-    const mOnHover = ColorsConvert.generateOnColor(mHover, isDarkMode);
-
-    const palette = {
-      "mPrimary": mPrimary,
-      "mOnPrimary": mOnPrimary,
-      "mPrimaryContainer": mPrimaryContainer,
-      "mOnPrimaryContainer": mOnPrimaryContainer,
-      "mSecondary": mSecondary,
-      "mOnSecondary": mOnSecondary,
-      "mSecondaryContainer": mSecondaryContainer,
-      "mOnSecondaryContainer": mOnSecondaryContainer,
-      "mTertiary": mTertiary,
-      "mOnTertiary": mOnTertiary,
-      "mTertiaryContainer": mTertiaryContainer,
-      "mOnTertiaryContainer": mOnTertiaryContainer,
-      "mError": mError,
-      "mOnError": mOnError,
-      "mErrorContainer": mErrorContainer,
-      "mOnErrorContainer": mOnErrorContainer,
-      "mBackground": mSurface,
-      "mOnBackground": mOnSurface,
-      "mSurface": mSurface,
-      "mOnSurface": mOnSurface,
-      "mSurfaceVariant": mSurfaceVariant,
-      "mOnSurfaceVariant": mOnSurfaceVariant,
-      "mSurfaceContainerLowest": mSurfaceContainerLowest,
-      "mSurfaceContainerLow": mSurfaceContainerLow,
-      "mSurfaceContainer": mSurfaceContainer,
-      "mSurfaceContainerHigh": mSurfaceContainerHigh,
-      "mSurfaceContainerHighest": mSurfaceContainerHighest,
-      "mSurfaceBright": mSurfaceBright,
-      "mSurfaceDim": mSurfaceDim,
-      "mOutline": mOutline,
-      "mOutlineVariant": mOutlineVariant,
-      "mShadow": mShadow,
-      "mHover": mHover,
-      "mOnHover": mOnHover
-    };
-
-    return {
-      "mode": isDarkMode ? "dark" : "light",
-      "palette": palette
-    };
   }
 
   function writeSchemeFile(result) {
@@ -659,7 +492,15 @@ Item {
       }
 
       Logger.i("Omarchy", "Successfully parsed theme colors");
-      const schemeResult = generateScheme(parsed);
+      const schemeResult = ThemePipeline.generateScheme(parsed, ColorsConvert);
+      Logger.d("Omarchy", "Detected mode:", schemeResult.mode);
+
+      // Auto-sync dark mode setting
+      const isDarkMode = schemeResult.mode === "dark";
+      if (Settings.data.colorSchemes.darkMode !== isDarkMode) {
+        Logger.i("Omarchy", "Auto-switching Noctalia dark mode to:", isDarkMode);
+        Settings.data.colorSchemes.darkMode = isDarkMode;
+      }
       writeSchemeFile(schemeResult);
     }
   }
