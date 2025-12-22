@@ -1,5 +1,5 @@
 // Fast runtime pipeline for generating Noctalia palettes from Omarchy colors.
-const PIPELINE_VERSION = "a0b9d7d54c47";
+const PIPELINE_VERSION = "e93a979d8999";
 
 function ensureContrast(foreground, background, minRatio, step, convert) {
   let result = foreground;
@@ -20,7 +20,9 @@ function normalizeLightSurface(surface, convert) {
   if (hsl.l < 85)
     return surface;
   const isWarmYellow = hsl.h >= 40 && hsl.h <= 70;
-  if (!isWarmYellow || hsl.s < 25)
+  // Only neutralize lightly saturated warm backgrounds (25-45% saturation)
+  // High saturation (>45%) indicates an intentional warm theme like Flexoki
+  if (!isWarmYellow || hsl.s < 25 || hsl.s > 45)
     return surface;
   const neutralLightness = convert.clamp(hsl.l, 88, 97);
   return convert.hslToHex(0, 0, neutralLightness);

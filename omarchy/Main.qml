@@ -20,6 +20,7 @@ Item {
   property string themeName: ""
   property var availableThemes: []
   property bool suppressSettingsSignal: false
+  property bool pendingReloadApply: false
 
   readonly property var defaultSettings: pluginApi?.manifest?.metadata?.defaultSettings || ({})
   readonly property string schemeDisplayName: pluginApi?.manifest?.metadata?.schemeName || "Omarchy"
@@ -449,6 +450,11 @@ Item {
     stdout: StdioCollector {}
     onExited: function (code) {
       themeName = (stdout.text || "").trim();
+      if (root.pendingReloadApply) {
+        root.pendingReloadApply = false;
+        if (pluginApi?.pluginSettings?.active)
+          applyCurrentTheme();
+      }
     }
   }
 
@@ -542,6 +548,7 @@ Item {
     target: "omarchy"
 
     function reload() {
+      root.pendingReloadApply = true;
       root.refresh();
     }
 
@@ -582,8 +589,19 @@ Item {
       const themes = root.availableThemes || [];
       if (themes.length === 0)
         return;
-      const randomIndex = Math.floor(Math.random() * themes.length);
-      const randomTheme = themes[randomIndex];
+
+      // Filter out the currently active theme
+      const otherThemes = themes.filter(theme => {
+        const name = typeof theme === "string" ? theme : theme.name;
+        return name !== root.themeName;
+      });
+
+      // If no other themes available, can't pick a different one
+      if (otherThemes.length === 0)
+        return;
+
+      const randomIndex = Math.floor(Math.random() * otherThemes.length);
+      const randomTheme = otherThemes[randomIndex];
       const randomName = typeof randomTheme === "string" ? randomTheme : randomTheme.name;
       root.setTheme(randomName);
     }
