@@ -48,8 +48,11 @@ Item {
     ? Color.mOnPrimary
     : Color.mOnSurface
 
-  readonly property int thumbSize: Math.round(120 * Style.uiScaleRatio)
-  readonly property int gridColumns: Math.max(1, Math.floor((contentPreferredWidth - Style.marginL * 2 - Style.marginM * 2) / (thumbSize + Style.marginS)))
+  readonly property int minThumbWidth: Math.round(120 * Style.uiScaleRatio)
+  readonly property real thumbAspect: 110 / 140
+  readonly property int gridColumns: Math.max(1, Math.floor((wallpaperFlickable.width + Style.marginS) / (minThumbWidth + Style.marginS)))
+  readonly property int thumbWidth: Math.max(minThumbWidth, Math.floor((wallpaperFlickable.width - (gridColumns - 1) * Style.marginS) / gridColumns))
+  readonly property int thumbHeight: Math.round(thumbWidth * thumbAspect)
   property int thumbReloadToken: 0
 
   onWallpapersChanged: {
@@ -134,43 +137,6 @@ Item {
           }
         }
 
-        Rectangle {
-          id: headerStatusPill
-          radius: height / 2
-          color: autoCycleEnabled ? primaryAccentColor : Color.mSurfaceVariant
-          border.width: Style.borderS
-          border.color: autoCycleEnabled ? primaryAccentColor : Color.mOutline
-          visible: isAvailable
-          implicitHeight: Math.round(28 * Style.uiScaleRatio)
-          implicitWidth: headerStatusRow.implicitWidth + (Style.marginM * 2)
-
-          RowLayout {
-            id: headerStatusRow
-            anchors.centerIn: parent
-            spacing: Style.marginS
-
-            NIcon {
-              icon: autoCycleEnabled ? "player-play" : "player-pause"
-              pointSize: Style.fontSizeM
-              color: autoCycleEnabled ? onPrimaryAccentColor : Color.mOnSurfaceVariant
-            }
-
-            NText {
-              text: autoCycleEnabled
-                ? trOrDefault("status.auto-cycle-on", "Auto-cycle on")
-                : trOrDefault("status.auto-cycle-off", "Auto-cycle off")
-              pointSize: Style.fontSizeS
-              color: autoCycleEnabled ? onPrimaryAccentColor : Color.mOnSurfaceVariant
-            }
-          }
-
-          MouseArea {
-            anchors.fill: parent
-            cursorShape: Qt.PointingHandCursor
-            onClicked: pluginMain?.toggleAutoCycle()
-          }
-        }
-
         NIconButton {
           icon: "x"
           baseSize: Style.baseWidgetSize * 0.8
@@ -183,10 +149,10 @@ Item {
     // Control buttons
     NBox {
       Layout.fillWidth: true
-      Layout.preferredHeight: controlsFlow.implicitHeight + (Style.marginM * 2)
+      Layout.preferredHeight: controlsRow.implicitHeight + (Style.marginM * 2)
 
-      Flow {
-        id: controlsFlow
+      RowLayout {
+        id: controlsRow
         anchors.fill: parent
         anchors.margins: Style.marginM
         spacing: Style.marginS
@@ -195,44 +161,26 @@ Item {
           text: trOrDefault("actions.random", "Random")
           enabled: isAvailable && hasWallpapers
           implicitHeight: Math.round(32 * Style.uiScaleRatio)
+          Layout.fillWidth: true
           onClicked: pluginMain?.random()
         }
 
-        Rectangle {
-          id: shuffleChip
-          radius: height / 2
-          color: shuffleMode ? secondaryContainerColor : Color.mSurfaceVariant
-          border.width: Style.borderS
-          border.color: shuffleMode ? secondaryContainerColor : Color.mOutline
+        NButton {
+          text: autoCycleEnabled
+            ? trOrDefault("status.auto-cycle-on", "Auto-cycle on")
+            : trOrDefault("status.auto-cycle-off", "Auto-cycle off")
+          enabled: isAvailable
           implicitHeight: Math.round(32 * Style.uiScaleRatio)
-          implicitWidth: shuffleRow.implicitWidth + (Style.marginM * 2)
-          opacity: isAvailable ? 1 : 0.5
+          Layout.fillWidth: true
+          onClicked: pluginMain?.toggleAutoCycle()
+        }
 
-          RowLayout {
-            id: shuffleRow
-            anchors.centerIn: parent
-            spacing: Style.marginS
-
-            NIcon {
-              icon: "arrows-shuffle"
-              pointSize: Style.fontSizeM
-              color: shuffleMode ? onSecondaryContainerColor : Color.mOnSurfaceVariant
-            }
-
-            NText {
-              text: trOrDefault("actions.shuffle", "Shuffle")
-              pointSize: Style.fontSizeS
-              color: shuffleMode ? onSecondaryContainerColor : Color.mOnSurfaceVariant
-            }
-          }
-
-          MouseArea {
-            anchors.fill: parent
-            hoverEnabled: true
-            cursorShape: Qt.PointingHandCursor
-            enabled: isAvailable
-            onClicked: pluginMain?.toggleShuffleMode()
-          }
+        NButton {
+          text: trOrDefault("actions.shuffle", "Shuffle")
+          enabled: isAvailable
+          implicitHeight: Math.round(32 * Style.uiScaleRatio)
+          Layout.fillWidth: true
+          onClicked: pluginMain?.toggleShuffleMode()
         }
       }
     }
@@ -264,7 +212,7 @@ Item {
         wallpaperFlow.implicitHeight + (Style.marginM * 2),
         320 * Style.uiScaleRatio
       )
-      Layout.minimumHeight: thumbSize + Style.marginM * 2
+      Layout.minimumHeight: thumbHeight + Style.marginM * 2
 
       Flickable {
         id: wallpaperFlickable
@@ -301,8 +249,8 @@ Item {
                 });
               }
 
-              width: thumbSize
-              height: thumbSize
+              width: thumbWidth
+              height: thumbHeight
               radius: Style.radiusM
               color: isCurrent
                 ? Qt.rgba(Color.mPrimary.r, Color.mPrimary.g, Color.mPrimary.b, 0.15)
@@ -326,8 +274,8 @@ Item {
                   source: ""
                   fillMode: Image.PreserveAspectCrop
                   asynchronous: true
-                  sourceSize.width: thumbSize * 2
-                  sourceSize.height: thumbSize * 2
+                  sourceSize.width: thumbWidth * 2
+                  sourceSize.height: thumbHeight * 2
                   cache: false
                   visible: false
                 }
@@ -366,7 +314,7 @@ Item {
                     anchors.margins: Style.marginS
                     text: fileName
                     pointSize: Style.fontSizeS
-                    color: Color.mOnPrimary !== undefined ? Color.mOnPrimary : Qt.rgba(1, 1, 1, 0.92)
+                    color: Qt.rgba(1, 1, 1, 0.92)
                     elide: Text.ElideRight
                   }
                 }

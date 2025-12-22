@@ -1,0 +1,25 @@
+{
+  "id": "polkit-auth",
+  "name": "Polkit Authentication",
+  "version": "0.1.0",
+  "minNoctaliaVersion": "3.6.0",
+  "author": "habibe",
+  "license": "MIT",
+  "repository": "https://github.com/habibe/noctalia-shell",
+  "description": "Use Noctalia panels as your Polkit authentication agent.",
+  "entryPoints": {
+    "main": "Main.qml",
+    "panel": "Panel.qml",
+    "settings": "Settings.qml"
+  },
+  "dependencies": { "plugins": [] },
+  "metadata": {
+    "defaultSettings": {
+      "helperPath": "",
+      "pollInterval": 100,
+      "autoOpenPanel": true,
+      "autoCloseOnSuccess": true,
+      "autoCloseOnCancel": true
+    }
+  }
+}
