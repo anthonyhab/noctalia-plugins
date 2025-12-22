@@ -1,0 +1,7 @@
+# Generated files
+theme-cache.json
+node_modules/
+
+# Test files
+test-*.js
+*-test.js
