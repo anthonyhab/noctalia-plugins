@@ -51,4 +51,4 @@ The plugin talks to the agent over IPC via:
 
 `$XDG_RUNTIME_DIR/noctalia-polkit-agent.sock`
 
-Make sure the systemd user service is enabled and running. No helper path configuration is required.
+Make sure the systemd user service is enabled and running. No extra configuration is required.

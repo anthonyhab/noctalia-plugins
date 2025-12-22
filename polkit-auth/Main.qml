@@ -9,7 +9,7 @@ Item {
 
   property var pluginApi: null
 
-  // Helper to get setting with fallback to manifest defaults
+  // Settings getter with fallback to manifest defaults
   function getSetting(key, fallback) {
     const userVal = pluginApi?.pluginSettings?.[key];
     if (userVal !== undefined && userVal !== null) return userVal;

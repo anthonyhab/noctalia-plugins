@@ -26,7 +26,7 @@
   "errors": {
     "auth-failed": "Authentication failed",
     "cancel-failed": "Failed to cancel request",
-    "helper-failed": "Authentication error"
+    "agent-failed": "Authentication error"
   },
   "settings": {
     "description": "Connect to the Noctalia polkit agent over IPC.",
