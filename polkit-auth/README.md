@@ -27,7 +27,7 @@ cmake -B build -DCMAKE_INSTALL_PREFIX=/usr
 cmake --build build
 sudo cmake --install build
 ```
-Use `/usr/local` instead if you want a local install; the helper path changes accordingly.
+Use `/usr/local` instead if you want a local install.
 
 ### 3. Disable other polkit agents
 
@@ -47,8 +47,8 @@ systemctl --user enable --now noctalia-polkit.service
 
 ### 5. Configure the plugin
 
-In Noctalia's plugin settings, set the helper path to the installed binary. Typical paths:
-- `/usr/libexec/noctalia-polkit` for `-DCMAKE_INSTALL_PREFIX=/usr`
-- `/usr/local/libexec/noctalia-polkit` for the default `/usr/local`
-If your distro uses `lib64`, the path may be `/usr/lib64/libexec/noctalia-polkit`.
-On NixOS, the path is typically `/run/current-system/sw/libexec/noctalia-polkit`, or `~/.nix-profile/libexec/noctalia-polkit` for user installs.
+The plugin talks to the agent over IPC via:
+
+`$XDG_RUNTIME_DIR/noctalia-polkit-agent.sock`
+
+Make sure the systemd user service is enabled and running. No helper path configuration is required.

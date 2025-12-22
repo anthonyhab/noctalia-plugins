@@ -17,7 +17,6 @@ ColumnLayout {
 
   property string themeSetCommand: ""
   property string configDir: ""
-  property bool useThemeSurface: true
   property bool showThemeName: true
   readonly property var pluginMain: pluginApi?.mainInstance
   readonly property var defaultSettings: pluginApi?.manifest?.metadata?.defaultSettings || ({})
@@ -53,7 +52,6 @@ ColumnLayout {
       return;
     themeSetCommand = getSetting("themeSetCommand", "") || "";
     configDir = getSetting("omarchyConfigDir", "") || "";
-    useThemeSurface = !!getSetting("useThemeSurface", true);
     showThemeName = getSetting("showThemeName", true) !== false;
   }
 
@@ -66,7 +64,6 @@ ColumnLayout {
 
     var settings = pluginApi.pluginSettings || {};
     var refreshNeeded = false;
-    var reapplyNeeded = false;
     var changed = false;
 
     var trimmedCommand = themeSetCommand.trim();
@@ -83,14 +80,6 @@ ColumnLayout {
       changed = true;
     }
 
-    if (!!settings.useThemeSurface !== useThemeSurface) {
-      settings.useThemeSurface = useThemeSurface;
-      if (settings.active) {
-        reapplyNeeded = true;
-      }
-      changed = true;
-    }
-
     if (!!settings.showThemeName !== showThemeName) {
       settings.showThemeName = showThemeName;
       changed = true;
@@ -104,9 +93,6 @@ ColumnLayout {
 
     if (refreshNeeded) {
       pluginApi.mainInstance?.refresh();
-    }
-    if (reapplyNeeded) {
-      pluginApi.mainInstance?.applyCurrentTheme();
     }
   }
 
@@ -143,13 +129,6 @@ ColumnLayout {
         root.configDir = text;
       }
     }
-  }
-
-  NToggle {
-    label: pluginApi?.tr("fields.use-theme-surface.label") || "Use theme background for UI surfaces"
-    description: pluginApi?.tr("fields.use-theme-surface.desc") || "If disabled, surfaces stay neutral and theme colors are used as accents."
-    checked: root.useThemeSurface
-    onToggled: checked => root.useThemeSurface = checked
   }
 
   NToggle {

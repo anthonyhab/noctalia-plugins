@@ -15,7 +15,6 @@
   "dependencies": { "plugins": [] },
   "metadata": {
     "defaultSettings": {
-      "helperPath": "",
       "pollInterval": 100,
       "displayMode": "floating",
       "autoOpenPanel": true,

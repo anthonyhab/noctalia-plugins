@@ -18,12 +18,18 @@ Item {
     return fallback;
   }
 
-  readonly property string helperPath: getSetting("helperPath", "")
   readonly property int pollInterval: getSetting("pollInterval", 100)
   readonly property bool autoOpenPanel: getSetting("autoOpenPanel", true)
   readonly property bool autoCloseOnSuccess: getSetting("autoCloseOnSuccess", true)
   readonly property bool autoCloseOnCancel: getSetting("autoCloseOnCancel", true)
   readonly property string displayMode: getSetting("displayMode", "floating")
+
+  readonly property string socketPath: {
+    const runtimeDir = Quickshell.env("XDG_RUNTIME_DIR");
+    return runtimeDir && runtimeDir.length > 0
+      ? (runtimeDir + "/noctalia-polkit-agent.sock")
+      : "";
+  }
 
   property bool agentAvailable: false
   property string agentStatus: ""
@@ -34,6 +40,10 @@ Item {
   property bool requestInFlight: false
   property bool responseInFlight: false
   property string pendingPassword: ""
+  property var socketQueue: []
+  property var pendingSocketRequest: null
+  property bool socketBusy: false
+  property bool socketResponseReceived: false
 
   signal requestReceived()
   signal requestCompleted(bool success)
@@ -43,21 +53,25 @@ Item {
   }
 
   function checkAgent() {
-    if (!helperPath) {
+    if (!socketPath) {
       agentAvailable = false;
-      agentStatus = pluginApi?.tr("status.missing-helper") || "Helper path not configured";
+      agentStatus = pluginApi?.tr("status.socket-unavailable") || "Polkit agent socket not available";
       return;
     }
 
-    if (pingProcess.running)
-      return;
-
-    pingProcess.command = [helperPath, "--ping"];
-    pingProcess.running = true;
+    enqueueSocketCommand("PING", "", function(ok, response) {
+      if (ok && response === "PONG") {
+        agentAvailable = true;
+        agentStatus = "";
+      } else {
+        agentAvailable = false;
+        agentStatus = pluginApi?.tr("status.agent-unavailable") || "Polkit agent not reachable";
+      }
+    });
   }
 
   function pollRequests() {
-    if (!agentAvailable || !helperPath)
+    if (!agentAvailable)
       return;
 
     if (requestInFlight) {
@@ -66,8 +80,47 @@ Item {
     }
 
     requestInFlight = true;
-    pollProcess.command = [helperPath, "--next"];
-    pollProcess.running = true;
+    enqueueSocketCommand("NEXT", "", function(ok, response) {
+      requestInFlight = false;
+
+      if (!ok) {
+        pollRetryTimer.restart();
+        return;
+      }
+
+      const output = (response || "").trim();
+      if (!output) {
+        return;
+      }
+
+      let payload = null;
+      try {
+        payload = JSON.parse(output);
+      } catch (e) {
+        Logger.e("PolkitAuth", "Failed to parse agent payload:", e);
+        return;
+      }
+
+      if (payload.type === "request") {
+        enqueueRequest(payload);
+        Qt.callLater(pollImmediately);
+      } else if (payload.type === "update") {
+        if (payload.error) {
+          lastError = payload.error;
+        }
+        if (payload.id && currentRequest && currentRequest.id === payload.id) {
+          if (payload.prompt) {
+            currentRequest = Object.assign({}, currentRequest, { prompt: payload.prompt });
+          }
+        }
+        Qt.callLater(pollImmediately);
+      } else if (payload.type === "complete") {
+        const isSuccess = payload.result === "success";
+        const isCancelled = payload.result === "cancelled";
+        handleRequestComplete(payload.id, isSuccess, isCancelled);
+        Qt.callLater(pollImmediately);
+      }
+    });
   }
 
   function pollImmediately() {
@@ -144,20 +197,27 @@ Item {
   }
 
   function submitPassword(password) {
-    if (!currentRequest || responseInFlight || !helperPath)
+    if (!currentRequest || responseInFlight)
       return;
 
     responseInFlight = true;
     lastError = "";
     pendingPassword = password;
 
-    respondProcess.command = [helperPath, "--respond", currentRequest.id];
-    respondProcess.stdinEnabled = true;
-    respondProcess.running = true;
+    enqueueSocketCommand("RESPOND " + currentRequest.id, password, function(ok, response) {
+      responseInFlight = false;
+      pendingPassword = "";
+
+      if (!ok || response !== "OK") {
+        lastError = pluginApi?.tr("errors.auth-failed") || "Authentication failed";
+      }
+
+      Qt.callLater(pollImmediately);
+    });
   }
 
   function cancelRequest() {
-    if (!currentRequest || !helperPath)
+    if (!currentRequest)
       return;
 
     if (responseInFlight) {
@@ -168,8 +228,17 @@ Item {
     responseInFlight = true;
     lastError = "";
 
-    cancelProcess.command = [helperPath, "--cancel", currentRequest.id];
-    cancelProcess.running = true;
+    enqueueSocketCommand("CANCEL " + currentRequest.id, "", function(ok, response) {
+      responseInFlight = false;
+
+      if (!ok || response !== "OK") {
+        lastError = pluginApi?.tr("errors.cancel-failed") || "Failed to cancel request";
+        Qt.callLater(pollImmediately);
+        return;
+      }
+
+      Qt.callLater(pollImmediately);
+    });
   }
 
   function handleRequestComplete(requestId, success, wasCancelled) {
@@ -247,119 +316,81 @@ Item {
     }
   }
 
-  Process {
-    id: pingProcess
-    running: false
-    stdout: StdioCollector {}
-    onExited: function(code) {
-      const wasAvailable = agentAvailable;
-      if (code === 0) {
-        agentAvailable = true;
-        agentStatus = "";
-      } else {
-        agentAvailable = false;
-        const output = (stdout.text || "").trim();
-        agentStatus = output || (pluginApi?.tr("status.agent-unavailable") || "Polkit agent not reachable");
-      }
+  function enqueueSocketCommand(command, payload, onResponse) {
+    if (!socketPath) {
+      onResponse?.(false, "");
+      return;
     }
+
+    socketQueue = socketQueue.concat([{ command: command, payload: payload, onResponse: onResponse }]);
+    startNextSocketCommand();
   }
 
-  Process {
-    id: pollProcess
-    running: false
-    stdout: StdioCollector {}
-    onExited: function(code) {
-      requestInFlight = false;
+  function startNextSocketCommand() {
+    if (socketBusy || socketQueue.length === 0)
+      return;
 
-      if (code !== 0) {
-        pollRetryTimer.restart();
-        return;
-      }
-
-      const output = (stdout.text || "").trim();
-      if (!output) {
-        return;
-      }
-
-      let payload = null;
-      try {
-        payload = JSON.parse(output);
-      } catch (e) {
-        Logger.e("PolkitAuth", "Failed to parse helper payload:", e);
-        return;
-      }
-
-      if (payload.type === "request") {
-        enqueueRequest(payload);
-        Qt.callLater(pollImmediately);
-      } else if (payload.type === "update") {
-        if (payload.error) {
-          lastError = payload.error;
-        }
-        if (payload.id && currentRequest && currentRequest.id === payload.id) {
-          if (payload.prompt) {
-            currentRequest = Object.assign({}, currentRequest, { prompt: payload.prompt });
-          }
-        }
-        Qt.callLater(pollImmediately);
-      } else if (payload.type === "complete") {
-        const isSuccess = payload.result === "success";
-        const isCancelled = payload.result === "cancelled";
-        handleRequestComplete(payload.id, isSuccess, isCancelled);
-        Qt.callLater(pollImmediately);
-      }
-    }
+    pendingSocketRequest = socketQueue[0];
+    socketQueue = socketQueue.slice(1);
+    socketBusy = true;
+    socketResponseReceived = false;
+    agentSocket.connected = true;
+    socketTimeout.restart();
   }
 
-  Process {
-    id: respondProcess
-    running: false
-    stdout: StdioCollector {}
-    onStarted: {
-      if (pendingPassword !== "") {
-        write(pendingPassword + "\n");
-        pendingPassword = "";
-        closeStdinTimer.restart();
-      } else {
-        stdinEnabled = false;
+  function finishSocketCommand(ok, response) {
+    socketTimeout.stop();
+    socketResponseReceived = true;
+    agentSocket.connected = false;
+    socketBusy = false;
+    const cb = pendingSocketRequest?.onResponse;
+    pendingSocketRequest = null;
+    cb?.(ok, response || "");
+    Qt.callLater(startNextSocketCommand);
+  }
+
+  Socket {
+    id: agentSocket
+    path: root.socketPath
+    connected: false
+
+    onConnectedChanged: {
+      if (connected) {
+        if (!pendingSocketRequest) {
+          connected = false;
+          return;
+        }
+
+        let data = pendingSocketRequest.command + "\n";
+        if (pendingSocketRequest.payload && pendingSocketRequest.payload.length > 0) {
+          data += pendingSocketRequest.payload + "\n";
+        }
+        write(data);
+        flush();
+        return;
+      }
+
+      if (socketBusy && !socketResponseReceived) {
+        finishSocketCommand(false, "");
       }
     }
-    onExited: function(code) {
-      responseInFlight = false;
-      pendingPassword = "";
-      closeStdinTimer.stop();
 
-      if (code !== 0) {
-        lastError = pluginApi?.tr("errors.auth-failed") || "Authentication failed";
+    parser: SplitParser {
+      onRead: function(line) {
+        const response = (line || "").trim();
+        finishSocketCommand(true, response);
       }
-
-      Qt.callLater(pollImmediately);
     }
   }
 
   Timer {
-    id: closeStdinTimer
-    interval: 50
+    id: socketTimeout
+    interval: 1000
     repeat: false
     onTriggered: {
-      respondProcess.stdinEnabled = false;
-    }
-  }
-
-  Process {
-    id: cancelProcess
-    running: false
-    stdout: StdioCollector {}
-    onExited: function(code) {
-      responseInFlight = false;
-
-      if (code !== 0) {
-        lastError = pluginApi?.tr("errors.cancel-failed") || "Failed to cancel request";
-        Qt.callLater(pollImmediately);
-        return;
+      if (socketBusy && !socketResponseReceived) {
+        finishSocketCommand(false, "");
       }
-
-      Qt.callLater(pollImmediately);
     }
   }
 

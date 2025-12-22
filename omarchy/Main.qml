@@ -32,16 +32,6 @@ Item {
   readonly property string previousWallpaperKey: "_prevUseWallpaperColors"
   readonly property string previousSchemeKey: "_prevPredefinedScheme"
 
-  readonly property bool useThemeSurface: {
-    if (pluginApi?.pluginSettings && pluginApi.pluginSettings.useThemeSurface !== undefined) {
-      return !!pluginApi.pluginSettings.useThemeSurface;
-    }
-    if (defaultSettings && defaultSettings.useThemeSurface !== undefined) {
-      return !!defaultSettings.useThemeSurface;
-    }
-    return true;
-  }
-
   readonly property string omarchyConfigDir: {
     const configured = pluginApi?.pluginSettings?.omarchyConfigDir;
     if (configured && typeof configured === "string" && configured.trim() !== "") {
@@ -104,6 +94,19 @@ Item {
       result = ColorsConvert.adjustLightness(result, direction * stepSize);
     }
     return result;
+  }
+
+  function normalizeLightSurface(surface) {
+    const hsl = ColorsConvert.hexToHSL(surface);
+    if (!hsl)
+      return surface;
+    if (hsl.l < 85)
+      return surface;
+    const isWarmYellow = hsl.h >= 40 && hsl.h <= 70;
+    if (!isWarmYellow || hsl.s < 25)
+      return surface;
+    const neutralLightness = ColorsConvert.clamp(hsl.l, 88, 97);
+    return ColorsConvert.hslToHex(0, 0, neutralLightness);
   }
 
   function mutatePluginSettings(mutator) {
@@ -394,9 +397,12 @@ Item {
   }
 
   function generateScheme(colors) {
-    const baseSurface = useThemeSurface ? colors.background : colorToHex(Color.mSurface);
-    const baseOnSurface = useThemeSurface ? colors.foreground : colorToHex(Color.mOnSurface);
-    const isDarkMode = useThemeSurface ? (ColorsConvert.getLuminance(baseSurface) < 0.5) : (Settings.data.colorSchemes.darkMode === true);
+    const isDarkMode = ColorsConvert.getLuminance(colors.background || "#000000") < 0.5;
+    let baseSurface = colors.background || (isDarkMode ? "#1a1b26" : "#ffffff");
+    if (!isDarkMode) {
+      baseSurface = normalizeLightSurface(baseSurface);
+    }
+    const baseOnSurface = colors.foreground || (isDarkMode ? "#c0caf5" : "#1a1b26");
 
     Logger.d("Omarchy", "Detected mode:", isDarkMode ? "dark" : "light");
 
@@ -418,7 +424,9 @@ Item {
 
     // Use theme's brightWhite if available (closer to native's brighter text)
     // Fall back to foreground, then to default
-    const textColor = colors.brightWhite || baseOnSurface || (isDarkMode ? "#c0caf5" : "#1a1b26");
+    const textColor = isDarkMode
+      ? (colors.brightWhite || baseOnSurface || "#c0caf5")
+      : (baseOnSurface || "#1a1b26");
     const mOnSurface = ensureContrast(textColor, mSurface, 4.5, 4);
 
     // Surface variants

@@ -24,10 +24,6 @@
       "placeholder": "Select…",
       "available": "Available themes"
     },
-    "use-theme-surface": {
-      "label": "Use theme background for UI surfaces",
-      "desc": "If disabled, surfaces stay neutral and theme colors are used as accents."
-    },
     "show-theme-name": {
       "label": "Show theme name in bar widget",
       "desc": "If disabled, only the Omarchy icon is shown in the bar."
@@ -58,7 +54,7 @@
     "settings-hint": "Configure Omarchy paths via Settings → Plugins → Omarchy."
   },
   "settings": {
-    "description": "Set how Noctalia locates Omarchy and whether its colors replace shell surfaces.",
+    "description": "Set how Noctalia locates Omarchy and manage the plugin state.",
     "paths-hint": "Point the fields below at your Omarchy install; leave blank to use the defaults.",
     "controls": {
       "title": "Plugin controls"

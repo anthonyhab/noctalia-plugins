@@ -24,7 +24,6 @@ ColumnLayout {
     return fallback;
   }
 
-  property string valueHelperPath: getSetting("helperPath", "")
   property string valuePollInterval: getSetting("pollInterval", 100).toString()
   property string valueDisplayMode: getSetting("displayMode", "floating")
   property bool valueAutoOpenPanel: getSetting("autoOpenPanel", true)
@@ -37,7 +36,6 @@ ColumnLayout {
     if (!pluginApi)
       return;
 
-    pluginApi.pluginSettings.helperPath = valueHelperPath.trim();
     pluginApi.pluginSettings.pollInterval = parseInt(valuePollInterval, 10) || 100;
     pluginApi.pluginSettings.displayMode = valueDisplayMode;
     pluginApi.pluginSettings.autoOpenPanel = valueAutoOpenPanel;
@@ -49,17 +47,9 @@ ColumnLayout {
   }
 
   NText {
-    text: pluginApi?.tr("settings.description") || "Run the Noctalia polkit helper as your session authentication agent."
+    text: pluginApi?.tr("settings.description") || "Connect to the Noctalia polkit agent over IPC."
     wrapMode: Text.WordWrap
     color: Color.mOnSurface
-  }
-
-  NTextInput {
-    label: pluginApi?.tr("settings.helper-path") || "Helper binary path"
-    description: pluginApi?.tr("settings.helper-path-desc") || "Absolute path to the noctalia-polkit-agent binary."
-    placeholderText: "/usr/local/bin/noctalia-polkit-agent"
-    text: root.valueHelperPath
-    onTextChanged: root.valueHelperPath = text
   }
 
   NTextInput {

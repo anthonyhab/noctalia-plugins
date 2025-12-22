@@ -188,10 +188,15 @@ function correctThemeColors(themeColors, isDarkMode) {
     // Fix surface color if too warm or saturated
     const surfaceHsl = colorAnalysis.hexToHSL(themeColors.surface || themeColors.background);
     if ((surfaceHsl.h > 60 || surfaceHsl.s > 15) && surfaceLab) {
-      // Make surface more neutral
+      // Make surface more neutral and refresh derived surfaces.
       const neutralLightness = clamp(surfaceLab.l, 85, 95);
-      corrected.background = colorAnalysis.labToHex(neutralLightness, 0, 0) || corrected.background;
-      corrected.surface = corrected.background;
+      const neutralSurface = colorAnalysis.labToHex(neutralLightness, 0, 0) || corrected.background;
+      corrected.background = neutralSurface;
+      corrected.surface = neutralSurface;
+      corrected.surface1 = adjustLightness(neutralSurface, 5);
+      corrected.surface2 = adjustLightness(neutralSurface, 10);
+      corrected.outline = adjustLightness(neutralSurface, 15);
+      corrected.outlineVariant = adjustLightness(neutralSurface, 10);
     }
     
     // Fix text color if improper lightness
