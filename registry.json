@@ -33,6 +33,17 @@
       "minNoctaliaVersion": "3.6.0",
       "license": "MIT",
       "lastUpdated": "2025-12-17T23:50:00Z"
+    },
+    {
+      "id": "swww-picker",
+      "name": "SWWW Wallpaper Picker",
+      "version": "0.1.0",
+      "author": "habibe",
+      "description": "Cycle wallpapers using swww with manual and automatic controls.",
+      "repository": "https://github.com/habibe/noctalia-shell",
+      "minNoctaliaVersion": "3.6.0",
+      "license": "MIT",
+      "lastUpdated": "2025-12-22T00:00:00Z"
     }
   ]
 }
