@@ -358,6 +358,145 @@ function analyzeColorHarmony(colors) {
 }
 
 // ============================================
+// Light/Dark Theme Validation
+// ============================================
+
+function validateThemeColors(themeColors, isDarkMode) {
+  const issues = [];
+  
+  // Convert all colors to analysis formats
+  const surfaceLab = hexToLab(themeColors.surface);
+  const onSurfaceLab = hexToLab(themeColors.onSurface);
+  const primaryLab = hexToLab(themeColors.primary);
+  const shadowLab = hexToLab(themeColors.shadow);
+  
+  const surfaceHsl = hexToHSL(themeColors.surface);
+  const primaryHsl = hexToHSL(themeColors.primary);
+  
+  if (!surfaceLab || !onSurfaceLab || !primaryLab) {
+    issues.push('Invalid color format in theme');
+    return issues;
+  }
+  
+  // Mode-specific validation
+  if (isDarkMode) {
+    // Dark theme validation
+    if (surfaceLab.l > 60) {
+      issues.push('Dark theme surface too light (L:' + surfaceLab.l.toFixed(1) + ', should be <60)');
+    }
+    if (onSurfaceLab.l < 70) {
+      issues.push('Dark theme text too dark (L:' + onSurfaceLab.l.toFixed(1) + ', should be >70)');
+    }
+  } else {
+    // Light theme validation
+    if (surfaceLab.l < 85) {
+      issues.push('Light theme surface too dark (L:' + surfaceLab.l.toFixed(1) + ', should be >85)');
+    }
+    if (surfaceHsl.h > 60 || surfaceHsl.h < 0) {
+      issues.push('Light theme surface too warm (H:' + surfaceHsl.h.toFixed(0) + '°, should be 0-60°)');
+    }
+    if (surfaceHsl.s > 15) {
+      issues.push('Light theme surface too saturated (S:' + surfaceHsl.s.toFixed(1) + '%, should be <15%)');
+    }
+    if (onSurfaceLab.l > 30 || onSurfaceLab.l < 15) {
+      issues.push('Light theme text improper lightness (L:' + onSurfaceLab.l.toFixed(1) + ', should be 15-30)');
+    }
+  }
+  
+  // Common validation for both modes
+  const surfaceTextContrast = calculateColorDifference(themeColors.surface, themeColors.onSurface);
+  if (surfaceTextContrast < 40) {
+    issues.push('Poor surface/text contrast (ΔE:' + surfaceTextContrast.toFixed(1) + ', should be >40)');
+  } else if (surfaceTextContrast > 80) {
+    issues.push('Excessive surface/text contrast (ΔE:' + surfaceTextContrast.toFixed(1) + ', should be <80)');
+  }
+  
+  const surfacePrimaryContrast = calculateColorDifference(themeColors.surface, themeColors.primary);
+  if (surfacePrimaryContrast < 20) {
+    issues.push('Poor primary visibility (ΔE:' + surfacePrimaryContrast.toFixed(1) + ', should be >20)');
+  }
+  
+  const surfaceShadowDiff = calculateColorDifference(themeColors.surface, themeColors.shadow);
+  if (surfaceShadowDiff < 2) {
+    issues.push('Surface and shadow too similar (ΔE:' + surfaceShadowDiff.toFixed(1) + ', should be >2)');
+  }
+  
+  return issues;
+}
+
+function correctThemeColors(themeColors, isDarkMode) {
+  const corrected = {...themeColors};
+  const issues = validateThemeColors(themeColors, isDarkMode);
+  
+  if (issues.length === 0) {
+    return corrected; // No issues to fix
+  }
+  
+  // Apply corrections based on validation issues
+  const surfaceLab = hexToLab(themeColors.surface);
+  const onSurfaceLab = hexToLab(themeColors.onSurface);
+  
+  if (!isDarkMode) {
+    // Light theme specific corrections
+    
+    // Fix surface color if too warm or saturated
+    const surfaceHsl = hexToHSL(themeColors.surface);
+    if ((surfaceHsl.h > 60 || surfaceHsl.s > 15) && surfaceLab) {
+      // Make surface more neutral
+      const neutralLightness = clamp(surfaceLab.l, 85, 95);
+      corrected.surface = labToHex(neutralLightness, 0, 0) || corrected.surface;
+    }
+    
+    // Fix text color if improper lightness
+    if (onSurfaceLab && (onSurfaceLab.l > 30 || onSurfaceLab.l < 15)) {
+      const targetLightness = clamp(onSurfaceLab.l, 15, 30);
+      corrected.onSurface = labToHex(targetLightness, onSurfaceLab.a, onSurfaceLab.b) || corrected.onSurface;
+    }
+    
+    // Ensure proper contrast
+    const contrast = calculateColorDifference(corrected.surface, corrected.onSurface);
+    if (contrast > 80) {
+      // Reduce contrast by lightening text slightly
+      const onSurfaceLab = hexToLab(corrected.onSurface);
+      if (onSurfaceLab) {
+        const adjustedLightness = onSurfaceLab.l + 5;
+        corrected.onSurface = labToHex(adjustedLightness, onSurfaceLab.a, onSurfaceLab.b) || corrected.onSurface;
+      }
+    }
+  }
+  
+  // Fix shadow color if identical to surface
+  const surfaceShadowDiff = calculateColorDifference(corrected.surface, corrected.shadow);
+  if (surfaceShadowDiff < 2) {
+    const surfaceLab = hexToLab(corrected.surface);
+    if (surfaceLab) {
+      const shadowLightness = isDarkMode ? surfaceLab.l - 3 : surfaceLab.l - 2;
+      corrected.shadow = labToHex(shadowLightness, surfaceLab.a * 0.9, surfaceLab.b * 0.9) || corrected.shadow;
+    }
+  }
+  
+  // Fix primary visibility if poor
+  const primaryContrast = calculateColorDifference(corrected.surface, corrected.primary);
+  if (primaryContrast < 20) {
+    // Try to adjust primary color for better visibility
+    const primaryHsl = hexToHSL(corrected.primary);
+    const surfaceHsl = hexToHSL(corrected.surface);
+    
+    if (primaryHsl && surfaceHsl) {
+      // Adjust hue to be more different from surface
+      const hueDiff = Math.abs(primaryHsl.h - surfaceHsl.h);
+      if (hueDiff < 60 || hueDiff > 300) {
+        // Move hue away from surface hue
+        const newHue = (surfaceHsl.h + 180) % 360;
+        corrected.primary = hslToHex(newHue, primaryHsl.s, primaryHsl.l);
+      }
+    }
+  }
+  
+  return corrected;
+}
+
+// ============================================
 // Theme Comparison and Optimization
 // ============================================
 

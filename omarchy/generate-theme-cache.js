@@ -38,53 +38,218 @@ function isLightColor(hex) {
 
 function convertOmarchyToNoctalia(omarchyColors) {
   const isDarkMode = !isLightColor(omarchyColors.background || '#000000');
-
-  // Map omarchy colors to noctalia structure
+  
+  // First, validate and correct the source colors
+  const correctedColors = correctThemeColors(omarchyColors, isDarkMode);
+  
+  // Map corrected colors to noctalia structure
   const noctaliaTheme = {
     // Surface colors
-    surface: omarchyColors.background || omarchyColors.surface,
-    surfaceVariant: omarchyColors.surface1 || adjustLightness(omarchyColors.background, isDarkMode ? 5 : -5),
-    surface1: omarchyColors.surface1,
-    surface2: omarchyColors.surface2,
-
-    // Text colors
-    onSurface: omarchyColors.foreground || omarchyColors.onSurface,
-    onSurfaceVariant: omarchyColors.subtext0 || adjustLightness(omarchyColors.foreground, isDarkMode ? -15 : 15),
-
-    // Outline colors
-    outline: omarchyColors.outline || adjustLightness(omarchyColors.background, isDarkMode ? 15 : -15),
-    outlineVariant: omarchyColors.outlineVariant || adjustLightness(omarchyColors.background, isDarkMode ? 10 : -10),
-
-    // Accent colors
-    primary: omarchyColors.blue || omarchyColors.primary,
-    primaryContainer: omarchyColors.surface1 || adjustLightness(omarchyColors.blue, isDarkMode ? -20 : 20),
-    onPrimary: omarchyColors.crust || (isDarkMode ? '#000000' : '#ffffff'),
-
-    secondary: omarchyColors.mauve || omarchyColors.secondary,
-    secondaryContainer: adjustLightness(omarchyColors.mauve, isDarkMode ? -20 : 20),
-    onSecondary: isDarkMode ? '#000000' : '#ffffff',
-
-    tertiary: omarchyColors.pink || omarchyColors.tertiary,
-    tertiaryContainer: adjustLightness(omarchyColors.pink, isDarkMode ? -20 : 20),
-    onTertiary: isDarkMode ? '#000000' : '#ffffff',
-
-    // Semantic colors
-    error: omarchyColors.red,
-    errorContainer: adjustLightness(omarchyColors.red, isDarkMode ? -25 : 25),
-    onError: isDarkMode ? '#000000' : '#ffffff',
-
-    warning: omarchyColors.yellow || omarchyColors.peach,
-    success: omarchyColors.green,
-    info: omarchyColors.blue || omarchyColors.sky,
-
-    // Shadow
-    shadow: adjustLightness(omarchyColors.background, isDarkMode ? -5 : -10),
-
-    // Scrim
-    scrim: isDarkMode ? '#000000' : '#000000'
+    surface: correctedColors.background || correctedColors.surface,
+    surfaceVariant: correctedColors.surface1 || adjustLightness(correctedColors.background, isDarkMode ? 5 : -5),
+    surface1: correctedColors.surface1,
+    surface2: correctedColors.surface2,
+  
+  // Text colors
+  onSurface: correctedColors.foreground || correctedColors.onSurface,
+  onSurfaceVariant: correctedColors.subtext0 || adjustLightness(correctedColors.foreground, isDarkMode ? -15 : 15),
+  
+  // Outline colors
+  outline: correctedColors.outline || adjustLightness(correctedColors.background, isDarkMode ? 15 : -15),
+  outlineVariant: correctedColors.outlineVariant || adjustLightness(correctedColors.background, isDarkMode ? 10 : -10),
+  
+  // Accent colors
+  primary: correctedColors.blue || correctedColors.primary,
+  primaryContainer: correctedColors.surface1 || adjustLightness(correctedColors.blue, isDarkMode ? -20 : 20),
+  onPrimary: correctedColors.crust || (isDarkMode ? '#000000' : '#ffffff'),
+  
+  secondary: correctedColors.mauve || correctedColors.secondary,
+  secondaryContainer: adjustLightness(correctedColors.mauve, isDarkMode ? -20 : 20),
+  onSecondary: isDarkMode ? '#000000' : '#ffffff',
+  
+  tertiary: correctedColors.pink || correctedColors.tertiary,
+  tertiaryContainer: adjustLightness(correctedColors.pink, isDarkMode ? -20 : 20),
+  onTertiary: isDarkMode ? '#000000' : '#ffffff',
+  
+  // Semantic colors
+  error: correctedColors.red,
+  errorContainer: adjustLightness(correctedColors.red, isDarkMode ? -25 : 25),
+  onError: isDarkMode ? '#000000' : '#ffffff',
+  
+  warning: correctedColors.yellow || correctedColors.peach,
+  success: correctedColors.green,
+  info: correctedColors.blue || correctedColors.sky,
+  
+  // Shadow (ensure it's different from surface)
+  shadow: adjustLightness(correctedColors.background, isDarkMode ? -5 : -10),
+  
+  // Scrim
+  scrim: isDarkMode ? '#000000' : '#000000'
   };
-
+  
+  // Final validation of the converted theme
+  const validationIssues = validateThemeColors(noctaliaTheme, isDarkMode);
+  if (validationIssues.length > 0) {
+    console.warn(`  Theme validation issues for ${omarchyColors.themeName || 'unknown'}:`);
+    validationIssues.forEach(issue => console.warn(`    - ${issue}`));
+  }
+  
   return noctaliaTheme;
+}
+
+// Add the validation and correction functions
+function validateThemeColors(themeColors, isDarkMode) {
+  const issues = [];
+  
+  // Convert all colors to analysis formats
+  const surfaceLab = colorAnalysis.hexToLab(themeColors.surface || themeColors.background);
+  const onSurfaceLab = colorAnalysis.hexToLab(themeColors.onSurface || themeColors.foreground);
+  const primaryLab = colorAnalysis.hexToLab(themeColors.primary);
+  const shadowLab = colorAnalysis.hexToLab(themeColors.shadow);
+  
+  const surfaceHsl = colorAnalysis.hexToHSL(themeColors.surface || themeColors.background);
+  const primaryHsl = colorAnalysis.hexToHSL(themeColors.primary);
+  
+  if (!surfaceLab || !onSurfaceLab || !primaryLab) {
+    issues.push('Invalid color format in theme');
+    return issues;
+  }
+  
+  // Mode-specific validation
+  if (isDarkMode) {
+    // Dark theme validation
+    if (surfaceLab.l > 60) {
+      issues.push('Dark theme surface too light (L:' + surfaceLab.l.toFixed(1) + ', should be <60)');
+    }
+    if (onSurfaceLab.l < 70) {
+      issues.push('Dark theme text too dark (L:' + onSurfaceLab.l.toFixed(1) + ', should be >70)');
+    }
+  } else {
+    // Light theme validation
+    if (surfaceLab.l < 85) {
+      issues.push('Light theme surface too dark (L:' + surfaceLab.l.toFixed(1) + ', should be >85)');
+    }
+    if (surfaceHsl.h > 60 || surfaceHsl.h < 0) {
+      issues.push('Light theme surface too warm (H:' + surfaceHsl.h.toFixed(0) + '°, should be 0-60°)');
+    }
+    if (surfaceHsl.s > 15) {
+      issues.push('Light theme surface too saturated (S:' + surfaceHsl.s.toFixed(1) + '%, should be <15%)');
+    }
+    if (onSurfaceLab.l > 30 || onSurfaceLab.l < 15) {
+      issues.push('Light theme text improper lightness (L:' + onSurfaceLab.l.toFixed(1) + ', should be 15-30)');
+    }
+  }
+  
+  // Common validation for both modes
+  const surfaceTextContrast = colorAnalysis.calculateColorDifference(
+    themeColors.surface || themeColors.background, 
+    themeColors.onSurface || themeColors.foreground
+  );
+  if (surfaceTextContrast < 40) {
+    issues.push('Poor surface/text contrast (ΔE:' + surfaceTextContrast.toFixed(1) + ', should be >40)');
+  } else if (surfaceTextContrast > 80) {
+    issues.push('Excessive surface/text contrast (ΔE:' + surfaceTextContrast.toFixed(1) + ', should be <80)');
+  }
+  
+  const surfacePrimaryContrast = colorAnalysis.calculateColorDifference(
+    themeColors.surface || themeColors.background, 
+    themeColors.primary
+  );
+  if (surfacePrimaryContrast < 20) {
+    issues.push('Poor primary visibility (ΔE:' + surfacePrimaryContrast.toFixed(1) + ', should be >20)');
+  }
+  
+  const surfaceShadowDiff = colorAnalysis.calculateColorDifference(
+    themeColors.surface || themeColors.background, 
+    themeColors.shadow
+  );
+  if (surfaceShadowDiff < 2) {
+    issues.push('Surface and shadow too similar (ΔE:' + surfaceShadowDiff.toFixed(1) + ', should be >2)');
+  }
+  
+  return issues;
+}
+
+function correctThemeColors(themeColors, isDarkMode) {
+  const corrected = {...themeColors};
+  const issues = validateThemeColors(themeColors, isDarkMode);
+  
+  if (issues.length === 0) {
+    return corrected; // No issues to fix
+  }
+  
+  // Apply corrections based on validation issues
+  const surfaceLab = colorAnalysis.hexToLab(themeColors.surface || themeColors.background);
+  const onSurfaceLab = colorAnalysis.hexToLab(themeColors.onSurface || themeColors.foreground);
+  
+  if (!isDarkMode) {
+    // Light theme specific corrections
+    
+    // Fix surface color if too warm or saturated
+    const surfaceHsl = colorAnalysis.hexToHSL(themeColors.surface || themeColors.background);
+    if ((surfaceHsl.h > 60 || surfaceHsl.s > 15) && surfaceLab) {
+      // Make surface more neutral
+      const neutralLightness = clamp(surfaceLab.l, 85, 95);
+      corrected.background = colorAnalysis.labToHex(neutralLightness, 0, 0) || corrected.background;
+      corrected.surface = corrected.background;
+    }
+    
+    // Fix text color if improper lightness
+    if (onSurfaceLab && (onSurfaceLab.l > 30 || onSurfaceLab.l < 15)) {
+      const targetLightness = clamp(onSurfaceLab.l, 15, 30);
+      corrected.foreground = colorAnalysis.labToHex(targetLightness, onSurfaceLab.a, onSurfaceLab.b) || corrected.foreground;
+      corrected.onSurface = corrected.foreground;
+    }
+    
+    // Ensure proper contrast
+    const contrast = colorAnalysis.calculateColorDifference(corrected.surface || corrected.background, corrected.onSurface || corrected.foreground);
+    if (contrast > 80) {
+      // Reduce contrast by lightening text slightly
+      const onSurfaceLab = colorAnalysis.hexToLab(corrected.onSurface || corrected.foreground);
+      if (onSurfaceLab) {
+        const adjustedLightness = onSurfaceLab.l + 5;
+        corrected.foreground = colorAnalysis.labToHex(adjustedLightness, onSurfaceLab.a, onSurfaceLab.b) || corrected.foreground;
+        corrected.onSurface = corrected.foreground;
+      }
+    }
+  }
+  
+  // Fix shadow color if identical to surface
+  const surfaceShadowDiff = colorAnalysis.calculateColorDifference(
+    corrected.surface || corrected.background, 
+    corrected.shadow
+  );
+  if (surfaceShadowDiff < 2) {
+    const surfaceLab = colorAnalysis.hexToLab(corrected.surface || corrected.background);
+    if (surfaceLab) {
+      const shadowLightness = isDarkMode ? surfaceLab.l - 3 : surfaceLab.l - 2;
+      corrected.shadow = colorAnalysis.labToHex(shadowLightness, surfaceLab.a * 0.9, surfaceLab.b * 0.9) || corrected.shadow;
+    }
+  }
+  
+  // Fix primary visibility if poor
+  const primaryContrast = colorAnalysis.calculateColorDifference(
+    corrected.surface || corrected.background, 
+    corrected.primary || corrected.blue
+  );
+  if (primaryContrast < 20) {
+    // Try to adjust primary color for better visibility
+    const primaryHsl = colorAnalysis.hexToHSL(corrected.primary || corrected.blue);
+    const surfaceHsl = colorAnalysis.hexToHSL(corrected.surface || corrected.background);
+    
+    if (primaryHsl && surfaceHsl) {
+      // Adjust hue to be more different from surface
+      const hueDiff = Math.abs(primaryHsl.h - surfaceHsl.h);
+      if (hueDiff < 60 || hueDiff > 300) {
+        // Move hue away from surface hue
+        const newHue = (surfaceHsl.h + 180) % 360;
+        corrected.blue = colorAnalysis.hslToHex(newHue, primaryHsl.s, primaryHsl.l);
+        corrected.primary = corrected.blue;
+      }
+    }
+  }
+  
+  return corrected;
 }
 
 function adjustLightness(hex, amount) {

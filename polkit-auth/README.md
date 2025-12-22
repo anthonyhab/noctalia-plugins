@@ -8,13 +8,13 @@ Use Noctalia as your Polkit authentication agent. When an app requests elevated 
 
 ```bash
 # Arch
-sudo pacman -S qt6-base polkit-qt6 hyprutils cmake
+sudo pacman -S qt6-base polkit polkit-qt6 hyprutils cmake pkgconf
 
 # Fedora
-sudo dnf install qt6-qtbase-devel polkit-qt6-1-devel hyprutils-devel cmake
+sudo dnf install qt6-qtbase-devel polkit polkit-qt6-1-devel hyprutils-devel cmake pkgconf-pkg-config
 
 # Debian/Ubuntu
-sudo apt install qt6-base-dev libpolkit-qt6-1-dev cmake
+sudo apt install qt6-base-dev polkit libpolkit-qt6-1-dev cmake pkg-config
 # hyprutils may need to be built from source
 ```
 
@@ -23,10 +23,11 @@ sudo apt install qt6-base-dev libpolkit-qt6-1-dev cmake
 ```bash
 git clone https://github.com/anthonyhab/noctalia-polkit.git
 cd noctalia-polkit
-cmake -B build
+cmake -B build -DCMAKE_INSTALL_PREFIX=/usr
 cmake --build build
 sudo cmake --install build
 ```
+Use `/usr/local` instead if you want a local install; the helper path changes accordingly.
 
 ### 3. Disable other polkit agents
 
@@ -40,9 +41,14 @@ Remove any existing polkit agent from your session autostart. For example, in Hy
 ### 4. Enable the systemd service
 
 ```bash
-systemctl --user enable --now hyprpolkitagent.service
+systemctl --user daemon-reload
+systemctl --user enable --now noctalia-polkit.service
 ```
 
 ### 5. Configure the plugin
 
-In Noctalia's plugin settings, set the helper path to the installed binary (typically `/usr/local/libexec/hyprpolkitagent`).
+In Noctalia's plugin settings, set the helper path to the installed binary. Typical paths:
+- `/usr/libexec/noctalia-polkit` for `-DCMAKE_INSTALL_PREFIX=/usr`
+- `/usr/local/libexec/noctalia-polkit` for the default `/usr/local`
+If your distro uses `lib64`, the path may be `/usr/lib64/libexec/noctalia-polkit`.
+On NixOS, the path is typically `/run/current-system/sw/libexec/noctalia-polkit`, or `~/.nix-profile/libexec/noctalia-polkit` for user installs.

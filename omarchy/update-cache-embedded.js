@@ -23,10 +23,25 @@ const cacheStr = JSON.stringify(cache, null, 2)
   .map(line => '  ' + line)
   .join('\n');
 
-const regex = /const THEME_CACHE = \{[\s\S]*?\n\};/;
-const replacement = 'const THEME_CACHE = ' + cacheStr + ';';
+// More specific regex to match the exact structure
+const regex = /const THEME_CACHE = \{[\s\S]*?\n  \};/;
+const replacement = 'const THEME_CACHE = ' + cacheStr + '\n  };';
 
-content = content.replace(regex, replacement);
+// If regex doesn't match, try to find the start and manually replace
+if (!regex.test(content)) {
+  const startIndex = content.indexOf('const THEME_CACHE =');
+  if (startIndex !== -1) {
+    // Find the end of the object (look for the closing };
+    const endPattern = /\n  \};/;
+    const endMatch = content.slice(startIndex).match(endPattern);
+    if (endMatch) {
+      const endIndex = startIndex + endMatch.index + endMatch[0].length;
+      content = content.slice(0, startIndex) + 'const THEME_CACHE = ' + cacheStr + '\n  };' + content.slice(endIndex);
+    }
+  }
+} else {
+  content = content.replace(regex, replacement);
+}
 
 // Write back
 fs.writeFileSync(targetFile, content);
