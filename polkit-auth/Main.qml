@@ -1,4 +1,5 @@
 import QtQuick
+import Quickshell
 import Quickshell.Io
 import qs.Commons
 import qs.Services.UI
@@ -22,6 +23,7 @@ Item {
   readonly property bool autoOpenPanel: getSetting("autoOpenPanel", true)
   readonly property bool autoCloseOnSuccess: getSetting("autoCloseOnSuccess", true)
   readonly property bool autoCloseOnCancel: getSetting("autoCloseOnCancel", true)
+  readonly property string displayMode: getSetting("displayMode", "floating")
 
   property bool agentAvailable: false
   property string agentStatus: ""
@@ -118,19 +120,27 @@ Item {
     }
   }
 
-  function openPanel() {
+  function openAuthUI() {
     if (!currentRequest)
       return;
 
-    pluginApi?.withCurrentScreen(function(screen) {
-      pluginApi?.openPanel(screen);
-    });
+    if (displayMode === "floating") {
+      authWindow.visible = true;
+    } else {
+      pluginApi?.withCurrentScreen(function(screen) {
+        pluginApi?.openPanel(screen);
+      });
+    }
   }
 
-  function closePanel() {
-    pluginApi?.withCurrentScreen(function(screen) {
-      pluginApi?.closePanel(screen);
-    });
+  function closeAuthUI() {
+    if (displayMode === "floating") {
+      authWindow.visible = false;
+    } else {
+      pluginApi?.withCurrentScreen(function(screen) {
+        pluginApi?.closePanel(screen);
+      });
+    }
   }
 
   function submitPassword(password) {
@@ -170,15 +180,15 @@ Item {
       if (success) {
         lastError = "";
         if (autoCloseOnSuccess) {
-          closePanel();
+          closeAuthUI();
         }
       } else if (wasCancelled) {
         lastError = "";
         if (autoCloseOnCancel) {
-          closePanel();
+          closeAuthUI();
         }
       }
-      // On failure (!success && !wasCancelled): keep panel open with error, but request is done
+      // On failure (!success && !wasCancelled): keep window/panel open with error, but request is done
 
       advanceQueue();
     } else {
@@ -215,7 +225,7 @@ Item {
     interval: 16
     repeat: false
     running: false
-    onTriggered: openPanel()
+    onTriggered: openAuthUI()
   }
 
   Timer {
@@ -350,6 +360,29 @@ Item {
       }
 
       Qt.callLater(pollImmediately);
+    }
+  }
+
+  // Floating window mode
+  FloatingWindow {
+    id: authWindow
+    title: "Authentication Required"
+    visible: false
+    color: Color.mSurface
+
+    implicitWidth: Math.round(420 * Style.uiScaleRatio)
+    implicitHeight: Math.round(400 * Style.uiScaleRatio)
+
+    AuthContent {
+      id: floatingAuthContent
+      anchors.fill: parent
+      pluginMain: root
+      request: root.currentRequest
+      busy: root.responseInFlight
+      agentAvailable: root.agentAvailable
+      statusText: root.agentStatus
+      errorText: root.lastError
+      onCloseRequested: authWindow.visible = false
     }
   }
 

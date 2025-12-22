@@ -26,6 +26,7 @@ ColumnLayout {
 
   property string valueHelperPath: getSetting("helperPath", "")
   property string valuePollInterval: getSetting("pollInterval", 100).toString()
+  property string valueDisplayMode: getSetting("displayMode", "floating")
   property bool valueAutoOpenPanel: getSetting("autoOpenPanel", true)
   property bool valueAutoCloseOnSuccess: getSetting("autoCloseOnSuccess", true)
   property bool valueAutoCloseOnCancel: getSetting("autoCloseOnCancel", true)
@@ -37,7 +38,8 @@ ColumnLayout {
       return;
 
     pluginApi.pluginSettings.helperPath = valueHelperPath.trim();
-    pluginApi.pluginSettings.pollInterval = parseInt(valuePollInterval, 10) || 600;
+    pluginApi.pluginSettings.pollInterval = parseInt(valuePollInterval, 10) || 100;
+    pluginApi.pluginSettings.displayMode = valueDisplayMode;
     pluginApi.pluginSettings.autoOpenPanel = valueAutoOpenPanel;
     pluginApi.pluginSettings.autoCloseOnSuccess = valueAutoCloseOnSuccess;
     pluginApi.pluginSettings.autoCloseOnCancel = valueAutoCloseOnCancel;
@@ -67,6 +69,18 @@ ColumnLayout {
     text: root.valuePollInterval
     inputItem.inputMethodHints: Qt.ImhDigitsOnly
     onTextChanged: root.valuePollInterval = text
+  }
+
+  NComboBox {
+    Layout.fillWidth: true
+    label: pluginApi?.tr("settings.display-mode") || "Display mode"
+    description: pluginApi?.tr("settings.display-mode-desc") || "How the authentication dialog appears"
+    model: [
+      { key: "floating", name: "Floating window" },
+      { key: "panel", name: "Panel (attached to bar)" }
+    ]
+    currentKey: root.valueDisplayMode
+    onSelected: key => root.valueDisplayMode = key
   }
 
   NDivider { Layout.fillWidth: true }
