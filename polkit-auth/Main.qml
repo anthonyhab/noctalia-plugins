@@ -243,25 +243,37 @@ Item {
 
   function handleRequestComplete(requestId, success, wasCancelled) {
     if (currentRequest && currentRequest.id === requestId) {
-      currentRequest = null;
       requestCompleted(success);
 
-      if (success) {
+      if (success && autoCloseOnSuccess) {
         lastError = "";
-        if (autoCloseOnSuccess) {
-          closeAuthUI();
+        successTimer.restart();
+      } else {
+        currentRequest = null;
+        if (success) {
+           lastError = "";
+           if (autoCloseOnSuccess) closeAuthUI();
+        } else if (wasCancelled) {
+           lastError = "";
+           if (autoCloseOnCancel) closeAuthUI();
         }
-      } else if (wasCancelled) {
-        lastError = "";
-        if (autoCloseOnCancel) {
-          closeAuthUI();
-        }
+        advanceQueue();
       }
-      // On failure (!success && !wasCancelled): keep window/panel open with error, but request is done
-
-      advanceQueue();
     } else {
       requestQueue = requestQueue.filter(r => r.id !== requestId);
+    }
+  }
+
+  Timer {
+    id: successTimer
+    interval: 1200
+    repeat: false
+    onTriggered: {
+      if (currentRequest) {
+        currentRequest = null;
+        closeAuthUI();
+        advanceQueue();
+      }
     }
   }
 
@@ -401,8 +413,8 @@ Item {
     visible: false
     color: Color.mSurface
 
-    width: Math.round(420 * Style.uiScaleRatio)
-    height: Math.round(480 * Style.uiScaleRatio)
+    implicitWidth: Math.round(420 * Style.uiScaleRatio)
+    implicitHeight: Math.round(480 * Style.uiScaleRatio)
 
     AuthContent {
       id: floatingAuthContent

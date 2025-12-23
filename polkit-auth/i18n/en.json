@@ -6,7 +6,8 @@
     "request": "Authentication required",
     "processing": "Working...",
     "socket-unavailable": "Polkit agent socket not available",
-    "agent-unavailable": "Polkit agent not reachable"
+    "agent-unavailable": "Polkit agent not reachable",
+    "auth-command": "Authentication is required to run this command as the super user."
   },
   "labels": {
     "action": "Action",
