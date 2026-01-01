@@ -7,7 +7,13 @@
     "processing": "Working...",
     "socket-unavailable": "Polkit agent socket not available",
     "agent-unavailable": "Polkit agent not reachable",
-    "auth-command": "Authentication is required to run this command as the super user."
+    "auth-command": "Authentication is required to run this command as the super user.",
+    "authenticated": "Authenticated",
+    "fingerprint-or": "or",
+    "fingerprint-hint": "Touch fingerprint sensor"
+  },
+  "warnings": {
+    "caps-lock": "Caps Lock is on"
   },
   "labels": {
     "action": "Action",
@@ -37,6 +43,8 @@
     "auto-open-desc": "Show the panel immediately when a request arrives.",
     "auto-close-success": "Close on success",
     "auto-close-success-desc": "Close the panel after a successful authentication.",
+    "show-success-animation": "Show success animation",
+    "show-success-animation-desc": "Keep the dialog visible briefly after success.",
     "auto-close-cancel": "Close on cancel",
     "auto-close-cancel-desc": "Close the panel when a request is cancelled.",
     "display-mode": "Display mode",

@@ -30,6 +30,9 @@ Item {
 
   // Computed property
   readonly property bool hasRequest: request !== null && request !== undefined && typeof request === "object" && request.id
+  readonly property string displayUser: formatUser(request?.user ?? "")
+  readonly property bool hasActionDetails: !!request?.actionId
+  readonly property bool fingerprintAvailable: request?.fingerprintAvailable ?? false
 
   // Command extraction
   readonly property string commandPath: {
@@ -45,7 +48,16 @@ Item {
   }
 
   function trOrDefault(key, fallback) {
-    return fallback; // Placeholder for actual translation logic if available
+    const translated = pluginMain?.pluginApi?.tr ? pluginMain.pluginApi.tr(key) : "";
+    return translated && translated.length > 0 ? translated : fallback;
+  }
+
+  function formatUser(value) {
+    if (!value) return "";
+    if (value.indexOf("unix-user:") === 0) {
+      return value.slice("unix-user:".length);
+    }
+    return value;
   }
 
   function focusPasswordInput() {
@@ -74,6 +86,7 @@ Item {
     anchors.top: parent.top
     anchors.margins: Style.marginS
     z: 10
+    visible: hasRequest && !successState
     icon: "x"
     baseSize: Math.round(Style.baseWidgetSize * 0.75)
     colorBg: "transparent"
@@ -81,7 +94,12 @@ Item {
     colorBgHover: Color.mSurfaceVariant
     colorFgHover: Color.mOnSurface
     tooltipText: trOrDefault("actions.close", "Close")
-    onClicked: root.closeRequested()
+    onClicked: {
+      if (hasRequest) {
+        pluginMain?.cancelRequest();
+      }
+      root.closeRequested();
+    }
   }
 
   ColumnLayout {
@@ -103,7 +121,7 @@ Item {
         color: successState ? Color.mPrimary : Color.mPrimary
 
         Behavior on color {
-          ColorAnimation { duration: Style.animationNormal } // animationNormal might be missing, assume animationFast or 150
+          ColorAnimation { duration: Style.animationFast || 150 }
         }
       }
     }
@@ -113,9 +131,9 @@ Item {
       Layout.fillWidth: true
       horizontalAlignment: Text.AlignHCenter
       text: {
-        if (successState) return trOrDefault("title.authenticated", "Authenticated");
-        if (hasRequest) return trOrDefault("title.auth-required", "Authentication Required");
-        return trOrDefault("title.waiting", "Polkit Agent");
+        if (successState) return trOrDefault("status.authenticated", "Authenticated");
+        if (hasRequest) return trOrDefault("status.request", "Authentication Required");
+        return trOrDefault("title", "Polkit Authentication");
       }
       font.weight: Style.fontWeightBold
       pointSize: Style.fontSizeXL
@@ -150,11 +168,11 @@ Item {
     // User Identity (New)
     RowLayout {
       Layout.alignment: Qt.AlignHCenter
-      visible: hasRequest && (request?.user || "").length > 0 && !successState
+      visible: hasRequest && displayUser.length > 0 && !successState
       spacing: Style.marginS
 
       Rectangle {
-        width: Style.iconSizeM // iconSizeM might be missing? BaseWidgetSize is safer?
+        width: Style.iconSizeM && Style.iconSizeM > 0 ? Style.iconSizeM : Math.round(Style.baseWidgetSize * 0.8)
         height: width
         radius: width / 2
         color: (Color.mSecondaryContainer !== undefined) ? Color.mSecondaryContainer : Color.mSurfaceVariant
@@ -168,7 +186,7 @@ Item {
       }
 
       NText {
-        text: (request?.user ?? "")
+        text: displayUser
         font.weight: Style.fontWeightMedium
         color: Color.mOnSurface
         pointSize: Style.fontSizeM
@@ -183,8 +201,8 @@ Item {
       text: {
         if (!hasRequest) {
           return agentAvailable
-            ? trOrDefault("status.waiting", "Waiting for requests...")
-            : (statusText || trOrDefault("status.unavailable", "Agent unavailable"));
+            ? trOrDefault("status.waiting", "Waiting for authentication requests")
+            : (statusText || trOrDefault("status.agent-unavailable", "Agent unavailable"));
         }
         if (commandPath !== "") {
           return trOrDefault("status.auth-command", "Authentication is required to run this command as the super user.");
@@ -201,7 +219,7 @@ Item {
     Item {
       id: inputContainer
       Layout.fillWidth: true
-      Layout.preferredHeight: passwordInput.height
+      Layout.preferredHeight: passwordInput.implicitHeight
       visible: hasRequest && !successState
       
       // Focus Glow
@@ -234,10 +252,10 @@ Item {
             visible: root.capsLockOn
             icon: "arrow-up-circle" // or a generic warning/caps icon
             pointSize: Style.fontSizeM
-            color: Color.mWarning
+            color: Color.mError
             
             ToolTip.visible: mouseAreaCaps.containsMouse
-            ToolTip.text: trOrDefault("warning.caps-lock", "Caps Lock is On")
+            ToolTip.text: trOrDefault("warnings.caps-lock", "Caps Lock is on")
             
             MouseArea {
                 id: mouseAreaCaps
@@ -264,7 +282,7 @@ Item {
         // Dynamic padding based on the overlay width + its offset
         inputItem.rightPadding: overlayRow.width + overlayRow.anchors.rightMargin + Style.marginXS
 
-        placeholderText: request?.prompt || trOrDefault("input.password", "Password")
+        placeholderText: request?.prompt || trOrDefault("placeholders.password", "Enter your password")
         text: ""
         
         inputItem.echoMode: root.revealPassword ? TextInput.Normal : TextInput.Password
@@ -297,6 +315,59 @@ Item {
       }
     }
 
+    // Fingerprint hint
+    RowLayout {
+      Layout.alignment: Qt.AlignHCenter
+      visible: hasRequest && fingerprintAvailable && !successState && !busy
+      spacing: Style.marginS
+
+      Rectangle {
+        width: 1
+        height: Style.fontSizeS
+        color: Color.mOutline
+        Layout.alignment: Qt.AlignVCenter
+      }
+
+      NText {
+        text: trOrDefault("status.fingerprint-or", "or")
+        color: Color.mOnSurfaceVariant
+        pointSize: Style.fontSizeS
+      }
+
+      Rectangle {
+        width: 1
+        height: Style.fontSizeS
+        color: Color.mOutline
+        Layout.alignment: Qt.AlignVCenter
+      }
+    }
+
+    RowLayout {
+      Layout.alignment: Qt.AlignHCenter
+      visible: hasRequest && fingerprintAvailable && !successState
+      spacing: Style.marginS
+      opacity: busy ? 0.5 : 1
+
+      NIcon {
+        icon: "fingerprint"
+        pointSize: Style.fontSizeL
+        color: Color.mPrimary
+
+        SequentialAnimation on opacity {
+          running: hasRequest && fingerprintAvailable && !successState && !busy
+          loops: Animation.Infinite
+          NumberAnimation { to: 0.4; duration: 1000; easing.type: Easing.InOutQuad }
+          NumberAnimation { to: 1.0; duration: 1000; easing.type: Easing.InOutQuad }
+        }
+      }
+
+      NText {
+        text: trOrDefault("status.fingerprint-hint", "Touch fingerprint sensor")
+        color: Color.mOnSurfaceVariant
+        pointSize: Style.fontSizeS
+      }
+    }
+
     // Error Message
     NText {
       Layout.fillWidth: true
@@ -318,8 +389,8 @@ Item {
       property bool showSpinner: busy
       
       text: busy
-        ? trOrDefault("button.working", "Verifying...")
-        : trOrDefault("button.authenticate", "Authenticate")
+        ? trOrDefault("status.processing", "Verifying...")
+        : trOrDefault("actions.authenticate", "Authenticate")
       
       enabled: !busy && passwordInput.text.length > 0
       
@@ -372,7 +443,7 @@ Item {
       Layout.fillWidth: true
       horizontalAlignment: Text.AlignHCenter
       visible: hasRequest && !busy && !successState
-      text: trOrDefault("button.cancel", "Cancel")
+      text: trOrDefault("actions.cancel", "Cancel")
       color: cancelHover.hovered ? Color.mPrimary : Color.mOnSurfaceVariant
       font.underline: cancelHover.hovered
       
@@ -392,14 +463,9 @@ Item {
     // Details Section
     ColumnLayout {
       Layout.fillWidth: true
-      visible: hasRequest && (request?.actionId || request?.user) && !successState
+      visible: hasRequest && hasActionDetails && !successState
       spacing: Style.marginXS
       
-      Item {
-        Layout.fillWidth: true
-        Layout.preferredHeight: Style.marginM
-      }
-
       RowLayout {
         Layout.alignment: Qt.AlignHCenter
         spacing: Style.marginXS
@@ -411,7 +477,7 @@ Item {
         }
         
         NText {
-          text: showDetails ? trOrDefault("details.hide", "Hide Details") : trOrDefault("details.show", "Show Details")
+          text: showDetails ? trOrDefault("actions.hide-details", "Hide details") : trOrDefault("actions.show-details", "Show details")
           color: Color.mOnSurfaceVariant
           pointSize: Style.fontSizeXS
         }
@@ -436,40 +502,23 @@ Item {
          
          Behavior on opacity { NumberAnimation { duration: 200 } }
          
-         ColumnLayout {
-             id: detailsCol
-             anchors.top: parent.top
-             anchors.left: parent.left
-             anchors.right: parent.right
-             anchors.margins: Style.marginS
-             spacing: Style.marginXS
-             
-             NText {
-                visible: !!request?.actionId
+        ColumnLayout {
+            id: detailsCol
+            anchors.top: parent.top
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.margins: Style.marginS
+            spacing: Style.marginXS
+            
+            NText {
+               visible: hasActionDetails
                 Layout.fillWidth: true
-                text: "<b>Action:</b> " + (request?.actionId ?? "")
+                text: trOrDefault("labels.action", "Action") + ": " + (request?.actionId ?? "")
                 color: Color.mOnSurfaceVariant
                 pointSize: Style.fontSizeXS
                 wrapMode: Text.WrapAnywhere
              }
-             
-             NText {
-                visible: !!request?.user
-                Layout.fillWidth: true
-                text: "<b>User:</b> " + (request?.user ?? "")
-                color: Color.mOnSurfaceVariant
-                pointSize: Style.fontSizeXS
-             }
-             
-             NText {
-                 visible: !!request?.message
-                 Layout.fillWidth: true
-                 text: "<b>Message:</b> " + (request?.message ?? "")
-                 color: Color.mOnSurfaceVariant
-                 pointSize: Style.fontSizeXS
-                 wrapMode: Text.Wrap
-             }
-         }
+        }
       }
     }
   }

@@ -22,6 +22,7 @@ Item {
   readonly property bool autoOpenPanel: getSetting("autoOpenPanel", true)
   readonly property bool autoCloseOnSuccess: getSetting("autoCloseOnSuccess", true)
   readonly property bool autoCloseOnCancel: getSetting("autoCloseOnCancel", true)
+  readonly property bool showSuccessAnimation: getSetting("showSuccessAnimation", true)
   readonly property string displayMode: getSetting("displayMode", "floating")
 
   readonly property string socketPath: {
@@ -247,7 +248,13 @@ Item {
 
       if (success && autoCloseOnSuccess) {
         lastError = "";
-        successTimer.restart();
+        if (showSuccessAnimation) {
+          successTimer.restart();
+        } else {
+          currentRequest = null;
+          closeAuthUI();
+          advanceQueue();
+        }
       } else {
         currentRequest = null;
         if (success) {

@@ -19,6 +19,7 @@
       "displayMode": "floating",
       "autoOpenPanel": true,
       "autoCloseOnSuccess": true,
+      "showSuccessAnimation": true,
       "autoCloseOnCancel": true
     }
   }

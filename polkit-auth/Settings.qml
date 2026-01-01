@@ -28,6 +28,7 @@ ColumnLayout {
   property string valueDisplayMode: getSetting("displayMode", "floating")
   property bool valueAutoOpenPanel: getSetting("autoOpenPanel", true)
   property bool valueAutoCloseOnSuccess: getSetting("autoCloseOnSuccess", true)
+  property bool valueShowSuccessAnimation: getSetting("showSuccessAnimation", true)
   property bool valueAutoCloseOnCancel: getSetting("autoCloseOnCancel", true)
 
   readonly property var pluginMain: pluginApi?.mainInstance
@@ -40,6 +41,7 @@ ColumnLayout {
     pluginApi.pluginSettings.displayMode = valueDisplayMode;
     pluginApi.pluginSettings.autoOpenPanel = valueAutoOpenPanel;
     pluginApi.pluginSettings.autoCloseOnSuccess = valueAutoCloseOnSuccess;
+    pluginApi.pluginSettings.showSuccessAnimation = valueShowSuccessAnimation;
     pluginApi.pluginSettings.autoCloseOnCancel = valueAutoCloseOnCancel;
 
     pluginApi.saveSettings();
@@ -87,6 +89,13 @@ ColumnLayout {
     description: pluginApi?.tr("settings.auto-close-success-desc") || "Close the panel after a successful authentication."
     checked: root.valueAutoCloseOnSuccess
     onToggled: checked => root.valueAutoCloseOnSuccess = checked
+  }
+
+  NToggle {
+    label: pluginApi?.tr("settings.show-success-animation") || "Show success animation"
+    description: pluginApi?.tr("settings.show-success-animation-desc") || "Keep the dialog visible briefly after success."
+    checked: root.valueShowSuccessAnimation
+    onToggled: checked => root.valueShowSuccessAnimation = checked
   }
 
   NToggle {
