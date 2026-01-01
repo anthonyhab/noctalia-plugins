@@ -288,6 +288,8 @@ Item {
         inputItem.echoMode: root.revealPassword ? TextInput.Normal : TextInput.Password
         enabled: !busy
         
+        KeyNavigation.tab: authButton
+        
         inputItem.Keys.onPressed: function (event) {
           // Best-effort Caps Lock detection
           if (event.modifiers & Qt.ShiftModifier) {
@@ -430,43 +432,16 @@ Item {
         }
       }
     }
-    
-    // Spacer
-    Item {
-       Layout.fillWidth: true
-       Layout.preferredHeight: Style.marginS
-       visible: hasRequest && !successState
-    }
-
-    // Cancel Button (Secondary)
-    NText {
-      Layout.fillWidth: true
-      horizontalAlignment: Text.AlignHCenter
-      visible: hasRequest && !busy && !successState
-      text: trOrDefault("actions.cancel", "Cancel")
-      color: cancelHover.hovered ? Color.mPrimary : Color.mOnSurfaceVariant
-      font.underline: cancelHover.hovered
-      
-      HoverHandler {
-        id: cancelHover
-        cursorShape: Qt.PointingHandCursor
-      }
-      
-      TapHandler {
-        onTapped: {
-           pluginMain?.cancelRequest();
-           passwordInput.text = "";
-        }
-      }
-    }
 
     // Details Section
     ColumnLayout {
       Layout.fillWidth: true
       visible: hasRequest && hasActionDetails && !successState
       spacing: Style.marginXS
+      Layout.preferredHeight: showDetailsButton.implicitHeight + detailsBox.implicitHeight + Style.marginS
       
       RowLayout {
+        id: showDetailsButton
         Layout.alignment: Qt.AlignHCenter
         spacing: Style.marginXS
         
@@ -493,11 +468,11 @@ Item {
       }
       
       Rectangle {
+         id: detailsBox
          Layout.fillWidth: true
          Layout.preferredHeight: detailsCol.implicitHeight + Style.marginM
-         color: Color.mSurfaceVariant // Used in other plugin for thumbs
+         color: Color.mSurfaceVariant
          radius: Style.radiusM
-         visible: showDetails
          opacity: showDetails ? 1 : 0
          
          Behavior on opacity { NumberAnimation { duration: 200 } }

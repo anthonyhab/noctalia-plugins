@@ -48,6 +48,8 @@
     "auto-close-cancel": "Close on cancel",
     "auto-close-cancel-desc": "Close the panel when a request is cancelled.",
     "display-mode": "Display mode",
-    "display-mode-desc": "How the authentication dialog appears"
+    "display-mode-desc": "How the authentication dialog appears",
+    "success-animation-duration": "Success animation duration (ms)",
+    "success-animation-duration-desc": "How long the success state is shown before closing."
   }
 }

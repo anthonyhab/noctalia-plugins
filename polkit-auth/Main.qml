@@ -24,6 +24,7 @@ Item {
   readonly property bool autoCloseOnCancel: getSetting("autoCloseOnCancel", true)
   readonly property bool showSuccessAnimation: getSetting("showSuccessAnimation", true)
   readonly property string displayMode: getSetting("displayMode", "floating")
+  readonly property int successAnimationDuration: getSetting("successAnimationDuration", 300)
 
   readonly property string socketPath: {
     const runtimeDir = Quickshell.env("XDG_RUNTIME_DIR");
@@ -60,8 +61,8 @@ Item {
       return;
     }
 
-    enqueueSocketCommand("PING", "", function(ok, response) {
-      if (ok && response === "PONG") {
+    enqueueSocketCommand({ type: "ping" }, function(ok, response) {
+      if (ok && response?.type === "pong") {
         agentAvailable = true;
         agentStatus = "";
       } else {
@@ -81,7 +82,7 @@ Item {
     }
 
     requestInFlight = true;
-    enqueueSocketCommand("NEXT", "", function(ok, response) {
+    enqueueSocketCommand({ type: "next" }, function(ok, response) {
       requestInFlight = false;
 
       if (!ok) {
@@ -89,36 +90,27 @@ Item {
         return;
       }
 
-      const output = (response || "").trim();
-      if (!output) {
+      if (!response || response.type === "empty") {
         return;
       }
 
-      let payload = null;
-      try {
-        payload = JSON.parse(output);
-      } catch (e) {
-        Logger.e("PolkitAuth", "Failed to parse agent payload:", e);
-        return;
-      }
-
-      if (payload.type === "request") {
-        enqueueRequest(payload);
+      if (response.type === "request") {
+        enqueueRequest(response);
         Qt.callLater(pollImmediately);
-      } else if (payload.type === "update") {
-        if (payload.error) {
-          lastError = payload.error;
+      } else if (response.type === "update") {
+        if (response.error) {
+          lastError = response.error;
         }
-        if (payload.id && currentRequest && currentRequest.id === payload.id) {
-          if (payload.prompt) {
-            currentRequest = Object.assign({}, currentRequest, { prompt: payload.prompt });
+        if (response.id && currentRequest && currentRequest.id === response.id) {
+          if (response.prompt) {
+            currentRequest = Object.assign({}, currentRequest, { prompt: response.prompt });
           }
         }
         Qt.callLater(pollImmediately);
-      } else if (payload.type === "complete") {
-        const isSuccess = payload.result === "success";
-        const isCancelled = payload.result === "cancelled";
-        handleRequestComplete(payload.id, isSuccess, isCancelled);
+      } else if (response.type === "complete") {
+        const isSuccess = response.result === "success";
+        const isCancelled = response.result === "cancelled";
+        handleRequestComplete(response.id, isSuccess, isCancelled);
         Qt.callLater(pollImmediately);
       }
     });
@@ -205,11 +197,11 @@ Item {
     lastError = "";
     pendingPassword = password;
 
-    enqueueSocketCommand("RESPOND " + currentRequest.id, password, function(ok, response) {
+    enqueueSocketCommand({ type: "respond", id: currentRequest.id, response: password }, function(ok, response) {
       responseInFlight = false;
       pendingPassword = "";
 
-      if (!ok || response !== "OK") {
+      if (!ok || response?.type !== "ok") {
         lastError = pluginApi?.tr("errors.auth-failed") || "Authentication failed";
       }
 
@@ -229,10 +221,10 @@ Item {
     responseInFlight = true;
     lastError = "";
 
-    enqueueSocketCommand("CANCEL " + currentRequest.id, "", function(ok, response) {
+    enqueueSocketCommand({ type: "cancel", id: currentRequest.id }, function(ok, response) {
       responseInFlight = false;
 
-      if (!ok || response !== "OK") {
+      if (!ok || response?.type !== "ok") {
         lastError = pluginApi?.tr("errors.cancel-failed") || "Failed to cancel request";
         Qt.callLater(pollImmediately);
         return;
@@ -273,7 +265,7 @@ Item {
 
   Timer {
     id: successTimer
-    interval: 1200
+    interval: root.successAnimationDuration
     repeat: false
     onTriggered: {
       if (currentRequest) {
@@ -335,13 +327,13 @@ Item {
     }
   }
 
-  function enqueueSocketCommand(command, payload, onResponse) {
+  function enqueueSocketCommand(message, onResponse) {
     if (!socketPath) {
-      onResponse?.(false, "");
+      onResponse?.(false, null);
       return;
     }
 
-    socketQueue = socketQueue.concat([{ command: command, payload: payload, onResponse: onResponse }]);
+    socketQueue = socketQueue.concat([{ payload: JSON.stringify(message), onResponse: onResponse }]);
     startNextSocketCommand();
   }
 
@@ -362,9 +354,23 @@ Item {
     socketResponseReceived = true;
     agentSocket.connected = false;
     socketBusy = false;
+    let parsed = null;
+    if (ok) {
+      const line = (response || "").trim();
+      if (!line) {
+        ok = false;
+      } else {
+        try {
+          parsed = JSON.parse(line);
+        } catch (e) {
+          Logger.e("PolkitAuth", "Failed to parse agent response:", e);
+          ok = false;
+        }
+      }
+    }
     const cb = pendingSocketRequest?.onResponse;
     pendingSocketRequest = null;
-    cb?.(ok, response || "");
+    cb?.(ok, parsed);
     Qt.callLater(startNextSocketCommand);
   }
 
@@ -380,10 +386,7 @@ Item {
           return;
         }
 
-        let data = pendingSocketRequest.command + "\n";
-        if (pendingSocketRequest.payload && pendingSocketRequest.payload.length > 0) {
-          data += pendingSocketRequest.payload + "\n";
-        }
+        const data = pendingSocketRequest.payload + "\n";
         write(data);
         flush();
         return;

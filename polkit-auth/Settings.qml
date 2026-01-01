@@ -30,6 +30,7 @@ ColumnLayout {
   property bool valueAutoCloseOnSuccess: getSetting("autoCloseOnSuccess", true)
   property bool valueShowSuccessAnimation: getSetting("showSuccessAnimation", true)
   property bool valueAutoCloseOnCancel: getSetting("autoCloseOnCancel", true)
+  property string valueSuccessAnimationDuration: getSetting("successAnimationDuration", 300).toString()
 
   readonly property var pluginMain: pluginApi?.mainInstance
 
@@ -43,6 +44,7 @@ ColumnLayout {
     pluginApi.pluginSettings.autoCloseOnSuccess = valueAutoCloseOnSuccess;
     pluginApi.pluginSettings.showSuccessAnimation = valueShowSuccessAnimation;
     pluginApi.pluginSettings.autoCloseOnCancel = valueAutoCloseOnCancel;
+    pluginApi.pluginSettings.successAnimationDuration = parseInt(valueSuccessAnimationDuration, 10) || 300;
 
     pluginApi.saveSettings();
     pluginMain?.refresh();
@@ -103,5 +105,14 @@ ColumnLayout {
     description: pluginApi?.tr("settings.auto-close-cancel-desc") || "Close the panel when a request is cancelled."
     checked: root.valueAutoCloseOnCancel
     onToggled: checked => root.valueAutoCloseOnCancel = checked
+  }
+
+  NTextInput {
+    label: pluginApi?.tr("settings.success-animation-duration") || "Success animation duration (ms)"
+    description: pluginApi?.tr("settings.success-animation-duration-desc") || "How long the success state is shown before closing."
+    placeholderText: "300"
+    text: root.valueSuccessAnimationDuration
+    inputItem.inputMethodHints: Qt.ImhDigitsOnly
+    onTextChanged: root.valueSuccessAnimationDuration = text
   }
 }

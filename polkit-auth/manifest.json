@@ -20,7 +20,8 @@
       "autoOpenPanel": true,
       "autoCloseOnSuccess": true,
       "showSuccessAnimation": true,
-      "autoCloseOnCancel": true
+      "autoCloseOnCancel": true,
+      "successAnimationDuration": 300
     }
   }
 }
