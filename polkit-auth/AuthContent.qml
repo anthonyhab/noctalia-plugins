@@ -26,7 +26,7 @@ Item {
 
   // Implicit sizing for parent containers
   implicitWidth: mainColumn.implicitWidth + (Style.marginXL * 2)
-  implicitHeight: mainColumn.implicitHeight + (Style.marginXL * 2)
+  implicitHeight: mainColumn.implicitHeight + (Style.marginXL * 2) + Style.marginL
 
   // Computed property
   readonly property bool hasRequest: request !== null && request !== undefined && typeof request === "object" && request.id
@@ -474,7 +474,7 @@ Item {
          color: Color.mSurfaceVariant
          radius: Style.radiusM
          opacity: showDetails ? 1 : 0
-         
+
          Behavior on opacity { NumberAnimation { duration: 200 } }
          
         ColumnLayout {
