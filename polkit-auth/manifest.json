@@ -16,7 +16,8 @@
   "metadata": {
     "defaultSettings": {
       "pollInterval": 100,
-      "displayMode": "floating",
+      "settingsPanelMode": "centered",
+      "syncPanelModeWithShell": false,
       "autoOpenPanel": true,
       "autoCloseOnSuccess": true,
       "showSuccessAnimation": true,

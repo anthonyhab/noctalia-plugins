@@ -25,7 +25,8 @@ ColumnLayout {
   }
 
   property string valuePollInterval: getSetting("pollInterval", 100).toString()
-  property string valueDisplayMode: getSetting("displayMode", "floating")
+  property string valueSettingsPanelMode: getSetting("settingsPanelMode", "centered")
+  property bool valueSyncPanelModeWithShell: getSetting("syncPanelModeWithShell", false)
   property bool valueAutoOpenPanel: getSetting("autoOpenPanel", true)
   property bool valueAutoCloseOnSuccess: getSetting("autoCloseOnSuccess", true)
   property bool valueShowSuccessAnimation: getSetting("showSuccessAnimation", true)
@@ -39,7 +40,8 @@ ColumnLayout {
       return;
 
     pluginApi.pluginSettings.pollInterval = parseInt(valuePollInterval, 10) || 100;
-    pluginApi.pluginSettings.displayMode = valueDisplayMode;
+    pluginApi.pluginSettings.settingsPanelMode = valueSettingsPanelMode;
+    pluginApi.pluginSettings.syncPanelModeWithShell = valueSyncPanelModeWithShell;
     pluginApi.pluginSettings.autoOpenPanel = valueAutoOpenPanel;
     pluginApi.pluginSettings.autoCloseOnSuccess = valueAutoCloseOnSuccess;
     pluginApi.pluginSettings.showSuccessAnimation = valueShowSuccessAnimation;
@@ -65,16 +67,26 @@ ColumnLayout {
     onTextChanged: root.valuePollInterval = text
   }
 
+  NToggle {
+    label: pluginApi?.tr("settings.sync-panel-mode") || "Sync panel mode with shell"
+    description: pluginApi?.tr("settings.sync-panel-mode-desc") || "Automatically use the same panel mode as the main shell settings."
+    checked: root.valueSyncPanelModeWithShell
+    onToggled: checked => root.valueSyncPanelModeWithShell = checked
+  }
+
   NComboBox {
     Layout.fillWidth: true
-    label: pluginApi?.tr("settings.display-mode") ?? "Display mode"
-    description: pluginApi?.tr("settings.display-mode-desc") ?? "How the authentication dialog appears"
+    enabled: !root.valueSyncPanelModeWithShell
+    opacity: enabled ? 1.0 : 0.5
+    label: pluginApi?.tr("settings.panel-mode") ?? "Panel mode"
+    description: pluginApi?.tr("settings.panel-mode-desc") ?? "Choose how the authentication dialog appears (may require reopening)."
     model: [
-      { key: "floating", name: "Floating window" },
-      { key: "panel", name: "Panel (attached to bar)" }
+      { key: "attached", name: pluginApi?.tr("settings.panel-mode-attached") ?? "Panel attached to bar" },
+      { key: "centered", name: pluginApi?.tr("settings.panel-mode-centered") ?? "Centered panel" },
+      { key: "window", name: pluginApi?.tr("settings.panel-mode-window") ?? "Separate window" }
     ]
-    currentKey: root.valueDisplayMode
-    onSelected: key => root.valueDisplayMode = key
+    currentKey: root.valueSettingsPanelMode
+    onSelected: key => root.valueSettingsPanelMode = key
   }
 
   NDivider { Layout.fillWidth: true }

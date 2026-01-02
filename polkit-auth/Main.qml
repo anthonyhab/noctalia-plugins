@@ -23,7 +23,9 @@ Item {
   readonly property bool autoCloseOnSuccess: getSetting("autoCloseOnSuccess", true)
   readonly property bool autoCloseOnCancel: getSetting("autoCloseOnCancel", true)
   readonly property bool showSuccessAnimation: getSetting("showSuccessAnimation", true)
-  readonly property string displayMode: getSetting("displayMode", "floating")
+  readonly property string settingsPanelModeSaved: getSetting("settingsPanelMode", "centered")
+  readonly property bool syncPanelModeWithShell: getSetting("syncPanelModeWithShell", false)
+  readonly property string settingsPanelMode: syncPanelModeWithShell ? Settings.data.ui.settingsPanelMode : settingsPanelModeSaved
   readonly property int successAnimationDuration: getSetting("successAnimationDuration", 300)
 
   readonly property string socketPath: {
@@ -170,9 +172,10 @@ Item {
     if (!currentRequest)
       return;
 
-    if (displayMode === "floating") {
+    if (settingsPanelMode === "window") {
       authWindow.visible = true;
     } else {
+      // "attached" and "centered" modes both use the panel system
       pluginApi?.withCurrentScreen(function(screen) {
         pluginApi?.openPanel(screen);
       });
@@ -180,7 +183,7 @@ Item {
   }
 
   function closeAuthUI() {
-    if (displayMode === "floating") {
+    if (settingsPanelMode === "window") {
       authWindow.visible = false;
     } else {
       pluginApi?.withCurrentScreen(function(screen) {

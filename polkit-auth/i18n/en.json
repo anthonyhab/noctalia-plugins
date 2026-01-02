@@ -47,8 +47,13 @@
     "show-success-animation-desc": "Keep the dialog visible briefly after success.",
     "auto-close-cancel": "Close on cancel",
     "auto-close-cancel-desc": "Close the panel when a request is cancelled.",
-    "display-mode": "Display mode",
-    "display-mode-desc": "How the authentication dialog appears",
+    "panel-mode": "Panel mode",
+    "panel-mode-desc": "Choose how the authentication dialog appears (may require reopening).",
+    "panel-mode-attached": "Panel attached to bar",
+    "panel-mode-centered": "Centered panel",
+    "panel-mode-window": "Separate window",
+    "sync-panel-mode": "Sync panel mode with shell",
+    "sync-panel-mode-desc": "Automatically use the same panel mode as the main shell settings.",
     "success-animation-duration": "Success animation duration (ms)",
     "success-animation-duration-desc": "How long the success state is shown before closing."
   }
