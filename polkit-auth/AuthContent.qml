@@ -136,55 +136,38 @@ Item {
       }
     }
 
-    // Icon (Animated with glow)
-    Item {
-      Layout.fillWidth: true
-      Layout.preferredHeight: lockIcon.height + 8  // Extra space for shadow
+    // Header (Icon + Title)
+    RowLayout {
+        Layout.alignment: Qt.AlignHCenter
+        spacing: Style.marginS
 
-      layer.enabled: true
-      layer.effect: MultiEffect {
-        shadowEnabled: true
-        shadowBlur: 0.4
-        shadowOpacity: 0.35
-        shadowColor: Color.mPrimary
-        shadowVerticalOffset: 3
-        shadowHorizontalOffset: 0
-      }
-
-      NIcon {
-        id: lockIcon
-        anchors.horizontalCenter: parent.horizontalCenter
-        anchors.top: parent.top
-        icon: successState ? "circle-check" : (hasRequest ? "lock" : "shield")
-        pointSize: Math.round(Style.fontSizeXXXL * 2.0)
-        color: successState ? Color.mPrimary : Color.mPrimary
-
-        // Success bounce animation
-        SequentialAnimation on scale {
-          id: successBounce
-          running: false
-          NumberAnimation { to: 1.15; duration: Style.animationFast; easing.type: Easing.OutCubic }
-          NumberAnimation { to: 1.0; duration: Style.animationFast; easing.type: Easing.OutCubic }
+        NIcon {
+            id: headerIcon
+            icon: successState ? "circle-check" : (hasRequest ? "lock" : "shield")
+            pointSize: Style.fontSizeXL
+            color: successState ? Color.mPrimary : Color.mOnSurface
+            
+             // Success bounce animation
+            SequentialAnimation on scale {
+                id: successBounce
+                running: false
+                NumberAnimation { to: 1.2; duration: Style.animationFast; easing.type: Easing.OutCubic }
+                NumberAnimation { to: 1.0; duration: Style.animationFast; easing.type: Easing.OutCubic }
+            }
+            
+            Behavior on color { ColorAnimation { duration: Style.animationFast } }
         }
 
-        Behavior on color {
-          ColorAnimation { duration: Style.animationFast; easing.type: Easing.OutCubic }
+        NText {
+            text: {
+                if (successState) return trOrDefault("status.authenticated", "Authenticated");
+                if (hasRequest) return trOrDefault("status.request", "Authentication Required");
+                return trOrDefault("title", "Polkit Authentication");
+            }
+            font.weight: Style.fontWeightBold
+            pointSize: Style.fontSizeXL
+            color: Color.mOnSurface
         }
-      }
-    }
-
-    // Title
-    NText {
-      Layout.fillWidth: true
-      horizontalAlignment: Text.AlignHCenter
-      text: {
-        if (successState) return trOrDefault("status.authenticated", "Authenticated");
-        if (hasRequest) return trOrDefault("status.request", "Authentication Required");
-        return trOrDefault("title", "Polkit Authentication");
-      }
-      font.weight: Style.fontWeightBold
-      pointSize: Style.fontSizeXL
-      color: Color.mOnSurface
     }
 
     // Queue indicator
@@ -220,153 +203,168 @@ Item {
       }
     }
 
-    // Command Pill (New)
+    // Context Card (User + Command)
     Rectangle {
-      id: commandPill
+      id: contextCard
       Layout.alignment: Qt.AlignHCenter
+      Layout.fillWidth: true
       Layout.maximumWidth: parent.width
-      visible: hasRequest && commandPath !== "" && !successState
-      color: cmdHover.hovered ? Qt.lighter(Color.mSurfaceVariant, 1.1) : Color.mSurfaceVariant
-      radius: Style.iRadiusM
-      implicitWidth: cmdText.implicitWidth + Style.marginL
-      implicitHeight: cmdText.implicitHeight + Style.marginS
-
-      border.color: cmdHover.hovered ? Color.mPrimary : Color.mOutline
-      border.width: Style.borderS
-
-      Behavior on color {
-        ColorAnimation {
-          duration: Style.animationFast
-          easing.type: Easing.OutCubic
-        }
-      }
-
-      Behavior on border.color {
-        ColorAnimation {
-          duration: Style.animationFast
-          easing.type: Easing.OutCubic
-        }
-      }
-
-      HoverHandler {
-        id: cmdHover
-        cursorShape: Qt.PointingHandCursor
-      }
-
-      TapHandler {
-        onTapped: {
-          // Copy to clipboard using Quickshell.Io.Process
-          copyProcess.running = true;
-          cmdCopyFeedback.restart();
-        }
-      }
-
-      // Copy feedback overlay
-      Rectangle {
-        id: copyFeedbackRect
-        anchors.fill: parent
-        radius: parent.radius
-        color: Color.mPrimary
-        opacity: 0
-
-        NText {
-          anchors.centerIn: parent
-          text: trOrDefault("feedback.copied", "Copied!")
-          color: Color.mOnPrimary
-          pointSize: Style.fontSizeXS
-        }
-
-        SequentialAnimation on opacity {
-          id: cmdCopyFeedback
-          running: false
-          NumberAnimation { to: 1; duration: Style.animationFaster; easing.type: Easing.OutCubic }
-          PauseAnimation { duration: 500 }
-          NumberAnimation { to: 0; duration: Style.animationFast; easing.type: Easing.OutCubic }
-        }
-      }
-
-      NText {
-        id: cmdText
-        anchors.centerIn: parent
-        width: Math.min(implicitWidth, root.width - Style.marginXL * 3)
-        text: commandPath
-        font.family: "Monospace"
-        color: Color.mOnSurfaceVariant
-        elide: Text.ElideMiddle
-        horizontalAlignment: Text.AlignHCenter
-      }
-    }
-
-    // User Identity (New)
-    Rectangle {
-      Layout.alignment: Qt.AlignHCenter
-      visible: hasRequest && displayUser.length > 0 && !successState
       
-      implicitWidth: userRow.implicitWidth + Style.marginL
-      implicitHeight: userRow.implicitHeight + Style.marginS
+      visible: hasRequest && !successState && (displayUser.length > 0 || commandPath !== "")
+      
+      implicitHeight: contextCol.implicitHeight + (Style.marginM * 2)
       
       radius: Style.iRadiusL
       color: Color.mSurfaceVariant
       border.color: Color.mOutline
       border.width: Style.borderS
 
-      RowLayout {
-        id: userRow
+      ColumnLayout {
+        id: contextCol
         anchors.centerIn: parent
-        spacing: Style.marginS
+        width: parent.width - (Style.marginM * 2)
+        spacing: 0
 
-        Item {
-          width: Style.iconSizeM && Style.iconSizeM > 0 ? Style.iconSizeM : Math.round(Style.baseWidgetSize * 0.8)
-          height: width
+        // User Identity Section
+        ColumnLayout {
+            Layout.alignment: Qt.AlignHCenter
+            Layout.fillWidth: true
+            Layout.topMargin: Style.marginS
+            Layout.bottomMargin: commandPath !== "" ? Style.marginXS : Style.marginS
+            visible: displayUser.length > 0
+            spacing: Style.marginXS / 2
 
-          // Container Background & Border with Fallback Icon
-          Rectangle {
-              anchors.fill: parent
-              radius: width / 2
-              color: (Color.mSecondaryContainer !== undefined) ? Color.mSecondaryContainer : Color.mSurfaceVariant
-              border.color: Color.mOutline
-              border.width: Style.borderS
-              
-              NIcon {
-                anchors.centerIn: parent
-                visible: avatarImage.status !== Image.Ready
-                icon: "user"
-                pointSize: Style.fontSizeS
-                color: (Color.mOnSecondaryContainer !== undefined) ? Color.mOnSecondaryContainer : Color.mPrimary
-              }
-          }
+            // Avatar Item
+            Item {
+                Layout.alignment: Qt.AlignHCenter
+                width: Style.iconSizeM && Style.iconSizeM > 0 ? Style.iconSizeM : Math.round(Style.baseWidgetSize * 0.7)
+                height: width
 
-          // Avatar Image (Rounded, on top)
-          NImageRounded {
-            id: avatarImage
-            anchors.fill: parent
-            radius: width / 2
-            
-            property string userName: displayUser
-            property string currentUser: Quickshell.env("USER")
-            
-            imagePath: {
-                if (!userName) return "";
-                if (userName === currentUser && typeof Settings !== "undefined") {
-                     return Settings.preprocessPath(Settings.data.general.avatarImage);
+                // Container Background & Border (Frame)
+                Rectangle {
+                    anchors.fill: parent
+                    radius: width / 2
+                    color: (Color.mSecondaryContainer !== undefined) ? Color.mSecondaryContainer : Color.mSurfaceVariant
+                    border.color: Color.mOutline
+                    border.width: Style.borderS
+                    
+                    // Fallback Icon
+                    NIcon {
+                        anchors.centerIn: parent
+                        visible: avatarImage.status !== Image.Ready
+                        icon: "user"
+                        pointSize: Style.fontSizeS
+                        color: (Color.mOnSecondaryContainer !== undefined) ? Color.mOnSecondaryContainer : Color.mPrimary
+                    }
                 }
-                return "/var/lib/AccountsService/icons/" + userName;
+
+                // Avatar Image
+                NImageRounded {
+                    id: avatarImage
+                    anchors.fill: parent
+                    anchors.margins: 3
+                    radius: width / 2
+                    
+                    property string userName: displayUser
+                    property string currentUser: Quickshell.env("USER")
+                    
+                    imagePath: {
+                        if (!userName) return "";
+                        if (userName === currentUser && typeof Settings !== "undefined") {
+                            return Settings.preprocessPath(Settings.data.general.avatarImage);
+                        }
+                        return "/var/lib/AccountsService/icons/" + userName;
+                    }
+                    
+                    fallbackIcon: "" 
+                    imageFillMode: Image.PreserveAspectCrop
+                    borderWidth: 0 
+                    visible: status === Image.Ready
+                }
             }
-            
-            fallbackIcon: "" // Disable internal fallback
-            imageFillMode: Image.PreserveAspectCrop
-            borderWidth: 0 // Border handled by parent Rectangle
-            
-            // Only visible when image is successfully loaded
-            visible: status === Image.Ready
-          }
+
+            NText {
+                text: displayUser
+                font.weight: Style.fontWeightMedium
+                color: Color.mOnSurface
+                pointSize: Style.fontSizeM
+                Layout.alignment: Qt.AlignHCenter
+            }
         }
 
-        NText {
-          text: displayUser
-          font.weight: Style.fontWeightMedium
-          color: Color.mOnSurface
-          pointSize: Style.fontSizeM
+        // Separator
+        Item {
+            visible: displayUser.length > 0 && commandPath !== ""
+            Layout.fillWidth: true
+            Layout.preferredHeight: Style.marginS
+            
+            Rectangle {
+                anchors.centerIn: parent
+                width: parent.width
+                height: 1
+                color: Color.mOutline
+                opacity: 0.5
+            }
+        }
+
+        // Command Section
+        Item {
+            visible: commandPath !== ""
+            Layout.fillWidth: true
+            Layout.preferredHeight: Math.max(cmdText.implicitHeight + Style.marginXS, 26)
+            Layout.bottomMargin: Style.marginXS
+            
+            Rectangle {
+                id: cmdBackground
+                anchors.fill: parent
+                radius: Style.iRadiusS
+                color: cmdHover.hovered ? Qt.alpha(Color.mOnSurface, 0.05) : "transparent"
+                
+                Behavior on color { ColorAnimation { duration: Style.animationFast } }
+            }
+
+            HoverHandler { id: cmdHover; cursorShape: Qt.PointingHandCursor }
+            TapHandler {
+                onTapped: {
+                  copyProcess.running = true;
+                  cmdCopyFeedback.restart();
+                }
+            }
+            
+            NText {
+                id: cmdText
+                anchors.centerIn: parent
+                width: parent.width - Style.marginS
+                text: commandPath
+                font.family: "Monospace"
+                color: Color.mOnSurfaceVariant
+                pointSize: Style.fontSizeS
+                elide: Text.ElideMiddle
+                horizontalAlignment: Text.AlignHCenter
+            }
+            
+            // Copy Feedback Overlay
+            Rectangle {
+                anchors.fill: parent
+                radius: Style.iRadiusS
+                color: Color.mPrimary
+                opacity: 0
+                
+                NText {
+                    anchors.centerIn: parent
+                    text: trOrDefault("feedback.copied", "Copied!")
+                    color: Color.mOnPrimary
+                    pointSize: Style.fontSizeXS
+                }
+                
+                SequentialAnimation on opacity {
+                    id: cmdCopyFeedback
+                    running: false
+                    NumberAnimation { to: 1; duration: Style.animationFaster }
+                    PauseAnimation { duration: 500 }
+                    NumberAnimation { to: 0; duration: Style.animationFast }
+                }
+            }
         }
       }
     }
@@ -400,17 +398,18 @@ Item {
       Layout.preferredHeight: passwordInput.implicitHeight
       visible: hasRequest && !successState
       
-      // Focus Glow (matches NTextInput pattern)
+      // Focus/Error Glow
       Rectangle {
         anchors.fill: passwordInput
         anchors.margins: -2
         radius: Style.iRadiusM
         color: "transparent"
-        border.color: Color.mSecondary
+        border.color: errorText.length > 0 ? Color.mError : Color.mSecondary
         border.width: 2
-        opacity: passwordInput.activeFocus ? 0.5 : 0
+        opacity: (passwordInput.activeFocus || errorText.length > 0) ? 0.5 : 0
 
         Behavior on opacity { NumberAnimation { duration: Style.animationFast } }
+        Behavior on border.color { ColorAnimation { duration: Style.animationFast } }
       }
 
       // Icons Overlay (Caps Lock, Reveal)
