@@ -43,6 +43,7 @@ Item {
   readonly property string displayUser: formatUser(request?.user ?? "")
   readonly property bool hasActionDetails: !!request?.actionId
   readonly property bool fingerprintAvailable: request?.fingerprintAvailable ?? false
+  readonly property bool useBigLayout: !hasRequest || successState
 
   // Command extraction
   readonly property string commandPath: {
@@ -82,7 +83,7 @@ Item {
     function onRequestCompleted(success) {
       if (success) {
         successState = true;
-        successBounce.restart();
+        // Animation handled by binding
       } else {
         shakeAnim.restart();
         passwordInput.text = "";
@@ -91,26 +92,20 @@ Item {
     }
   }
 
-  // Close button (top right, subtle)
+  // Close button for Success State (Big Layout)
   NIconButton {
     anchors.right: parent.right
     anchors.top: parent.top
     anchors.margins: Style.marginS
     z: 10
-    visible: hasRequest && !successState
+    visible: useBigLayout && successState
     icon: "x"
     baseSize: Math.round(Style.baseWidgetSize * 0.75)
     colorBg: "transparent"
     colorFg: Color.mOnSurfaceVariant
     colorBgHover: Color.mSurfaceVariant
     colorFgHover: Color.mOnSurface
-    tooltipText: trOrDefault("actions.close", "Close")
-    onClicked: {
-      if (hasRequest) {
-        pluginMain?.cancelRequest();
-      }
-      root.closeRequested();
-    }
+    onClicked: root.closeRequested()
   }
 
   ColumnLayout {
@@ -136,37 +131,129 @@ Item {
       }
     }
 
-    // Header (Icon + Title)
-    RowLayout {
-        Layout.alignment: Qt.AlignHCenter
-        spacing: Style.marginS
+    // Big Icon (Idle / Success)
+    Item {
+      visible: useBigLayout
+      Layout.fillWidth: true
+      Layout.preferredHeight: bigLockIcon.height + 8
 
-        NIcon {
-            id: headerIcon
-            icon: successState ? "circle-check" : (hasRequest ? "lock" : "shield")
-            pointSize: Style.fontSizeXL
-            color: successState ? Color.mPrimary : Color.mOnSurface
-            
-             // Success bounce animation
-            SequentialAnimation on scale {
-                id: successBounce
-                running: false
-                NumberAnimation { to: 1.2; duration: Style.animationFast; easing.type: Easing.OutCubic }
-                NumberAnimation { to: 1.0; duration: Style.animationFast; easing.type: Easing.OutCubic }
-            }
-            
-            Behavior on color { ColorAnimation { duration: Style.animationFast } }
+      layer.enabled: true
+      layer.effect: MultiEffect {
+        shadowEnabled: true
+        shadowBlur: 0.4
+        shadowOpacity: 0.35
+        shadowColor: Color.mPrimary
+        shadowVerticalOffset: 3
+        shadowHorizontalOffset: 0
+      }
+
+      NIcon {
+        id: bigLockIcon
+        anchors.horizontalCenter: parent.horizontalCenter
+        anchors.top: parent.top
+        icon: successState ? "circle-check" : (hasRequest ? "lock" : "shield")
+        pointSize: Math.round(Style.fontSizeXXXL * 2.0)
+        color: Color.mPrimary
+
+        SequentialAnimation on scale {
+          id: bigSuccessBounce
+          running: successState
+          NumberAnimation { to: 1.15; duration: Style.animationFast; easing.type: Easing.OutCubic }
+          NumberAnimation { to: 1.0; duration: Style.animationFast; easing.type: Easing.OutCubic }
         }
 
+        Behavior on color { ColorAnimation { duration: Style.animationFast } }
+      }
+    }
+
+    // Big Title
+    NText {
+      visible: useBigLayout
+      Layout.fillWidth: true
+      horizontalAlignment: Text.AlignHCenter
+      text: {
+        if (successState) return trOrDefault("status.authenticated", "Authenticated");
+        return trOrDefault("title", "Polkit Authentication");
+      }
+      font.weight: Style.fontWeightBold
+      pointSize: Style.fontSizeXL
+      color: Color.mOnSurface
+    }
+
+    // Header (Structured) - Compact Mode
+    Rectangle {
+        visible: !useBigLayout
+        Layout.fillWidth: true
+        Layout.preferredHeight: Style.baseWidgetSize * 1.5 + Style.marginS
+        
+        color: Color.mSurfaceVariant
+        radius: Style.iRadiusL
+        border.color: Color.mOutline
+        border.width: Style.borderS
+
+        // Left: Lock Icon Container
+        Rectangle {
+            anchors.left: parent.left
+            anchors.leftMargin: Style.marginS
+            anchors.verticalCenter: parent.verticalCenter
+            width: Style.baseWidgetSize * 1.5
+            height: Style.baseWidgetSize * 1.5
+            radius: Style.iRadiusM
+            color: Qt.alpha(Color.mPrimary, 0.1)
+            border.color: Qt.alpha(Color.mPrimary, 0.3)
+            border.width: Style.borderS
+
+            NIcon {
+                anchors.centerIn: parent
+                icon: successState ? "check" : (hasRequest ? "lock" : "shield")
+                pointSize: Style.fontSizeXL
+                color: Color.mPrimary
+                
+                SequentialAnimation on scale {
+                    id: successBounce
+                    running: false
+                    NumberAnimation { to: 1.2; duration: Style.animationFast; easing.type: Easing.OutCubic }
+                    NumberAnimation { to: 1.0; duration: Style.animationFast; easing.type: Easing.OutCubic }
+                }
+                
+                Behavior on color { ColorAnimation { duration: Style.animationFast } }
+            }
+        }
+
+        // Center: Title
         NText {
+            anchors.centerIn: parent
             text: {
                 if (successState) return trOrDefault("status.authenticated", "Authenticated");
                 if (hasRequest) return trOrDefault("status.request", "Authentication Required");
                 return trOrDefault("title", "Polkit Authentication");
             }
             font.weight: Style.fontWeightBold
-            pointSize: Style.fontSizeXL
+            pointSize: Style.fontSizeL
             color: Color.mOnSurface
+        }
+
+        // Right: Close Button
+        NIconButton {
+            id: closeButton
+            anchors.right: parent.right
+            anchors.rightMargin: Style.marginS
+            anchors.verticalCenter: parent.verticalCenter
+            
+            visible: hasRequest && !successState
+            icon: "x"
+            baseSize: Math.round(Style.baseWidgetSize * 0.75)
+            colorBg: "transparent"
+            colorFg: Color.mOnSurfaceVariant
+            colorBgHover: Color.mSurface
+            colorFgHover: Color.mOnSurface
+            tooltipText: trOrDefault("actions.close", "Close")
+            onClicked: {
+              if (hasRequest) {
+                pluginMain?.cancelRequest();
+              }
+              root.closeRequested();
+            }
         }
     }
 
@@ -212,7 +299,7 @@ Item {
       
       visible: hasRequest && !successState && (displayUser.length > 0 || commandPath !== "")
       
-      implicitHeight: contextCol.implicitHeight + (Style.marginM * 2)
+      implicitHeight: contextCol.implicitHeight + (Style.marginS * 2)
       
       radius: Style.iRadiusL
       color: Color.mSurfaceVariant
@@ -222,21 +309,20 @@ Item {
       ColumnLayout {
         id: contextCol
         anchors.centerIn: parent
-        width: parent.width - (Style.marginM * 2)
+        width: parent.width
         spacing: 0
 
         // User Identity Section
-        ColumnLayout {
+        RowLayout {
             Layout.alignment: Qt.AlignHCenter
-            Layout.fillWidth: true
             Layout.topMargin: Style.marginS
-            Layout.bottomMargin: commandPath !== "" ? Style.marginXS : Style.marginS
+            Layout.bottomMargin: commandPath !== "" ? Style.marginXS : 0
             visible: displayUser.length > 0
-            spacing: Style.marginXS / 2
+            spacing: Style.marginS
 
             // Avatar Item
             Item {
-                Layout.alignment: Qt.AlignHCenter
+                Layout.alignment: Qt.AlignVCenter
                 width: Style.iconSizeM && Style.iconSizeM > 0 ? Style.iconSizeM : Math.round(Style.baseWidgetSize * 0.7)
                 height: width
 
@@ -288,7 +374,6 @@ Item {
                 font.weight: Style.fontWeightMedium
                 color: Color.mOnSurface
                 pointSize: Style.fontSizeM
-                Layout.alignment: Qt.AlignHCenter
             }
         }
 
@@ -300,10 +385,10 @@ Item {
             
             Rectangle {
                 anchors.centerIn: parent
-                width: parent.width
+                width: parent.width - (Style.marginM * 2)
                 height: 1
                 color: Color.mOutline
-                opacity: 0.5
+                opacity: 0.3
             }
         }
 
@@ -312,7 +397,6 @@ Item {
             visible: commandPath !== ""
             Layout.fillWidth: true
             Layout.preferredHeight: Math.max(cmdText.implicitHeight + Style.marginXS, 26)
-            Layout.bottomMargin: Style.marginXS
             
             Rectangle {
                 id: cmdBackground
