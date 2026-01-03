@@ -1,6 +1,8 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
+import QtQuick.Effects
+import Quickshell.Io
 import qs.Commons
 import qs.Widgets
 
@@ -20,9 +22,16 @@ Item {
   property bool successState: false
   property bool revealPassword: false
   property bool capsLockOn: false
+  property bool animateIn: false
 
   // Signal to request closing the container (window or panel)
   signal closeRequested()
+
+  // Clipboard copy helper process
+  Process {
+    id: copyProcess
+    command: ["wl-copy", commandPath]
+  }
 
   // Implicit sizing for parent containers
   implicitWidth: mainColumn.implicitWidth + (Style.marginXL * 2)
@@ -72,6 +81,7 @@ Item {
     function onRequestCompleted(success) {
       if (success) {
         successState = true;
+        successBounce.restart();
       } else {
         shakeAnim.restart();
         passwordInput.text = "";
@@ -108,20 +118,56 @@ Item {
     width: parent.width - (Style.marginXL * 2)
     spacing: Style.marginL
 
-    // Icon (Animated)
+    // Entrance animation
+    scale: root.animateIn ? 1.0 : 0.95
+    opacity: root.animateIn ? 1.0 : 0.0
+
+    Behavior on scale {
+      NumberAnimation {
+        duration: Style.animationNormal
+        easing.type: Easing.OutCubic
+      }
+    }
+    Behavior on opacity {
+      NumberAnimation {
+        duration: Style.animationFast
+        easing.type: Easing.OutCubic
+      }
+    }
+
+    // Icon (Animated with glow)
     Item {
       Layout.fillWidth: true
-      Layout.preferredHeight: lockIcon.height
+      Layout.preferredHeight: lockIcon.height + 8  // Extra space for shadow
+
+      layer.enabled: true
+      layer.effect: MultiEffect {
+        shadowEnabled: true
+        shadowBlur: 0.4
+        shadowOpacity: 0.35
+        shadowColor: Color.mPrimary
+        shadowVerticalOffset: 3
+        shadowHorizontalOffset: 0
+      }
 
       NIcon {
         id: lockIcon
         anchors.horizontalCenter: parent.horizontalCenter
-        icon: successState ? "lock-open" : (hasRequest ? "lock" : "shield")
+        anchors.top: parent.top
+        icon: successState ? "circle-check" : (hasRequest ? "lock" : "shield")
         pointSize: Math.round(Style.fontSizeXXXL * 2.0)
         color: successState ? Color.mPrimary : Color.mPrimary
 
+        // Success bounce animation
+        SequentialAnimation on scale {
+          id: successBounce
+          running: false
+          NumberAnimation { to: 1.15; duration: Style.animationFast; easing.type: Easing.OutCubic }
+          NumberAnimation { to: 1.0; duration: Style.animationFast; easing.type: Easing.OutCubic }
+        }
+
         Behavior on color {
-          ColorAnimation { duration: Style.animationFast || 150 }
+          ColorAnimation { duration: Style.animationFast; easing.type: Easing.OutCubic }
         }
       }
     }
@@ -140,18 +186,103 @@ Item {
       color: Color.mOnSurface
     }
 
+    // Queue indicator
+    RowLayout {
+      Layout.alignment: Qt.AlignHCenter
+      visible: hasRequest && !successState && (pluginMain?.requestQueue?.length ?? 0) > 0
+      spacing: Style.marginXS
+      opacity: visible ? 1.0 : 0.0
+
+      Behavior on opacity {
+        NumberAnimation {
+          duration: Style.animationFast
+          easing.type: Easing.OutCubic
+        }
+      }
+
+      Rectangle {
+        width: queueText.implicitWidth + Style.marginM
+        height: queueText.implicitHeight + Style.marginXS
+        radius: Style.iRadiusS
+        color: Color.mTertiary
+        border.color: Color.mOutline
+        border.width: Style.borderS
+
+        NText {
+          id: queueText
+          anchors.centerIn: parent
+          text: "+" + (pluginMain?.requestQueue?.length ?? 0) + " " +
+                trOrDefault("status.more-requests", "more")
+          pointSize: Style.fontSizeXS
+          color: Color.mOnTertiary
+        }
+      }
+    }
+
     // Command Pill (New)
     Rectangle {
+      id: commandPill
       Layout.alignment: Qt.AlignHCenter
       Layout.maximumWidth: parent.width
       visible: hasRequest && commandPath !== "" && !successState
-      color: Color.mSurfaceVariant
-      radius: Style.radiusM
+      color: cmdHover.hovered ? Qt.lighter(Color.mSurfaceVariant, 1.1) : Color.mSurfaceVariant
+      radius: Style.iRadiusM
       implicitWidth: cmdText.implicitWidth + Style.marginL
       implicitHeight: cmdText.implicitHeight + Style.marginS
-      
-      border.color: Color.mOutline
-      border.width: 1
+
+      border.color: cmdHover.hovered ? Color.mPrimary : Color.mOutline
+      border.width: Style.borderS
+
+      Behavior on color {
+        ColorAnimation {
+          duration: Style.animationFast
+          easing.type: Easing.OutCubic
+        }
+      }
+
+      Behavior on border.color {
+        ColorAnimation {
+          duration: Style.animationFast
+          easing.type: Easing.OutCubic
+        }
+      }
+
+      HoverHandler {
+        id: cmdHover
+        cursorShape: Qt.PointingHandCursor
+      }
+
+      TapHandler {
+        onTapped: {
+          // Copy to clipboard using Quickshell.Io.Process
+          copyProcess.running = true;
+          cmdCopyFeedback.restart();
+        }
+      }
+
+      // Copy feedback overlay
+      Rectangle {
+        id: copyFeedbackRect
+        anchors.fill: parent
+        radius: parent.radius
+        color: Color.mPrimary
+        opacity: 0
+
+        NText {
+          anchors.centerIn: parent
+          text: trOrDefault("feedback.copied", "Copied!")
+          color: Color.mOnPrimary
+          pointSize: Style.fontSizeXS
+        }
+
+        SequentialAnimation on opacity {
+          id: cmdCopyFeedback
+          running: false
+          NumberAnimation { to: 1; duration: Style.animationFaster; easing.type: Easing.OutCubic }
+          PauseAnimation { duration: 500 }
+          NumberAnimation { to: 0; duration: Style.animationFast; easing.type: Easing.OutCubic }
+        }
+      }
 
       NText {
         id: cmdText
@@ -166,30 +297,74 @@ Item {
     }
 
     // User Identity (New)
-    RowLayout {
+    Rectangle {
       Layout.alignment: Qt.AlignHCenter
       visible: hasRequest && displayUser.length > 0 && !successState
-      spacing: Style.marginS
+      
+      implicitWidth: userRow.implicitWidth + Style.marginL
+      implicitHeight: userRow.implicitHeight + Style.marginS
+      
+      radius: Style.iRadiusL
+      color: Color.mSurfaceVariant
+      border.color: Color.mOutline
+      border.width: Style.borderS
 
-      Rectangle {
-        width: Style.iconSizeM && Style.iconSizeM > 0 ? Style.iconSizeM : Math.round(Style.baseWidgetSize * 0.8)
-        height: width
-        radius: width / 2
-        color: (Color.mSecondaryContainer !== undefined) ? Color.mSecondaryContainer : Color.mSurfaceVariant
-        
-        NIcon {
-          anchors.centerIn: parent
-          icon: "user"
-          pointSize: Style.fontSizeS
-          color: (Color.mOnSecondaryContainer !== undefined) ? Color.mOnSecondaryContainer : Color.mPrimary
+      RowLayout {
+        id: userRow
+        anchors.centerIn: parent
+        spacing: Style.marginS
+
+        Item {
+          width: Style.iconSizeM && Style.iconSizeM > 0 ? Style.iconSizeM : Math.round(Style.baseWidgetSize * 0.8)
+          height: width
+
+          // Avatar Image
+          Image {
+            id: userAvatar
+            anchors.fill: parent
+            source: "/var/lib/AccountsService/icons/" + displayUser
+            fillMode: Image.PreserveAspectCrop
+            visible: status === Image.Ready
+            asynchronous: true
+            
+            layer.enabled: true
+            layer.effect: MultiEffect {
+                maskEnabled: true
+                maskSource: avatarMask
+            }
+          }
+          
+          Rectangle {
+              id: avatarMask
+              anchors.fill: parent
+              radius: width / 2
+              visible: false
+          }
+
+          // Fallback Icon
+          Rectangle {
+            anchors.fill: parent
+            visible: userAvatar.status !== Image.Ready
+            radius: width / 2
+            color: (Color.mSecondaryContainer !== undefined) ? Color.mSecondaryContainer : Color.transparent
+            border.color: Color.mOutline
+            border.width: Style.borderS
+
+            NIcon {
+              anchors.centerIn: parent
+              icon: "user"
+              pointSize: Style.fontSizeS
+              color: (Color.mOnSecondaryContainer !== undefined) ? Color.mOnSecondaryContainer : Color.mPrimary
+            }
+          }
         }
-      }
 
-      NText {
-        text: displayUser
-        font.weight: Style.fontWeightMedium
-        color: Color.mOnSurface
-        pointSize: Style.fontSizeM
+        NText {
+          text: displayUser
+          font.weight: Style.fontWeightMedium
+          color: Color.mOnSurface
+          pointSize: Style.fontSizeM
+        }
       }
     }
 
@@ -222,17 +397,17 @@ Item {
       Layout.preferredHeight: passwordInput.implicitHeight
       visible: hasRequest && !successState
       
-      // Focus Glow
+      // Focus Glow (matches NTextInput pattern)
       Rectangle {
         anchors.fill: passwordInput
         anchors.margins: -2
-        radius: Style.radiusM
+        radius: Style.iRadiusM
         color: "transparent"
-        border.color: Color.mPrimary
+        border.color: Color.mSecondary
         border.width: 2
-        opacity: passwordInput.activeFocus ? 0.6 : 0
-        
-        Behavior on opacity { NumberAnimation { duration: 150 } }
+        opacity: passwordInput.activeFocus ? 0.5 : 0
+
+        Behavior on opacity { NumberAnimation { duration: Style.animationFast } }
       }
 
       // Icons Overlay (Caps Lock, Reveal)
@@ -245,7 +420,7 @@ Item {
         spacing: 2
         z: 5
         
-        Behavior on anchors.rightMargin { NumberAnimation { duration: 100 } }
+        Behavior on anchors.rightMargin { NumberAnimation { duration: Style.animationFaster } }
 
         // Caps Lock Warning
         NIcon {
@@ -382,54 +557,72 @@ Item {
     }
 
     // Authenticate Button
-    NButton {
-      id: authButton
+    Item {
+      id: authButtonWrapper
       Layout.fillWidth: true
       Layout.preferredHeight: Style.baseWidgetSize * 1.2
       visible: hasRequest && !successState
-      
-      property bool showSpinner: busy
-      
-      text: busy
-        ? trOrDefault("status.processing", "Verifying...")
-        : trOrDefault("actions.authenticate", "Authenticate")
-      
-      enabled: !busy && passwordInput.text.length > 0
-      
-      opacity: busy ? 0.7 : 1
-      
-      Behavior on opacity { NumberAnimation { duration: 150 } }
-      
-      onClicked: {
-        if (hasRequest && pluginMain) {
-          pluginMain.submitPassword(passwordInput.text);
+
+      scale: authButtonTap.pressed ? 0.98 : 1.0
+      Behavior on scale {
+        NumberAnimation {
+          duration: Style.animationFaster
+          easing.type: Easing.OutCubic
         }
       }
-      
-      Item {
-        width: Style.fontSizeM
-        height: width
-        anchors.right: parent.right
-        anchors.rightMargin: Style.marginM
-        anchors.verticalCenter: parent.verticalCenter
-        visible: authButton.showSpinner
-        
-        NIcon {
-          id: spinnerIcon
-          anchors.centerIn: parent
-          icon: "loader"
-          pointSize: Style.fontSizeS
-          color: Color.mOnPrimary
-          
-          RotationAnimation on rotation {
-            from: 0
-            to: 360
-            duration: 1000
-            loops: Animation.Infinite
-            running: authButton.showSpinner
-            easing.type: Easing.Linear
+
+      NButton {
+        id: authButton
+        anchors.fill: parent
+
+        property bool showSpinner: busy
+
+        text: busy
+          ? trOrDefault("status.processing", "Verifying...")
+          : trOrDefault("actions.authenticate", "Authenticate")
+
+        enabled: !busy && passwordInput.text.length > 0
+
+        opacity: busy ? 0.7 : 1
+
+        Behavior on opacity { NumberAnimation { duration: Style.animationFast; easing.type: Easing.OutCubic } }
+
+        onClicked: {
+          if (hasRequest && pluginMain) {
+            pluginMain.submitPassword(passwordInput.text);
           }
         }
+
+        Item {
+          width: Style.fontSizeM
+          height: width
+          anchors.right: parent.right
+          anchors.rightMargin: Style.marginM
+          anchors.verticalCenter: parent.verticalCenter
+          visible: authButton.showSpinner
+
+          NIcon {
+            id: spinnerIcon
+            anchors.centerIn: parent
+            icon: "loader"
+            pointSize: Style.fontSizeS
+            color: Color.mOnPrimary
+
+            RotationAnimation on rotation {
+              from: 0
+              to: 360
+              duration: 1000
+              loops: Animation.Infinite
+              running: authButton.showSpinner
+              easing.type: Easing.Linear
+            }
+          }
+        }
+      }
+
+      TapHandler {
+        id: authButtonTap
+        gesturePolicy: TapHandler.WithinBounds
       }
     }
 
@@ -474,8 +667,11 @@ Item {
          color: Color.mSurfaceVariant
          radius: Style.radiusM
          opacity: showDetails ? 1 : 0
+         border.color: showDetails ? Color.mOutline : Color.transparent
+         border.width: Style.borderS
 
-         Behavior on opacity { NumberAnimation { duration: 200 } }
+         Behavior on opacity { NumberAnimation { duration: Style.animationFast } }
+         Behavior on border.color { ColorAnimation { duration: Style.animationFast } }
          
         ColumnLayout {
             id: detailsCol
@@ -518,6 +714,14 @@ Item {
     onTriggered: focusPasswordInput()
   }
 
+  // Entrance animation timer
+  Timer {
+    id: animateInTimer
+    interval: 16
+    repeat: false
+    onTriggered: root.animateIn = true
+  }
+
   onHasRequestChanged: {
     if (hasRequest) {
       successState = false;
@@ -535,6 +739,7 @@ Item {
   }
 
   Component.onCompleted: {
+    animateInTimer.start();
     if (hasRequest) {
       focusTimer.restart();
     }
