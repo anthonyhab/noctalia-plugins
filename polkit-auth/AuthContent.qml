@@ -184,10 +184,10 @@ Item {
     Rectangle {
         visible: !useBigLayout
         Layout.fillWidth: true
-        Layout.preferredHeight: Style.baseWidgetSize * 1.5 + Style.marginS
+        Layout.preferredHeight: (Style.baseWidgetSize * 1.2) + (Style.marginS * 2)
         
         color: Color.mSurfaceVariant
-        radius: Style.iRadiusL
+        radius: Style.radiusL
         border.color: Color.mOutline
         border.width: Style.borderS
 
@@ -196,8 +196,8 @@ Item {
             anchors.left: parent.left
             anchors.leftMargin: Style.marginS
             anchors.verticalCenter: parent.verticalCenter
-            width: Style.baseWidgetSize * 1.5
-            height: Style.baseWidgetSize * 1.5
+            width: Style.baseWidgetSize * 1.2
+            height: Style.baseWidgetSize * 1.2
             radius: Style.iRadiusM
             color: Qt.alpha(Color.mPrimary, 0.1)
             border.color: Qt.alpha(Color.mPrimary, 0.3)
@@ -206,7 +206,7 @@ Item {
             NIcon {
                 anchors.centerIn: parent
                 icon: successState ? "check" : (hasRequest ? "lock" : "shield")
-                pointSize: Style.fontSizeXL
+                pointSize: Style.fontSizeL
                 color: Color.mPrimary
                 
                 SequentialAnimation on scale {
@@ -301,7 +301,7 @@ Item {
       
       implicitHeight: contextCol.implicitHeight + (Style.marginS * 2)
       
-      radius: Style.iRadiusL
+      radius: Style.radiusL
       color: Color.mSurfaceVariant
       border.color: Color.mOutline
       border.width: Style.borderS
@@ -751,7 +751,7 @@ Item {
          Layout.fillWidth: true
          Layout.preferredHeight: detailsCol.implicitHeight + Style.marginM
          color: Color.mSurfaceVariant
-         radius: Style.radiusM
+         radius: Style.radiusL
          opacity: showDetails ? 1 : 0
          border.color: showDetails ? Color.mOutline : Color.transparent
          border.width: Style.borderS
