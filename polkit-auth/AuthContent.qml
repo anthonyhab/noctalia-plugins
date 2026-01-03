@@ -2,6 +2,7 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 import QtQuick.Effects
+import Quickshell
 import Quickshell.Io
 import qs.Commons
 import qs.Widgets
@@ -322,9 +323,28 @@ Item {
           Image {
             id: userAvatar
             anchors.fill: parent
-            source: "/var/lib/AccountsService/icons/" + displayUser
+            
+            property string userName: displayUser
+            property string currentUser: Quickshell.env("USER")
+            
+            source: {
+                if (!userName) return "";
+                
+                // If it's the current user, try to use the Noctalia configured avatar
+                if (userName === currentUser && typeof Settings !== "undefined") {
+                    var avatar = Settings.data?.general?.avatarImage;
+                    if (avatar) {
+                        if (avatar.startsWith("~/")) return Quickshell.env("HOME") + avatar.substring(1);
+                        if (avatar === "~") return Quickshell.env("HOME");
+                        return avatar;
+                    }
+                }
+                
+                return "/var/lib/AccountsService/icons/" + userName;
+            }
+            
             fillMode: Image.PreserveAspectCrop
-            visible: status === Image.Ready
+            visible: status === Image.Ready && source.toString() !== ""
             asynchronous: true
             
             layer.enabled: true
