@@ -319,63 +319,46 @@ Item {
           width: Style.iconSizeM && Style.iconSizeM > 0 ? Style.iconSizeM : Math.round(Style.baseWidgetSize * 0.8)
           height: width
 
-          // Avatar Image
-          Image {
-            id: userAvatar
+          // Container Background & Border with Fallback Icon
+          Rectangle {
+              anchors.fill: parent
+              radius: width / 2
+              color: (Color.mSecondaryContainer !== undefined) ? Color.mSecondaryContainer : Color.mSurfaceVariant
+              border.color: Color.mOutline
+              border.width: Style.borderS
+              
+              NIcon {
+                anchors.centerIn: parent
+                visible: avatarImage.status !== Image.Ready
+                icon: "user"
+                pointSize: Style.fontSizeS
+                color: (Color.mOnSecondaryContainer !== undefined) ? Color.mOnSecondaryContainer : Color.mPrimary
+              }
+          }
+
+          // Avatar Image (Rounded, on top)
+          NImageRounded {
+            id: avatarImage
             anchors.fill: parent
+            radius: width / 2
             
             property string userName: displayUser
             property string currentUser: Quickshell.env("USER")
             
-            source: {
+            imagePath: {
                 if (!userName) return "";
-                
-                // If it's the current user, try to use the Noctalia configured avatar
                 if (userName === currentUser && typeof Settings !== "undefined") {
-                    var avatar = Settings.data?.general?.avatarImage;
-                    if (avatar) {
-                        if (avatar.startsWith("~/")) return Quickshell.env("HOME") + avatar.substring(1);
-                        if (avatar === "~") return Quickshell.env("HOME");
-                        return avatar;
-                    }
+                     return Settings.preprocessPath(Settings.data.general.avatarImage);
                 }
-                
                 return "/var/lib/AccountsService/icons/" + userName;
             }
             
-            fillMode: Image.PreserveAspectCrop
-            visible: status === Image.Ready && source.toString() !== ""
-            asynchronous: true
+            fallbackIcon: "" // Disable internal fallback
+            imageFillMode: Image.PreserveAspectCrop
+            borderWidth: 0 // Border handled by parent Rectangle
             
-            layer.enabled: true
-            layer.effect: MultiEffect {
-                maskEnabled: true
-                maskSource: avatarMask
-            }
-          }
-          
-          Rectangle {
-              id: avatarMask
-              anchors.fill: parent
-              radius: width / 2
-              visible: false
-          }
-
-          // Fallback Icon
-          Rectangle {
-            anchors.fill: parent
-            visible: userAvatar.status !== Image.Ready
-            radius: width / 2
-            color: (Color.mSecondaryContainer !== undefined) ? Color.mSecondaryContainer : Color.transparent
-            border.color: Color.mOutline
-            border.width: Style.borderS
-
-            NIcon {
-              anchors.centerIn: parent
-              icon: "user"
-              pointSize: Style.fontSizeS
-              color: (Color.mOnSecondaryContainer !== undefined) ? Color.mOnSecondaryContainer : Color.mPrimary
-            }
+            // Only visible when image is successfully loaded
+            visible: status === Image.Ready
           }
         }
 
