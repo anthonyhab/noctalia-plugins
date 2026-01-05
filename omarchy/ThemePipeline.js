@@ -1,5 +1,5 @@
 // Fast runtime pipeline for generating Noctalia palettes from Omarchy colors.
-const PIPELINE_VERSION = "e93a979d8999";
+const PIPELINE_VERSION = "f1a2b3c4d5e6"; // Updated to include mBarBorder
 
 function ensureContrast(foreground, background, minRatio, step, convert) {
   let result = foreground;
@@ -129,9 +129,12 @@ function generateScheme(colors, convert) {
   const surfaceTokens = buildSurfaceTokens(base, isDarkMode, convert);
   const accentTokens = buildAccentTokens(accents, errorColor, surfaceTokens.mSurface, isDarkMode, convert);
 
+  // Use Hyprland border color if available, otherwise fall back to primary
+  const mBarBorder = colors.hyprlandBorder || accents.primary;
+
   return {
     "mode": isDarkMode ? "dark" : "light",
-    "palette": Object.assign({}, accentTokens, surfaceTokens)
+    "palette": Object.assign({}, accentTokens, surfaceTokens, { "mBarBorder": mBarBorder })
   };
 }
 

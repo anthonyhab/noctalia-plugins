@@ -21,6 +21,7 @@ Item {
   property var availableThemes: []
   property bool suppressSettingsSignal: false
   property bool pendingReloadApply: false
+  property var pendingAlacrittyColors: null
 
   readonly property var defaultSettings: pluginApi?.manifest?.metadata?.defaultSettings || ({})
   readonly property string schemeDisplayName: pluginApi?.manifest?.metadata?.schemeName || "Omarchy"
@@ -51,6 +52,7 @@ Item {
   }
 
   readonly property string omarchyConfigPath: omarchyConfigDir + "current/theme/alacritty.toml"
+  readonly property string omarchyHyprlandPath: omarchyConfigDir + "current/theme/hyprland.conf"
   readonly property string omarchyThemePath: omarchyConfigDir + "current/theme"
   readonly property string omarchyThemesDir: omarchyConfigDir + "themes"
 
@@ -353,6 +355,38 @@ Item {
     return colors;
   }
 
+  function parseHyprlandConf(content) {
+    // Extract $activeBorderColor from hyprland.conf
+    // Formats: rgb(RRGGBB), rgba(RRGGBBAA), rgba(...) rgba(...) 45deg (gradient)
+    const lines = content.split("\n");
+    for (var i = 0; i < lines.length; i++) {
+      const line = lines[i].trim();
+      if (line.startsWith("$activeBorderColor")) {
+        // Extract the color value after the =
+        const match = line.match(/=\s*(.+)/);
+        if (!match) continue;
+
+        const value = match[1].trim();
+        // For gradients like "rgba(010401ee) rgba(518a51ee) 45deg", pick the second (brighter) color
+        // For simple colors like "rgb(c6d0f5)", use that
+        const colorMatches = value.match(/rgba?\(([a-fA-F0-9]{6,8})\)/g);
+        if (colorMatches && colorMatches.length > 0) {
+          // Use the last color in the list (usually brighter in gradients)
+          const lastColor = colorMatches[colorMatches.length - 1];
+          const hexMatch = lastColor.match(/rgba?\(([a-fA-F0-9]{6,8})\)/);
+          if (hexMatch) {
+            // Take first 6 chars for RGB, ignore alpha if present
+            const hex = hexMatch[1].slice(0, 6);
+            Logger.d("Omarchy", "Found Hyprland border color:", "#" + hex);
+            return "#" + hex.toLowerCase();
+          }
+        }
+      }
+    }
+    Logger.d("Omarchy", "No Hyprland border color found, using default");
+    return null;
+  }
+
   function writeSchemeFile(result) {
     const mode = result?.mode;
     const scheme = result?.palette;
@@ -497,7 +531,42 @@ Item {
         return;
       }
 
-      Logger.i("Omarchy", "Successfully parsed theme colors");
+      Logger.i("Omarchy", "Successfully parsed theme colors, now reading Hyprland config");
+      pendingAlacrittyColors = parsed;
+      hyprlandReadProcess.command = ["cat", omarchyHyprlandPath];
+      hyprlandReadProcess.running = true;
+    }
+  }
+
+  Process {
+    id: hyprlandReadProcess
+    running: false
+    stdout: StdioCollector {}
+    onExited: function (code) {
+      Logger.i("Omarchy", "hyprlandReadProcess exited with code:", code);
+
+      const parsed = pendingAlacrittyColors;
+      pendingAlacrittyColors = null;
+
+      if (!parsed) {
+        applying = false;
+        Logger.e("Omarchy", "No pending alacritty colors");
+        return;
+      }
+
+      // Parse Hyprland border color (optional - don't fail if missing)
+      if (code === 0) {
+        const content = stdout.text || "";
+        const borderColor = parseHyprlandConf(content);
+        if (borderColor) {
+          parsed.hyprlandBorder = borderColor;
+          Logger.i("Omarchy", "Using Hyprland border color:", borderColor);
+        }
+      } else {
+        Logger.w("Omarchy", "Could not read hyprland.conf, using default border color");
+      }
+
+      Logger.i("Omarchy", "Generating color scheme");
       const schemeResult = ThemePipeline.generateScheme(parsed, ColorsConvert);
       Logger.d("Omarchy", "Detected mode:", schemeResult.mode);
 

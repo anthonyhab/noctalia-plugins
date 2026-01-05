@@ -233,8 +233,19 @@ Item {
       return;
     }
 
-    const randomIndex = Math.floor(Math.random() * themes.length);
-    const randomTheme = themes[randomIndex];
+    const currentThemeName = pluginMain.themeName;
+    const otherThemes = themes.filter(theme => {
+      const name = typeof theme === 'string' ? theme : theme.name;
+      return name !== currentThemeName;
+    });
+
+    if (otherThemes.length === 0) {
+      Logger.w("OmarchyWidget", "No other themes available to switch to");
+      return;
+    }
+
+    const randomIndex = Math.floor(Math.random() * otherThemes.length);
+    const randomTheme = otherThemes[randomIndex];
     const randomName = typeof randomTheme === 'string' ? randomTheme : randomTheme.name;
 
     Logger.d("OmarchyWidget", "Random theme:", randomName);
