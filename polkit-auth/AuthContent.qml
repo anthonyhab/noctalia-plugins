@@ -19,7 +19,6 @@ Item {
   property string errorText: ""
 
   // Internal state
-  property bool showDetails: false
   property bool successState: false
   property bool revealPassword: false
   property bool capsLockOn: false
@@ -34,25 +33,65 @@ Item {
     command: ["wl-copy", commandPath]
   }
 
-  // Implicit sizing for parent containers
-  implicitWidth: mainColumn.implicitWidth + (Style.marginXL * 2)
-  implicitHeight: mainColumn.implicitHeight + (Style.marginXL * 2) + Style.marginL
+  // --- 1. THE UNIT SYSTEM (Single source of truth) ---
+  
+  readonly property string barSpaciousness: Settings?.data?.bar?.spaciousness ?? "default"
+  
+  // The spacing 'U'
+  readonly property int unit: {
+    switch (barSpaciousness) {
+      case "mini": return 4;
+      case "compact": return 6;
+      case "comfortable": return 12;
+      case "spacious": return 16;
+      default: return 8;
+    }
+  }
 
-  // Computed property
+  // Padding Logic:
+  // - Outer: 2U (Edge to items)
+  // - Gaps: 2U (Between items)
+  // - Inner: 1.5U (Item border to item content)
+  readonly property int padOuter: unit * 2
+  readonly property int padInner: Math.round(unit * 1.5)
+  readonly property int gapItems: unit * 2
+  readonly property int baseSize: Math.round(getStyle("baseWidgetSize", 32))
+  readonly property int controlHeight: Math.round(baseSize * 1.4)
+  readonly property int iconTile: baseSize
+  readonly property int overlayButton: Math.round(baseSize * 0.75)
+
+  // Radius Logic:
+  // - Outer: XL (from theme)
+  // - Inner: XL - P_OUTER (perfectly concentric)
+  readonly property int radiusOuter: getStyle("radiusXL", 24)
+  readonly property int radiusInner: Math.max(getStyle("radiusS", 4), radiusOuter - padOuter)
+
+  // --- 2. THEME HELPERS ---
+
+  function getColor(path, fallback) {
+    if (typeof Color === "undefined" || Color === null) return fallback;
+    const parts = path.split('.');
+    let cur = Color;
+    for (const p of parts) { if (cur[p] === undefined) return fallback; cur = cur[p]; }
+    return cur;
+  }
+
+  function getStyle(prop, fallback) {
+    if (typeof Style === "undefined" || Style === null) return fallback;
+    return Style[prop] !== undefined ? Style[prop] : fallback;
+  }
+
+  // --- 3. COMPUTED DATA ---
   readonly property bool hasRequest: request !== null && request !== undefined && typeof request === "object" && request.id
   readonly property string displayUser: formatUser(request?.user ?? "")
-  readonly property bool hasActionDetails: !!request?.actionId
   readonly property bool fingerprintAvailable: request?.fingerprintAvailable ?? false
   readonly property bool useBigLayout: !hasRequest || successState
 
-  // Command extraction
   readonly property string commandPath: {
     if (!hasRequest || !request.message) return "";
     const msg = request.message;
-    // Look for content in single quotes
     const match = msg.match(/'([^']+)'/);
     if (match && match[1]) return match[1];
-    // Look for absolute paths
     const matchPath = msg.match(/(\/[a-zA-Z0-9_\-\.\/]+)/);
     if (matchPath && matchPath[1]) return matchPath[1];
     return "";
@@ -65,9 +104,7 @@ Item {
 
   function formatUser(value) {
     if (!value) return "";
-    if (value.indexOf("unix-user:") === 0) {
-      return value.slice("unix-user:".length);
-    }
+    if (value.indexOf("unix-user:") === 0) return value.slice("unix-user:".length);
     return value;
   }
 
@@ -78,282 +115,156 @@ Item {
     }
   }
 
+  property int stableHeight: 0
+  function updateStableHeight() {
+    if (!hasRequest) return;
+    const next = mainColumn.implicitHeight + (padOuter * 2);
+    if (next > stableHeight) stableHeight = next;
+  }
+
+
   Connections {
     target: pluginMain
     function onRequestCompleted(success) {
-      if (success) {
-        successState = true;
-        // Animation handled by binding
-      } else {
-        shakeAnim.restart();
-        passwordInput.text = "";
-        focusPasswordInput();
-      }
+      if (success) successState = true;
+      else { shakeAnim.restart(); passwordInput.text = ""; focusPasswordInput(); }
     }
   }
 
-  // Close button for Success State (Big Layout)
-  NIconButton {
-    anchors.right: parent.right
-    anchors.top: parent.top
-    anchors.margins: Style.marginS
-    z: 10
-    visible: useBigLayout && successState
-    icon: "x"
-    baseSize: Math.round(Style.baseWidgetSize * 0.75)
-    colorBg: "transparent"
-    colorFg: Color.mOnSurfaceVariant
-    colorBgHover: Color.mSurfaceVariant
-    colorFgHover: Color.mOnSurface
-    onClicked: root.closeRequested()
-  }
+  // --- 4. UI STRUCTURE ---
+
+  implicitWidth: Math.round(400 * getStyle("uiScaleRatio", 1.0))
+  implicitHeight: Math.max(mainColumn.implicitHeight + (padOuter * 2), stableHeight > 0 ? stableHeight : 0)
 
   ColumnLayout {
     id: mainColumn
-    anchors.centerIn: parent
-    width: parent.width - (Style.marginXL * 2)
-    spacing: Style.marginL
+    anchors.fill: parent
+    anchors.margins: padOuter
+    spacing: gapItems
+    onImplicitHeightChanged: root.updateStableHeight()
 
-    // Entrance animation
-    scale: root.animateIn ? 1.0 : 0.95
     opacity: root.animateIn ? 1.0 : 0.0
-
-    Behavior on scale {
-      NumberAnimation {
-        duration: Style.animationNormal
-        easing.type: Easing.OutCubic
-      }
+    transform: Scale {
+        origin.x: mainColumn.width / 2; origin.y: mainColumn.height / 2
+        xScale: root.animateIn ? 1.0 : 0.95; yScale: root.animateIn ? 1.0 : 0.95
     }
-    Behavior on opacity {
-      NumberAnimation {
-        duration: Style.animationFast
-        easing.type: Easing.OutCubic
-      }
-    }
-
-    // Big Icon (Idle / Success)
+    Behavior on opacity { NumberAnimation { duration: getStyle("animationNormal", 200); easing.type: Easing.OutCubic } }
+    
+    // Icon Section
     Item {
       visible: useBigLayout
       Layout.fillWidth: true
-      Layout.preferredHeight: bigLockIcon.height + 8
-
-      layer.enabled: true
-      layer.effect: MultiEffect {
-        shadowEnabled: true
-        shadowBlur: 0.4
-        shadowOpacity: 0.35
-        shadowColor: Color.mPrimary
-        shadowVerticalOffset: 3
-        shadowHorizontalOffset: 0
-      }
+      Layout.preferredHeight: bigLockIcon.height
+      Layout.topMargin: unit
 
       NIcon {
         id: bigLockIcon
-        anchors.horizontalCenter: parent.horizontalCenter
-        anchors.top: parent.top
+        anchors.centerIn: parent
         icon: successState ? "circle-check" : (hasRequest ? "lock" : "shield")
-        pointSize: Math.round(Style.fontSizeXXXL * 2.0)
-        color: Color.mPrimary
-
-        SequentialAnimation on scale {
-          id: bigSuccessBounce
-          running: successState
-          NumberAnimation { to: 1.15; duration: Style.animationFast; easing.type: Easing.OutCubic }
-          NumberAnimation { to: 1.0; duration: Style.animationFast; easing.type: Easing.OutCubic }
-        }
-
-        Behavior on color { ColorAnimation { duration: Style.animationFast } }
+        pointSize: Math.round(getStyle("fontSizeXXXL", 32) * 1.5)
+        color: getColor("mPrimary", "blue")
       }
     }
 
-    // Big Title
+    // Title Section
     NText {
       visible: useBigLayout
       Layout.fillWidth: true
       horizontalAlignment: Text.AlignHCenter
-      text: {
-        if (successState) return trOrDefault("status.authenticated", "Authenticated");
-        return trOrDefault("title", "Polkit Authentication");
-      }
-      font.weight: Style.fontWeightBold
-      pointSize: Style.fontSizeXL
-      color: Color.mOnSurface
+      text: successState ? trOrDefault("status.authenticated", "Authenticated") : trOrDefault("title", "Polkit Authentication")
+      font.weight: getStyle("fontWeightBold", 700)
+      pointSize: getStyle("fontSizeXL", 20)
+      color: getColor("mOnSurface", "black")
     }
 
-    // Header (Structured) - Compact Mode
+    // Compact Header
     Rectangle {
+        id: headerCard
         visible: !useBigLayout
         Layout.fillWidth: true
-        Layout.preferredHeight: (Style.baseWidgetSize * 1.2) + (Style.marginS * 2)
-        
-        color: Color.mSurfaceVariant
-        radius: Style.radiusL
-        border.color: Color.mOutline
-        border.width: Style.borderS
+        implicitHeight: headerRow.implicitHeight + (padInner * 2)
+        color: getColor("mSurfaceVariant", "#eee")
+        radius: radiusInner
+        border.color: getColor("mOutline", "#ccc")
+        border.width: 1
 
-        // Left: Lock Icon Container
-        Rectangle {
-            anchors.left: parent.left
-            anchors.leftMargin: Style.marginS
-            anchors.verticalCenter: parent.verticalCenter
-            width: Style.baseWidgetSize * 1.2
-            height: Style.baseWidgetSize * 1.2
-            radius: Style.iRadiusM
-            color: Qt.alpha(Color.mPrimary, 0.1)
-            border.color: Qt.alpha(Color.mPrimary, 0.3)
-            border.width: Style.borderS
+        RowLayout {
+            id: headerRow
+            anchors.fill: parent
+            anchors.margins: padInner
+            spacing: padInner
 
-            NIcon {
-                anchors.centerIn: parent
-                icon: successState ? "check" : (hasRequest ? "lock" : "shield")
-                pointSize: Style.fontSizeL
-                color: Color.mPrimary
-                
-                SequentialAnimation on scale {
-                    id: successBounce
-                    running: false
-                    NumberAnimation { to: 1.2; duration: Style.animationFast; easing.type: Easing.OutCubic }
-                    NumberAnimation { to: 1.0; duration: Style.animationFast; easing.type: Easing.OutCubic }
+            Rectangle {
+                Layout.preferredWidth: iconTile
+                Layout.preferredHeight: iconTile
+                Layout.alignment: Qt.AlignVCenter
+                radius: Math.max(4, radiusInner - 4)
+                color: Qt.alpha(getColor("mPrimary", "blue"), 0.1)
+                NIcon { anchors.centerIn: parent; icon: "lock"; pointSize: 16; color: getColor("mPrimary", "blue") }
+            }
+
+            NText {
+                Layout.fillWidth: true
+                Layout.alignment: Qt.AlignVCenter
+                text: trOrDefault("status.request", "Authentication Required")
+                font.weight: getStyle("fontWeightBold", 700)
+                pointSize: getStyle("fontSizeM", 14)
+                color: getColor("mOnSurface", "black")
+                elide: Text.ElideRight
+            }
+
+            NIconButton {
+                Layout.preferredWidth: iconTile
+                Layout.preferredHeight: Layout.preferredWidth
+                Layout.alignment: Qt.AlignVCenter
+                icon: "x"; baseSize: Layout.preferredWidth; colorBg: "transparent"
+                onClicked: {
+                    if (hasRequest && !busy) {
+                        pluginMain?.requestClose();
+                        passwordInput.text = "";
+                    }
                 }
-                
-                Behavior on color { ColorAnimation { duration: Style.animationFast } }
-            }
-        }
-
-        // Center: Title
-        NText {
-            anchors.centerIn: parent
-            text: {
-                if (successState) return trOrDefault("status.authenticated", "Authenticated");
-                if (hasRequest) return trOrDefault("status.request", "Authentication Required");
-                return trOrDefault("title", "Polkit Authentication");
-            }
-            font.weight: Style.fontWeightBold
-            pointSize: Style.fontSizeL
-            color: Color.mOnSurface
-        }
-
-        // Right: Close Button
-        NIconButton {
-            id: closeButton
-            anchors.right: parent.right
-            anchors.rightMargin: Style.marginS
-            anchors.verticalCenter: parent.verticalCenter
-            
-            visible: hasRequest && !successState
-            icon: "x"
-            baseSize: Math.round(Style.baseWidgetSize * 0.75)
-            colorBg: "transparent"
-            colorFg: Color.mOnSurfaceVariant
-            colorBgHover: Color.mSurface
-            colorFgHover: Color.mOnSurface
-            tooltipText: trOrDefault("actions.close", "Close")
-            onClicked: {
-              if (hasRequest) {
-                pluginMain?.cancelRequest();
-              }
-              root.closeRequested();
             }
         }
     }
 
-    // Queue indicator
-    RowLayout {
-      Layout.alignment: Qt.AlignHCenter
-      visible: hasRequest && !successState && (pluginMain?.requestQueue?.length ?? 0) > 0
-      spacing: Style.marginXS
-      opacity: visible ? 1.0 : 0.0
-
-      Behavior on opacity {
-        NumberAnimation {
-          duration: Style.animationFast
-          easing.type: Easing.OutCubic
-        }
-      }
-
-      Rectangle {
-        width: queueText.implicitWidth + Style.marginM
-        height: queueText.implicitHeight + Style.marginXS
-        radius: Style.iRadiusS
-        color: Color.mTertiary
-        border.color: Color.mOutline
-        border.width: Style.borderS
-
-        NText {
-          id: queueText
-          anchors.centerIn: parent
-          text: "+" + (pluginMain?.requestQueue?.length ?? 0) + " " +
-                trOrDefault("status.more-requests", "more")
-          pointSize: Style.fontSizeXS
-          color: Color.mOnTertiary
-        }
-      }
-    }
-
-    // Context Card (User + Command)
+    // Identity Card
     Rectangle {
-      id: contextCard
-      Layout.alignment: Qt.AlignHCenter
-      Layout.fillWidth: true
-      Layout.maximumWidth: parent.width
-      
       visible: hasRequest && !successState && (displayUser.length > 0 || commandPath !== "")
-      
-      implicitHeight: contextCol.implicitHeight + (Style.marginS * 2)
-      
-      radius: Style.radiusL
-      color: Color.mSurfaceVariant
-      border.color: Color.mOutline
-      border.width: Style.borderS
+      Layout.fillWidth: true
+      implicitHeight: contextCol.implicitHeight + (padInner * 2)
+      radius: radiusInner
+      color: getColor("mSurfaceVariant", "#eee")
+      border.color: getColor("mOutline", "#ccc")
+      border.width: 1
 
       ColumnLayout {
         id: contextCol
-        anchors.centerIn: parent
-        width: parent.width
-        spacing: 0
+        anchors.fill: parent
+        anchors.margins: padInner
+        spacing: padInner
 
-        // User Identity Section
         RowLayout {
             Layout.alignment: Qt.AlignHCenter
-            Layout.topMargin: Style.marginS
-            Layout.bottomMargin: commandPath !== "" ? Style.marginXS : 0
             visible: displayUser.length > 0
-            spacing: Style.marginS
+            spacing: unit
 
-            // Avatar Item
             Item {
-                Layout.alignment: Qt.AlignVCenter
-                width: Style.iconSizeM && Style.iconSizeM > 0 ? Style.iconSizeM : Math.round(Style.baseWidgetSize * 0.7)
+                width: Math.round(baseSize * 0.8)
                 height: width
-
-                // Container Background & Border (Frame)
                 Rectangle {
-                    anchors.fill: parent
-                    radius: width / 2
-                    color: (Color.mSecondaryContainer !== undefined) ? Color.mSecondaryContainer : Color.mSurfaceVariant
-                    border.color: Color.mOutline
-                    border.width: Style.borderS
-                    
-                    // Fallback Icon
-                    NIcon {
-                        anchors.centerIn: parent
-                        visible: avatarImage.status !== Image.Ready
-                        icon: "user"
-                        pointSize: Style.fontSizeS
-                        color: (Color.mOnSecondaryContainer !== undefined) ? Color.mOnSecondaryContainer : Color.mPrimary
-                    }
+                    anchors.fill: parent; radius: width / 2; color: getColor("mSecondaryContainer", "#ddd")
+                    NIcon { anchors.centerIn: parent; visible: avatarImage.status !== Image.Ready; icon: "user"; pointSize: 12 }
                 }
-
-                // Avatar Image
                 NImageRounded {
                     id: avatarImage
                     anchors.fill: parent
                     anchors.margins: 3
                     radius: width / 2
-                    
+
                     property string userName: displayUser
                     property string currentUser: Quickshell.env("USER")
-                    
+
                     imagePath: {
                         if (!userName) return "";
                         if (userName === currentUser && typeof Settings !== "undefined") {
@@ -361,473 +272,120 @@ Item {
                         }
                         return "/var/lib/AccountsService/icons/" + userName;
                     }
-                    
-                    fallbackIcon: "" 
+
                     imageFillMode: Image.PreserveAspectCrop
-                    borderWidth: 0 
                     visible: status === Image.Ready
                 }
             }
 
-            NText {
-                text: displayUser
-                font.weight: Style.fontWeightMedium
-                color: Color.mOnSurface
-                pointSize: Style.fontSizeM
-            }
+            NText { text: displayUser; font.weight: 500; pointSize: 14 }
         }
 
-        // Separator
-        Item {
-            visible: displayUser.length > 0 && commandPath !== ""
-            Layout.fillWidth: true
-            Layout.preferredHeight: Style.marginS
-            
-            Rectangle {
-                anchors.centerIn: parent
-                width: parent.width - (Style.marginM * 2)
-                height: 1
-                color: Color.mOutline
-                opacity: 0.3
-            }
-        }
+        Rectangle { visible: displayUser.length > 0 && commandPath !== ""; Layout.fillWidth: true; Layout.preferredHeight: 1; color: getColor("mOutline", "#ccc"); opacity: 0.1 }
 
-        // Command Section
-        Item {
-            visible: commandPath !== ""
-            Layout.fillWidth: true
-            Layout.preferredHeight: Math.max(cmdText.implicitHeight + Style.marginXS, 26)
-            
-            Rectangle {
-                id: cmdBackground
-                anchors.fill: parent
-                radius: Style.iRadiusS
-                color: cmdHover.hovered ? Qt.alpha(Color.mOnSurface, 0.05) : "transparent"
-                
-                Behavior on color { ColorAnimation { duration: Style.animationFast } }
-            }
-
-            HoverHandler { id: cmdHover; cursorShape: Qt.PointingHandCursor }
-            TapHandler {
-                onTapped: {
-                  copyProcess.running = true;
-                  cmdCopyFeedback.restart();
-                }
-            }
-            
-            NText {
-                id: cmdText
-                anchors.centerIn: parent
-                width: parent.width - Style.marginS
-                text: commandPath
-                font.family: "Monospace"
-                color: Color.mOnSurfaceVariant
-                pointSize: Style.fontSizeS
-                elide: Text.ElideMiddle
-                horizontalAlignment: Text.AlignHCenter
-            }
-            
-            // Copy Feedback Overlay
-            Rectangle {
-                anchors.fill: parent
-                radius: Style.iRadiusS
-                color: Color.mPrimary
-                opacity: 0
-                
-                NText {
-                    anchors.centerIn: parent
-                    text: trOrDefault("feedback.copied", "Copied!")
-                    color: Color.mOnPrimary
-                    pointSize: Style.fontSizeXS
-                }
-                
-                SequentialAnimation on opacity {
-                    id: cmdCopyFeedback
-                    running: false
-                    NumberAnimation { to: 1; duration: Style.animationFaster }
-                    PauseAnimation { duration: 500 }
-                    NumberAnimation { to: 0; duration: Style.animationFast }
-                }
-            }
+        NText {
+            visible: commandPath !== ""; Layout.fillWidth: true; horizontalAlignment: Text.AlignHCenter
+            text: commandPath; font.family: "Monospace"; color: getColor("mOnSurfaceVariant", "#666"); pointSize: 12; elide: Text.ElideMiddle
         }
       }
     }
 
-    // Status / Message Text
-    NText {
+    // Password Input
+    Rectangle {
+      id: inputWrapper
       Layout.fillWidth: true
-      horizontalAlignment: Text.AlignHCenter
-      visible: !successState
-      text: {
-        if (!hasRequest) {
-          return agentAvailable
-            ? trOrDefault("status.waiting", "Waiting for authentication requests")
-            : (statusText || trOrDefault("status.agent-unavailable", "Agent unavailable"));
-        }
-        if (commandPath !== "") {
-          return trOrDefault("status.auth-command", "Authentication is required to run this command as the super user.");
-        }
-        return request?.message ?? "";
-      }
-      wrapMode: Text.WordWrap
-      color: Color.mOnSurfaceVariant
-      pointSize: Style.fontSizeM
-      lineHeight: 1.2
-    }
-
-    // Password Input Area
-    Item {
-      id: inputContainer
-      Layout.fillWidth: true
-      Layout.preferredHeight: passwordInput.implicitHeight
+      implicitHeight: passwordInput.implicitHeight + (padInner * 2)
       visible: hasRequest && !successState
-      
-      // Focus/Error Glow
-      Rectangle {
-        anchors.fill: passwordInput
-        anchors.margins: -2
-        radius: Style.iRadiusM
-        color: "transparent"
-        border.color: errorText.length > 0 ? Color.mError : Color.mSecondary
-        border.width: 2
-        opacity: (passwordInput.activeFocus || errorText.length > 0) ? 0.5 : 0
-
-        Behavior on opacity { NumberAnimation { duration: Style.animationFast } }
-        Behavior on border.color { ColorAnimation { duration: Style.animationFast } }
-      }
-
-      // Icons Overlay (Caps Lock, Reveal)
-      RowLayout {
-        id: overlayRow
-        anchors.right: parent.right
-        anchors.verticalCenter: parent.verticalCenter
-        // Shift left if text is present to avoid native clear button, but keep it tight
-        anchors.rightMargin: Style.marginXS + (passwordInput.text.length > 0 ? Math.round(Style.baseWidgetSize * 0.9) : 0)
-        spacing: 2
-        z: 5
-        
-        Behavior on anchors.rightMargin { NumberAnimation { duration: Style.animationFaster } }
-
-        // Caps Lock Warning
-        NIcon {
-            visible: root.capsLockOn
-            icon: "arrow-up-circle" // or a generic warning/caps icon
-            pointSize: Style.fontSizeM
-            color: Color.mError
-            
-            ToolTip.visible: mouseAreaCaps.containsMouse
-            ToolTip.text: trOrDefault("warnings.caps-lock", "Caps Lock is on")
-            
-            MouseArea {
-                id: mouseAreaCaps
-                anchors.fill: parent
-                hoverEnabled: true
-            }
-        }
-
-        // Reveal Button
-        NIconButton {
-          icon: root.revealPassword ? "eye-off" : "eye"
-          baseSize: Math.round(Style.baseWidgetSize * 0.7)
-          colorBg: "transparent"
-          colorFg: Color.mOnSurfaceVariant
-          onClicked: root.revealPassword = !root.revealPassword
-        }
-      }
+      radius: radiusInner
+      color: getColor("mSurfaceVariant", "#eee")
+      border.color: errorText.length > 0 ? getColor("mError", "red") : (passwordInput.activeFocus ? getColor("mPrimary", "blue") : getColor("mOutline", "#ccc"))
+      border.width: passwordInput.activeFocus ? 2 : 1
 
       NTextInput {
         id: passwordInput
-        anchors.left: parent.left
-        anchors.right: parent.right
+        anchors.fill: parent
+        anchors.leftMargin: padInner
+        anchors.rightMargin: overlayIcons.width + padInner + unit
+        anchors.topMargin: padInner
+        anchors.bottomMargin: padInner
         
-        // Dynamic padding based on the overlay width + its offset
-        inputItem.rightPadding: overlayRow.width + overlayRow.anchors.rightMargin + Style.marginXS
-
-        placeholderText: request?.prompt || trOrDefault("placeholders.password", "Enter your password")
+        inputItem.font.pointSize: getStyle("fontSizeM", 14)
+        inputItem.verticalAlignment: TextInput.AlignVCenter
+        placeholderText: request?.prompt || trOrDefault("placeholders.password", "Enter password")
         text: ""
-        
         inputItem.echoMode: root.revealPassword ? TextInput.Normal : TextInput.Password
         enabled: !busy
         
+        Component.onCompleted: { if (passwordInput.background) passwordInput.background.visible = false; }
+
         KeyNavigation.tab: authButton
-        
         inputItem.Keys.onPressed: function (event) {
-          // Best-effort Caps Lock detection
-          if (event.modifiers & Qt.ShiftModifier) {
-             // This assumes typing regular chars. Not perfect but helpful.
-             // Real Caps Lock detection requires C++.
-          }
-          
-          if (event.key === Qt.Key_CapsLock) {
-             root.capsLockOn = !root.capsLockOn; // Toggle guess
-          }
-
+          if (event.key === Qt.Key_CapsLock) root.capsLockOn = !root.capsLockOn;
           if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
-            if (hasRequest && !busy && passwordInput.text.length > 0) {
-              pluginMain?.submitPassword(passwordInput.text);
-              event.accepted = true;
-            }
+            if (hasRequest && !busy && passwordInput.text.length > 0) pluginMain?.submitPassword(passwordInput.text);
           } else if (event.key === Qt.Key_Escape) {
-            if (hasRequest && !busy) {
-              pluginMain?.cancelRequest();
-              passwordInput.text = "";
-              event.accepted = true;
-            }
+            if (hasRequest && !busy) { pluginMain?.requestClose(); passwordInput.text = ""; }
           }
         }
       }
-    }
 
-    // Fingerprint hint
-    RowLayout {
-      Layout.alignment: Qt.AlignHCenter
-      visible: hasRequest && fingerprintAvailable && !successState && !busy
-      spacing: Style.marginS
-
-      Rectangle {
-        width: 1
-        height: Style.fontSizeS
-        color: Color.mOutline
-        Layout.alignment: Qt.AlignVCenter
+      Row {
+        id: overlayIcons; anchors.right: parent.right; anchors.rightMargin: padInner; anchors.verticalCenter: parent.verticalCenter; spacing: unit
+        NIcon { visible: root.capsLockOn; icon: "arrow-up-circle"; pointSize: 14; color: getColor("mError", "red") }
+        NIconButton { icon: root.revealPassword ? "eye-off" : "eye"; baseSize: overlayButton; colorBg: "transparent"; onClicked: root.revealPassword = !root.revealPassword }
       }
-
-      NText {
-        text: trOrDefault("status.fingerprint-or", "or")
-        color: Color.mOnSurfaceVariant
-        pointSize: Style.fontSizeS
-      }
-
-      Rectangle {
-        width: 1
-        height: Style.fontSizeS
-        color: Color.mOutline
-        Layout.alignment: Qt.AlignVCenter
-      }
-    }
-
-    RowLayout {
-      Layout.alignment: Qt.AlignHCenter
-      visible: hasRequest && fingerprintAvailable && !successState
-      spacing: Style.marginS
-      opacity: busy ? 0.5 : 1
-
-      NIcon {
-        icon: "fingerprint"
-        pointSize: Style.fontSizeL
-        color: Color.mPrimary
-
-        SequentialAnimation on opacity {
-          running: hasRequest && fingerprintAvailable && !successState && !busy
-          loops: Animation.Infinite
-          NumberAnimation { to: 0.4; duration: 1000; easing.type: Easing.InOutQuad }
-          NumberAnimation { to: 1.0; duration: 1000; easing.type: Easing.InOutQuad }
-        }
-      }
-
-      NText {
-        text: trOrDefault("status.fingerprint-hint", "Touch fingerprint sensor")
-        color: Color.mOnSurfaceVariant
-        pointSize: Style.fontSizeS
-      }
-    }
-
-    // Error Message
-    NText {
-      Layout.fillWidth: true
-      visible: errorText.length > 0 && !successState
-      horizontalAlignment: Text.AlignHCenter
-      text: errorText
-      color: Color.mError
-      pointSize: Style.fontSizeS
-      wrapMode: Text.WordWrap
     }
 
     // Authenticate Button
-    Item {
-      id: authButtonWrapper
-      Layout.fillWidth: true
-      Layout.preferredHeight: Style.baseWidgetSize * 1.2
+    NButton {
+      id: authButton
       visible: hasRequest && !successState
+      Layout.fillWidth: true
+      Layout.preferredHeight: controlHeight
+      text: busy ? trOrDefault("status.processing", "Verifying...") : trOrDefault("actions.authenticate", "Authenticate")
+      enabled: !busy && passwordInput.text.length > 0
+      
+      Component.onCompleted: { if (authButton.background) authButton.background.radius = radiusInner; }
+      onClicked: if (hasRequest && pluginMain) pluginMain.submitPassword(passwordInput.text)
 
-      scale: authButtonTap.pressed ? 0.98 : 1.0
-      Behavior on scale {
-        NumberAnimation {
-          duration: Style.animationFaster
-          easing.type: Easing.OutCubic
-        }
-      }
-
-      NButton {
-        id: authButton
-        anchors.fill: parent
-
-        property bool showSpinner: busy
-
-        text: busy
-          ? trOrDefault("status.processing", "Verifying...")
-          : trOrDefault("actions.authenticate", "Authenticate")
-
-        enabled: !busy && passwordInput.text.length > 0
-
-        opacity: busy ? 0.7 : 1
-
-        Behavior on opacity { NumberAnimation { duration: Style.animationFast; easing.type: Easing.OutCubic } }
-
-        onClicked: {
-          if (hasRequest && pluginMain) {
-            pluginMain.submitPassword(passwordInput.text);
-          }
-        }
-
-        Item {
-          width: Style.fontSizeM
-          height: width
-          anchors.right: parent.right
-          anchors.rightMargin: Style.marginM
-          anchors.verticalCenter: parent.verticalCenter
-          visible: authButton.showSpinner
-
-          NIcon {
-            id: spinnerIcon
-            anchors.centerIn: parent
-            icon: "loader"
-            pointSize: Style.fontSizeS
-            color: Color.mOnPrimary
-
-            RotationAnimation on rotation {
-              from: 0
-              to: 360
-              duration: 1000
-              loops: Animation.Infinite
-              running: authButton.showSpinner
-              easing.type: Easing.Linear
-            }
-          }
-        }
-      }
-
-      TapHandler {
-        id: authButtonTap
-        gesturePolicy: TapHandler.WithinBounds
+      NIcon {
+        anchors.right: parent.right; anchors.rightMargin: padInner; anchors.verticalCenter: parent.verticalCenter
+        visible: busy; icon: "loader"; pointSize: 12
+        RotationAnimation on rotation { from: 0; to: 360; duration: 1000; loops: Animation.Infinite; running: busy }
       }
     }
 
-    // Details Section
+    // Fingerprint / Feedback
     ColumnLayout {
-      Layout.fillWidth: true
-      visible: hasRequest && hasActionDetails && !successState
-      spacing: Style.marginXS
-      Layout.preferredHeight: showDetailsButton.implicitHeight + detailsBox.implicitHeight + Style.marginS
-      
-      RowLayout {
-        id: showDetailsButton
-        Layout.alignment: Qt.AlignHCenter
-        spacing: Style.marginXS
-        
-        NIcon {
-          icon: showDetails ? "chevron-up" : "chevron-down"
-          pointSize: Style.fontSizeXS
-          color: Color.mOnSurfaceVariant
-        }
-        
-        NText {
-          text: showDetails ? trOrDefault("actions.hide-details", "Hide details") : trOrDefault("actions.show-details", "Show details")
-          color: Color.mOnSurfaceVariant
-          pointSize: Style.fontSizeXS
-        }
-        
-        HoverHandler {
-            id: detailsHover
-            cursorShape: Qt.PointingHandCursor
-        }
-        
-        TapHandler {
-            onTapped: showDetails = !showDetails
-        }
-      }
-      
-      Rectangle {
-         id: detailsBox
-         Layout.fillWidth: true
-         Layout.preferredHeight: detailsCol.implicitHeight + Style.marginM
-         color: Color.mSurfaceVariant
-         radius: Style.radiusL
-         opacity: showDetails ? 1 : 0
-         border.color: showDetails ? Color.mOutline : Color.transparent
-         border.width: Style.borderS
+      Layout.fillWidth: true; spacing: unit
+      visible: !successState && (errorText.length > 0 || (hasRequest && fingerprintAvailable && !busy))
 
-         Behavior on opacity { NumberAnimation { duration: Style.animationFast } }
-         Behavior on border.color { ColorAnimation { duration: Style.animationFast } }
-         
-        ColumnLayout {
-            id: detailsCol
-            anchors.top: parent.top
-            anchors.left: parent.left
-            anchors.right: parent.right
-            anchors.margins: Style.marginS
-            spacing: Style.marginXS
-            
-            NText {
-               visible: hasActionDetails
-                Layout.fillWidth: true
-                text: trOrDefault("labels.action", "Action") + ": " + (request?.actionId ?? "")
-                color: Color.mOnSurfaceVariant
-                pointSize: Style.fontSizeXS
-                wrapMode: Text.WrapAnywhere
-             }
-        }
+      RowLayout {
+        Layout.alignment: Qt.AlignHCenter; visible: hasRequest && fingerprintAvailable && !busy; spacing: unit
+        NIcon { icon: "fingerprint"; pointSize: 14; color: getColor("mPrimary", "blue") }
+        NText { text: trOrDefault("status.fingerprint-hint", "Touch fingerprint sensor"); color: getColor("mOnSurfaceVariant", "#666"); pointSize: 12 }
+      }
+
+      NText {
+        Layout.fillWidth: true; visible: errorText.length > 0; horizontalAlignment: Text.AlignHCenter
+        text: errorText; color: getColor("mError", "red"); pointSize: 12; wrapMode: Text.WordWrap
       }
     }
   }
 
-  // Shake Animation on Error
+  // State Management
   SequentialAnimation {
     id: shakeAnim
-    loops: 1
-    
-    NumberAnimation { target: mainColumn; property: "anchors.horizontalCenterOffset"; to: -10; duration: 50; easing.type: Easing.InOutQuad }
-    NumberAnimation { target: mainColumn; property: "anchors.horizontalCenterOffset"; to: 10; duration: 50; easing.type: Easing.InOutQuad }
-    NumberAnimation { target: mainColumn; property: "anchors.horizontalCenterOffset"; to: -10; duration: 50; easing.type: Easing.InOutQuad }
-    NumberAnimation { target: mainColumn; property: "anchors.horizontalCenterOffset"; to: 10; duration: 50; easing.type: Easing.InOutQuad }
-    NumberAnimation { target: mainColumn; property: "anchors.horizontalCenterOffset"; to: 0; duration: 50; easing.type: Easing.InOutQuad }
+    NumberAnimation { target: mainColumn; property: "anchors.horizontalCenterOffset"; from: 0; to: -8; duration: 50 }
+    NumberAnimation { target: mainColumn; property: "anchors.horizontalCenterOffset"; to: 8; duration: 50 }
+    NumberAnimation { target: mainColumn; property: "anchors.horizontalCenterOffset"; to: 0; duration: 50 }
   }
-
-  // Focus management
-  Timer {
-    id: focusTimer
-    interval: 100
-    repeat: false
-    onTriggered: focusPasswordInput()
-  }
-
-  // Entrance animation timer
-  Timer {
-    id: animateInTimer
-    interval: 16
-    repeat: false
-    onTriggered: root.animateIn = true
-  }
-
+  Timer { id: focusTimer; interval: 100; onTriggered: focusPasswordInput() }
+  Timer { id: animateInTimer; interval: 16; onTriggered: root.animateIn = true }
   onHasRequestChanged: {
-    if (hasRequest) {
-      successState = false;
-      passwordInput.text = "";
-      showDetails = false;
-      revealPassword = false;
-      focusTimer.restart();
-    }
+    if (!hasRequest) stableHeight = 0;
+    else { stableHeight = 0; successState = false; passwordInput.text = ""; revealPassword = false; focusTimer.restart(); updateStableHeight(); }
   }
-
-  onVisibleChanged: {
-    if (visible && hasRequest) {
-      focusTimer.restart();
-    }
-  }
-
-  Component.onCompleted: {
-    animateInTimer.start();
-    if (hasRequest) {
-      focusTimer.restart();
-    }
-  }
+  onVisibleChanged: if (visible && hasRequest) { focusTimer.restart(); updateStableHeight(); }
+  Component.onCompleted: { animateInTimer.start(); if (hasRequest) { focusTimer.restart(); updateStableHeight(); } }
 }

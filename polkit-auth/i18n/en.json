@@ -1,5 +1,11 @@
 {
   "title": "Polkit Authentication",
+  "keyring": {
+    "title": "Keyring Unlock",
+    "request": "Unlock Keyring",
+    "new-password": "Create Keyring Password",
+    "unlocked": "Unlocked"
+  },
   "status": {
     "waiting": "Waiting for authentication requests",
     "idle": "No pending authentication requests.",
@@ -25,6 +31,8 @@
   },
   "actions": {
     "authenticate": "Authenticate",
+    "unlock": "Unlock",
+    "confirm": "Confirm",
     "cancel": "Cancel",
     "close": "Close",
     "show-details": "Show details",

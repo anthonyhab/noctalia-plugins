@@ -48,6 +48,7 @@ Item {
   property var pendingSocketRequest: null
   property bool socketBusy: false
   property bool socketResponseReceived: false
+  property string closeRequestedId: ""
 
   signal requestReceived()
   signal requestCompleted(bool success)
@@ -214,11 +215,11 @@ Item {
 
   function cancelRequest() {
     if (!currentRequest)
-      return;
+      return false;
 
     if (responseInFlight) {
       lastError = pluginApi?.tr("errors.busy") || "Please wait...";
-      return;
+      return false;
     }
 
     responseInFlight = true;
@@ -235,9 +236,24 @@ Item {
 
       Qt.callLater(pollImmediately);
     });
+    return true;
+  }
+
+  function requestClose() {
+    if (!currentRequest) {
+      closeAuthUI();
+      return;
+    }
+
+    if (cancelRequest()) {
+      closeRequestedId = currentRequest.id;
+    }
   }
 
   function handleRequestComplete(requestId, success, wasCancelled) {
+    const shouldCloseForUser = closeRequestedId && closeRequestedId === requestId;
+    if (shouldCloseForUser) closeRequestedId = "";
+
     if (currentRequest && currentRequest.id === requestId) {
       requestCompleted(success);
 
@@ -254,14 +270,15 @@ Item {
         currentRequest = null;
         if (success) {
            lastError = "";
-           if (autoCloseOnSuccess) closeAuthUI();
+           if (autoCloseOnSuccess || shouldCloseForUser) closeAuthUI();
         } else if (wasCancelled) {
            lastError = "";
-           if (autoCloseOnCancel) closeAuthUI();
+           if (autoCloseOnCancel || shouldCloseForUser) closeAuthUI();
         }
         advanceQueue();
       }
     } else {
+      if (shouldCloseForUser) closeAuthUI();
       requestQueue = requestQueue.filter(r => r.id !== requestId);
     }
   }
@@ -438,8 +455,9 @@ Item {
       agentAvailable: root.agentAvailable
       statusText: root.agentStatus
       errorText: root.lastError
-      onCloseRequested: authWindow.visible = false
+      onCloseRequested: root.requestClose()
     }
+
   }
 
   Component.onCompleted: {

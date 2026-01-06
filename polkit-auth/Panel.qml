@@ -40,6 +40,6 @@ Item {
     agentAvailable: pluginMain?.agentAvailable ?? true
     statusText: pluginMain?.agentStatus ?? ""
     errorText: pluginMain?.lastError ?? ""
-    onCloseRequested: pluginApi?.closePanel(root.screen)
+    onCloseRequested: pluginMain?.requestClose()
   }
 }

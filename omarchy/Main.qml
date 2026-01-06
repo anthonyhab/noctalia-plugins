@@ -51,10 +51,17 @@ Item {
     return "~/.config/omarchy/";
   }
 
-  readonly property string omarchyConfigPath: omarchyConfigDir + "current/theme/alacritty.toml"
+  readonly property string omarchyConfigPath: omarchyConfigDir + "current/theme/colors.toml"
   readonly property string omarchyHyprlandPath: omarchyConfigDir + "current/theme/hyprland.conf"
   readonly property string omarchyThemePath: omarchyConfigDir + "current/theme"
+  readonly property string omarchyThemeNamePath: omarchyConfigDir + "current/theme.name"
   readonly property string omarchyThemesDir: omarchyConfigDir + "themes"
+  readonly property string omarchyPath: {
+    const home = Quickshell.env("HOME");
+    if (home && home !== "")
+      return home + "/.local/share/omarchy";
+    return "~/.local/share/omarchy";
+  }
 
   readonly property string themeSetCommand: {
     const configured = pluginApi?.pluginSettings?.themeSetCommand;
@@ -135,28 +142,25 @@ Item {
   }
 
   function checkAvailability() {
-    availabilityProcess.command = ["test", "-f", omarchyConfigPath];
+    // Check for both colors.toml and theme.name file
+    availabilityProcess.command = ["bash", "-c", "[ -f '" + omarchyConfigPath.replace(/'/g, "'\\''") + "' ] && [ -f '" + omarchyThemeNamePath.replace(/'/g, "'\\''") + "' ]"];
     availabilityProcess.running = true;
   }
 
   function scanThemes() {
-    const themesDirEsc = omarchyThemesDir.replace(/'/g, "'\\''");
-    Logger.i("Omarchy", "Scanning themes in:", omarchyThemesDir);
-    Logger.d("Omarchy", "Escaped path:", themesDirEsc);
+    Logger.i("Omarchy", "Scanning themes using omarchy-theme-list");
 
-    // Extract theme names and preview colors (background, green, yellow, red, blue)
-    // Use -e instead of -f to properly handle symlinked theme directories
-    const cmd = "cd '" + themesDirEsc
-          + "' && for theme in */; do theme=${theme%/}; if [ -e \"$theme/alacritty.toml\" ]; then file=\"$theme/alacritty.toml\"; echo -n \"$theme:\"; grep -E '(background|green|yellow|red|blue)\\s*=' \"$file\" | sed \"s/.*['\\\"]\\(#\\|0x\\)\\([0-9a-fA-F]\\{6\\}\\).*/\\2/\" | sed 's/^/#/' | head -4 | tr '\\n' ',' | sed 's/,$//'; echo; fi; done";
-
+    // Just use omarchy-theme-list to get theme names
+    // No need to parse colors - omarchy-theme-set will handle that
+    const cmd = "omarchy-theme-list";
     Logger.d("Omarchy", "Theme scan command:", cmd);
     themesProcess.command = ["bash", "-c", cmd];
     themesProcess.running = true;
   }
 
   function refreshThemeName() {
-    const themePathEsc = omarchyThemePath.replace(/'/g, "'\\''");
-    themeNameProcess.command = ["sh", "-c", "basename \"$(readlink -f '" + themePathEsc + "' 2>/dev/null)\" 2>/dev/null || true"];
+    const themeNamePathEsc = omarchyThemeNamePath.replace(/'/g, "'\\''");
+    themeNameProcess.command = ["sh", "-c", "cat '" + themeNamePathEsc + "' 2>/dev/null || true"];
     themeNameProcess.running = true;
   }
 
@@ -216,32 +220,17 @@ Item {
     if (!nextThemeName)
       return false;
 
-    // Validate theme exists
-    let themeExists = false;
-    for (var i = 0; i < availableThemes.length; i++) {
-      const theme = availableThemes[i];
-      const name = typeof theme === 'string' ? theme : theme.name;
-      if (name === nextThemeName) {
-        themeExists = true;
-        break;
-      }
-    }
-
-    if (!themeExists) {
-      ToastService.showError(pluginApi?.tr("title") || "Omarchy", `Theme not found: ${nextThemeName}`);
-      return false;
-    }
-
     themeSetProcess.command = [themeSetCommand, nextThemeName];
     themeSetProcess.running = true;
     return true;
   }
 
-  function parseAlacrittyToml(content) {
-    Logger.i("Omarchy", "Parsing Alacritty TOML, content length:", content.length);
+  function parseColorsToml(content) {
+    Logger.i("Omarchy", "Parsing colors.toml, content length:", content.length);
     Logger.d("Omarchy", "First 500 chars:", content.slice(0, 500));
 
     function extractColorFromLine(line) {
+      // Match both formats: color = "#ffffff" and color = "0xffffff"
       const colorMatch = line.match(/=\s*["'](?:#|0x)?([a-fA-F0-9]{6,8})["']/);
       if (colorMatch) {
         const hex = colorMatch[1].toLowerCase();
@@ -252,89 +241,21 @@ Item {
 
     const colors = {};
     const lines = content.split("\n");
-    let currentSection = null;
     Logger.d("Omarchy", "Parsing", lines.length, "lines");
 
     for (var i = 0; i < lines.length; i++) {
       const line = lines[i].trim();
-      if (!line)
+      if (!line || line.startsWith("#") || line.startsWith("["))
         continue;
-      if (line.startsWith("[colors.primary]")) {
-        currentSection = "primary";
-        Logger.d("Omarchy", "Entered [colors.primary] section");
-        continue;
-      } else if (line.startsWith("[colors.normal]")) {
-        currentSection = "normal";
-        Logger.d("Omarchy", "Entered [colors.normal] section");
-        continue;
-      } else if (line.startsWith("[colors.bright]")) {
-        currentSection = "bright";
-        Logger.d("Omarchy", "Entered [colors.bright] section");
-        continue;
-      } else if (line.startsWith("[colors.selection]")) {
-        currentSection = "selection";
-        Logger.d("Omarchy", "Entered [colors.selection] section");
-        continue;
-      } else if (line.startsWith("[")) {
-        if (currentSection) {
-          Logger.d("Omarchy", "Exited section", currentSection, "found colors:", Object.keys(colors).join(","));
-        }
-        currentSection = null;
-        continue;
-      }
 
-      if (currentSection === "primary") {
-        if (line.includes("background")) {
-          const color = extractColorFromLine(line);
-          if (color) {
-            colors.background = color;
-            Logger.d("Omarchy", "Found background:", color);
-          } else {
-            Logger.w("Omarchy", "Failed to extract background from:", line);
-          }
-        } else if (line.includes("foreground")) {
-          const color = extractColorFromLine(line);
-          if (color) {
-            colors.foreground = color;
-            Logger.d("Omarchy", "Found foreground:", color);
-          } else {
-            Logger.w("Omarchy", "Failed to extract foreground from:", line);
-          }
-        }
-      } else if (currentSection === "normal") {
-        const normalColors = ["black", "red", "green", "yellow", "blue", "magenta", "cyan", "white"];
-        for (const colorName of normalColors) {
-          const nameMatch = line.match(new RegExp("^\\s*(" + colorName + ")\\s*="));
-          if (nameMatch) {
-            const color = extractColorFromLine(line);
-            if (color) {
-              colors[colorName] = color;
-              Logger.d("Omarchy", "Found normal", colorName, ":", color);
-            }
-            break;
-          }
-        }
-      } else if (currentSection === "bright") {
-        const brightColors = ["black", "red", "green", "yellow", "blue", "magenta", "cyan", "white"];
-        for (const brightName of brightColors) {
-          const nameMatch = line.match(new RegExp("^\\s*(" + brightName + ")\\s*="));
-          if (nameMatch) {
-            const color = extractColorFromLine(line);
-            if (color) {
-              const key = "bright" + brightName.charAt(0).toUpperCase() + brightName.slice(1);
-              colors[key] = color;
-              Logger.d("Omarchy", "Found bright", brightName, ":", color);
-            }
-            break;
-          }
-        }
-      } else if (currentSection === "selection") {
-        if (line.includes("background")) {
-          const color = extractColorFromLine(line);
-          if (color) {
-            colors.selectionBackground = color;
-            Logger.d("Omarchy", "Found selection background:", color);
-          }
+      const color = extractColorFromLine(line);
+      if (color) {
+        // Extract the key name (everything before the =)
+        const keyMatch = line.match(/^([a-zA-Z0-9_]+)\s*=/);
+        if (keyMatch) {
+          const key = keyMatch[1];
+          colors[key] = color;
+          Logger.d("Omarchy", "Found", key, ":", color);
         }
       }
     }
@@ -439,9 +360,8 @@ Item {
         return;
       }
 
-      const output = (stdout.text || "").trim();
+      const output = stdout.text || "";
       Logger.d("Omarchy", "Theme scan output length:", output.length);
-      Logger.d("Omarchy", "Theme scan output:", output);
 
       if (!output) {
         Logger.w("Omarchy", "Theme scan returned empty output");
@@ -449,31 +369,19 @@ Item {
         return;
       }
 
-      const themes = [];
-      const lines = output.split("\n");
-      Logger.d("Omarchy", "Processing", lines.length, "lines");
+      const themeNames = output.trim().split("\n").filter(name => name && name.trim());
+      Logger.i("Omarchy", "Found", themeNames.length, "themes:", themeNames.join(", "));
 
-      for (var i = 0; i < lines.length; i++) {
-        const line = lines[i].trim();
-        if (!line)
-          continue;
-        Logger.d("Omarchy", "Processing line:", line);
-        const parts = line.split(":");
-        if (parts.length === 2) {
-          const themeName = parts[0];
-          const colorStr = parts[1];
-          const colors = colorStr ? colorStr.split(",").filter(c => c.length === 7 && c.startsWith("#")).map(c => c.toLowerCase()).slice(0, 4) : [];
-          Logger.d("Omarchy", "Theme:", themeName, "Colors:", colors.length, colors);
-          themes.push({
-                        "name": themeName,
-                        "colors": colors
-                      });
-        } else {
-          Logger.w("Omarchy", "Invalid line format (expected name:colors):", line);
-        }
+      // Create theme entries with just names (colors parsed by omarchy-theme-set)
+      const themes = [];
+      for (var i = 0; i < themeNames.length; i++) {
+        themes.push({
+          "name": themeNames[i],
+          "colors": []  // No preview colors needed
+        });
       }
 
-      Logger.i("Omarchy", "Found", themes.length, "themes");
+      Logger.i("Omarchy", "Theme list:", themes.length, "themes");
       availableThemes = themes;
     }
   }
@@ -523,10 +431,10 @@ Item {
       const content = stdout.text || "";
       Logger.d("Omarchy", "Read", content.length, "bytes from", omarchyConfigPath);
 
-      const parsed = parseAlacrittyToml(content);
+      const parsed = parseColorsToml(content);
       if (!parsed) {
         applying = false;
-        Logger.e("Omarchy", "parseAlacrittyToml returned null");
+        Logger.e("Omarchy", "parseColorsToml returned null");
         ToastService.showError(pluginApi?.tr("title") || "Omarchy", pluginApi?.tr("errors.failed-read") || "Failed to read theme colors");
         return;
       }

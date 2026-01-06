@@ -1,5 +1,5 @@
 // Fast runtime pipeline for generating Noctalia palettes from Omarchy colors.
-const PIPELINE_VERSION = "f1a2b3c4d5e6"; // Updated to include mBarBorder
+const PIPELINE_VERSION = "a0e19b763cce"; // Updated to include mBarBorder
 
 function ensureContrast(foreground, background, minRatio, step, convert) {
   let result = foreground;
@@ -42,9 +42,10 @@ function normalizeBase(colors, isDarkMode, convert) {
 }
 
 function pickAccents(colors) {
-  const primary = colors.blue || colors.brightBlue || colors.cyan || "#4CAF50";
-  const secondary = colors.magenta || colors.brightMagenta || colors.red || "#FFC107";
-  const tertiary = colors.green || colors.brightGreen || colors.yellow || "#2196F3";
+  // New omarchy format uses color0-15 instead of named colors
+  const primary = colors.color4 || colors.blue || colors.brightBlue || colors.cyan || "#4CAF50";
+  const secondary = colors.color5 || colors.magenta || colors.brightMagenta || colors.red || "#FFC107";
+  const tertiary = colors.color2 || colors.green || colors.brightGreen || colors.yellow || "#2196F3";
 
   return {
     "primary": primary,
@@ -124,7 +125,7 @@ function generateScheme(colors, convert) {
   base.brightWhite = colors.brightWhite;
 
   const accents = pickAccents(colors);
-  const errorColor = colors.red || "#f7768e";
+  const errorColor = colors.color1 || colors.red || "#f7768e";
 
   const surfaceTokens = buildSurfaceTokens(base, isDarkMode, convert);
   const accentTokens = buildAccentTokens(accents, errorColor, surfaceTokens.mSurface, isDarkMode, convert);

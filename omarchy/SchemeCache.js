@@ -7,7 +7,7 @@
 //   node generate-scheme-cache.js
 //   node update-scheme-cache-embedded.js
 
-const SCHEME_CACHE_VERSION = "e93a979d8999";
+const SCHEME_CACHE_VERSION = "a0e19b763cce";
 const SCHEME_CACHE = {
   "aetheria": {
     "mode": "dark",

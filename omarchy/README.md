@@ -63,13 +63,20 @@ When you want to improve the color conversion:
 
 ## Adding New Themes
 
-Just add your theme to `~/.config/omarchy/themes/my-theme/` with an `alacritty.toml` file!
+Just add your theme to `~/.config/omarchy/themes/my-theme/` with a `colors.toml` file!
 
 The script automatically:
-- Scans `~/.config/omarchy/themes/*`
-- Follows symlinks (like the ones in `.local/share/omarchy/themes/`)
-- Parses `alacritty.toml` for colors
+- Scans both user themes (`~/.config/omarchy/themes/*`) and default themes (`~/.local/share/omarchy/themes/*`)
+- Parses `colors.toml` for colors (simple TOML format: `key = "#hexvalue"`)
 - Converts to CIELAB-optimized noctalia format
+
+**Required colors.toml keys:**
+- `background` - Main background color
+- `foreground` - Main foreground color
+
+**Optional keys (fallbacks provided):**
+- `accent` or `color4` (blue) - Primary accent color
+- `color1` (red), `color2` (green), `color3` (yellow), etc. - Terminal colors 0-15
 
 Then regenerate:
 ```bash
@@ -77,7 +84,7 @@ node generate-scheme-cache.js    # Scans all themes, builds palettes
 node update-scheme-cache-embedded.js
 ```
 
-**18 themes cached automatically!**
+**Note: New omarchy versions include default themes bundled with omarchy, no need to install them separately!**
 
 ## Files
 
