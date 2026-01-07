@@ -1,12 +1,12 @@
 {
   "id": "polkit-auth",
   "name": "Polkit Authentication",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "minNoctaliaVersion": "3.6.0",
   "author": "habibe",
   "license": "MIT",
-  "repository": "https://github.com/habibe/noctalia-shell",
-  "description": "Use Noctalia panels as your Polkit authentication agent.",
+  "repository": "https://github.com/anthonyhab/noctalia-plugin",
+  "description": "Use Noctalia panels as your Polkit authentication agent and keyring auth.",
   "entryPoints": {
     "main": "Main.qml",
     "panel": "Panel.qml",

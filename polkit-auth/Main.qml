@@ -9,13 +9,33 @@ Item {
 
   property var pluginApi: null
 
-  // Settings getter with fallback to manifest defaults
+  // Settings getter with fallback to manifest defaults and error handling
   function getSetting(key, fallback) {
-    const userVal = pluginApi?.pluginSettings?.[key];
-    if (userVal !== undefined && userVal !== null) return userVal;
-    const defaultVal = pluginApi?.manifest?.metadata?.defaultSettings?.[key];
-    if (defaultVal !== undefined && defaultVal !== null) return defaultVal;
-    return fallback;
+    // Check if plugin API is available
+    if (!pluginApi) {
+      Logger.w("PolkitAuth", "Plugin API not available for settings access - using manifest defaults");
+      const defaultVal = pluginApi?.manifest?.metadata?.defaultSettings?.[key];
+      return defaultVal !== undefined ? defaultVal : fallback;
+    }
+
+    // Check if plugin settings are available
+    if (!pluginApi.pluginSettings) {
+      Logger.w("PolkitAuth", "Plugin settings not available - using manifest defaults");
+      const defaultVal = pluginApi?.manifest?.metadata?.defaultSettings?.[key];
+      return defaultVal !== undefined ? defaultVal : fallback;
+    }
+
+    // Original logic with additional safety checks
+    try {
+      const userVal = pluginApi?.pluginSettings?.[key];
+      if (userVal !== undefined && userVal !== null) return userVal;
+      const defaultVal = pluginApi?.manifest?.metadata?.defaultSettings?.[key];
+      if (defaultVal !== undefined && defaultVal !== null) return defaultVal;
+      return fallback;
+    } catch (e) {
+      Logger.e("PolkitAuth", "Error accessing plugin settings:", e);
+      return fallback;
+    }
   }
 
   readonly property int pollInterval: getSetting("pollInterval", 100)
@@ -33,6 +53,14 @@ Item {
     return runtimeDir && runtimeDir.length > 0
       ? (runtimeDir + "/noctalia-polkit-agent.sock")
       : "";
+  }
+
+  // Debug information about plugin loading
+  readonly property string debugInfo: {
+    const apiStatus = pluginApi ? "Available" : "Not available";
+    const settingsStatus = pluginApi?.pluginSettings ? "Available" : "Not available";
+    const manifestId = pluginApi?.manifest?.id || "Unknown";
+    return "API: " + apiStatus + ", Settings: " + settingsStatus + ", Manifest ID: " + manifestId;
   }
 
   property bool agentAvailable: false
@@ -54,6 +82,20 @@ Item {
   signal requestCompleted(bool success)
 
   function refresh() {
+    // Log debug information about plugin loading status
+    Logger.i("PolkitAuth", "Plugin refresh - " + debugInfo);
+    
+    // Check if we're running with composite key vs plain ID
+    if (pluginApi?.manifest?.id) {
+      const manifestId = pluginApi.manifest.id;
+      const expectedCompositePattern = /^[a-f0-9]{6}:.*$/;
+      if (expectedCompositePattern.test(manifestId)) {
+        Logger.d("PolkitAuth", "Running with composite key: " + manifestId);
+      } else {
+        Logger.d("PolkitAuth", "Running with plain ID: " + manifestId);
+      }
+    }
+    
     checkAgent();
   }
 
@@ -461,7 +503,15 @@ Item {
   }
 
   Component.onCompleted: {
-    refresh();
+    // Check if plugin API was properly initialized
+    if (!pluginApi) {
+      Logger.e("PolkitAuth", "Plugin initialized without API - this indicates a loading issue");
+      // Try to continue with defaults
+      Qt.callLater(refresh);
+    } else {
+      Logger.d("PolkitAuth", "Plugin initialized successfully with API");
+      refresh();
+    }
   }
 
   Connections {

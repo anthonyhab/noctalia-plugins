@@ -15,13 +15,33 @@ ColumnLayout {
   Layout.maximumWidth: implicitWidth
   Layout.preferredWidth: implicitWidth
 
-  // Settings getter with fallback to manifest defaults
+  // Settings getter with fallback to manifest defaults and error handling
   function getSetting(key, fallback) {
-    const userVal = pluginApi?.pluginSettings?.[key];
-    if (userVal !== undefined && userVal !== null) return userVal;
-    const defaultVal = pluginApi?.manifest?.metadata?.defaultSettings?.[key];
-    if (defaultVal !== undefined && defaultVal !== null) return defaultVal;
-    return fallback;
+    // Check if plugin API is available
+    if (!pluginApi) {
+      Logger.w("PolkitAuthSettings", "Plugin API not available for settings access - using manifest defaults");
+      const defaultVal = pluginApi?.manifest?.metadata?.defaultSettings?.[key];
+      return defaultVal !== undefined ? defaultVal : fallback;
+    }
+
+    // Check if plugin settings are available
+    if (!pluginApi.pluginSettings) {
+      Logger.w("PolkitAuthSettings", "Plugin settings not available - using manifest defaults");
+      const defaultVal = pluginApi?.manifest?.metadata?.defaultSettings?.[key];
+      return defaultVal !== undefined ? defaultVal : fallback;
+    }
+
+    // Original logic with additional safety checks
+    try {
+      const userVal = pluginApi?.pluginSettings?.[key];
+      if (userVal !== undefined && userVal !== null) return userVal;
+      const defaultVal = pluginApi?.manifest?.metadata?.defaultSettings?.[key];
+      if (defaultVal !== undefined && defaultVal !== null) return defaultVal;
+      return fallback;
+    } catch (e) {
+      Logger.e("PolkitAuthSettings", "Error accessing plugin settings:", e);
+      return fallback;
+    }
   }
 
   property string valuePollInterval: getSetting("pollInterval", 100).toString()
@@ -36,20 +56,35 @@ ColumnLayout {
   readonly property var pluginMain: pluginApi?.mainInstance
 
   function saveSettings() {
-    if (!pluginApi)
+    if (!pluginApi) {
+      Logger.e("PolkitAuthSettings", "Cannot save settings: plugin API not available");
+      ToastService.showError("Polkit Auth", "Settings cannot be saved - plugin not fully loaded");
       return;
+    }
 
-    pluginApi.pluginSettings.pollInterval = parseInt(valuePollInterval, 10) || 100;
-    pluginApi.pluginSettings.settingsPanelMode = valueSettingsPanelMode;
-    pluginApi.pluginSettings.syncPanelModeWithShell = valueSyncPanelModeWithShell;
-    pluginApi.pluginSettings.autoOpenPanel = valueAutoOpenPanel;
-    pluginApi.pluginSettings.autoCloseOnSuccess = valueAutoCloseOnSuccess;
-    pluginApi.pluginSettings.showSuccessAnimation = valueShowSuccessAnimation;
-    pluginApi.pluginSettings.autoCloseOnCancel = valueAutoCloseOnCancel;
-    pluginApi.pluginSettings.successAnimationDuration = parseInt(valueSuccessAnimationDuration, 10) || 300;
+    if (!pluginApi.pluginSettings) {
+      Logger.e("PolkitAuthSettings", "Cannot save settings: plugin settings not available");
+      ToastService.showError("Polkit Auth", "Settings cannot be saved - plugin configuration issue");
+      return;
+    }
 
-    pluginApi.saveSettings();
-    pluginMain?.refresh();
+    try {
+      pluginApi.pluginSettings.pollInterval = parseInt(valuePollInterval, 10) || 100;
+      pluginApi.pluginSettings.settingsPanelMode = valueSettingsPanelMode;
+      pluginApi.pluginSettings.syncPanelModeWithShell = valueSyncPanelModeWithShell;
+      pluginApi.pluginSettings.autoOpenPanel = valueAutoOpenPanel;
+      pluginApi.pluginSettings.autoCloseOnSuccess = valueAutoCloseOnSuccess;
+      pluginApi.pluginSettings.showSuccessAnimation = valueShowSuccessAnimation;
+      pluginApi.pluginSettings.autoCloseOnCancel = valueAutoCloseOnCancel;
+      pluginApi.pluginSettings.successAnimationDuration = parseInt(valueSuccessAnimationDuration, 10) || 300;
+
+      pluginApi.saveSettings();
+      pluginMain?.refresh();
+      Logger.d("PolkitAuthSettings", "Settings saved successfully");
+    } catch (e) {
+      Logger.e("PolkitAuthSettings", "Failed to save settings:", e);
+      ToastService.showError("Polkit Auth", "Failed to save settings: " + e.toString());
+    }
   }
 
   NText {
