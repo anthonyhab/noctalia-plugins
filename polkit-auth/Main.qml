@@ -102,7 +102,7 @@ Item {
   function checkAgent() {
     if (!socketPath) {
       agentAvailable = false;
-      agentStatus = pluginApi?.tr("status.socket-unavailable") || "Polkit agent socket not available";
+      agentStatus = pluginApi?.tr("status.socket-unavailable") ?? "Polkit agent socket not available";
       return;
     }
 
@@ -112,7 +112,7 @@ Item {
         agentStatus = "";
       } else {
         agentAvailable = false;
-        agentStatus = pluginApi?.tr("status.agent-unavailable") || "Polkit agent not reachable";
+        agentStatus = pluginApi?.tr("status.agent-unavailable") ?? "Polkit agent not reachable";
       }
     });
   }
@@ -248,7 +248,7 @@ Item {
       pendingPassword = "";
 
       if (!ok || response?.type !== "ok") {
-        lastError = pluginApi?.tr("errors.auth-failed") || "Authentication failed";
+        lastError = pluginApi?.tr("errors.auth-failed") ?? "Authentication failed";
       }
 
       Qt.callLater(pollImmediately);
@@ -260,7 +260,7 @@ Item {
       return false;
 
     if (responseInFlight) {
-      lastError = pluginApi?.tr("errors.busy") || "Please wait...";
+      lastError = pluginApi?.tr("errors.busy") ?? "Please wait...";
       return false;
     }
 
@@ -271,7 +271,7 @@ Item {
       responseInFlight = false;
 
       if (!ok || response?.type !== "ok") {
-        lastError = pluginApi?.tr("errors.cancel-failed") || "Failed to cancel request";
+        lastError = pluginApi?.tr("errors.cancel-failed") ?? "Failed to cancel request";
         Qt.callLater(pollImmediately);
         return;
       }
