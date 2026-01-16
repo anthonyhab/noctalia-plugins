@@ -29,6 +29,7 @@ Item {
   readonly property bool isConnected: pluginMain?.connected || false
   readonly property bool isConnecting: pluginMain?.connecting || false
   readonly property bool isPlaying: pluginMain?.isPlaying || false
+  readonly property bool isPaused: pluginMain?.isPaused || false
   property bool hasEverConnected: false
 
   onIsConnectedChanged: {
@@ -45,7 +46,7 @@ Item {
     if (!isConnected) {
       return pluginApi?.tr("title") || "Home Assistant";
     }
-    if (isPlaying && mediaTitle) {
+    if (mediaTitle) {
       return mediaTitle;
     }
     return friendlyName || (pluginApi?.tr("title") || "Home Assistant");
@@ -60,6 +61,8 @@ Item {
       return "home-off";
     if (isPlaying)
       return "player-play";
+    if (isPaused)
+      return "player-pause";
     return "home";
   }
 
@@ -153,7 +156,7 @@ Item {
 
   readonly property color pillBackgroundColor: {
     if (!isConnected && hasEverConnected)
-      return palette?.mSurfaceContainerLow ?? fallbackSurfaceLow;
+      return Color.mSurfaceVariant;
     return Qt.rgba(0, 0, 0, 0);
   }
   readonly property color pillTextIconColor: !isConnected && hasEverConnected
@@ -166,9 +169,9 @@ Item {
   readonly property real iconPixelSize: {
     switch (Settings.data.bar.density) {
     case "compact":
-      return Math.max(1, Math.round(capsuleHeight * 0.65));
+      return Math.max(1, Math.round(capsuleHeight * 0.55));
     default:
-      return Math.max(1, Math.round(capsuleHeight * 0.48));
+      return Math.max(1, Math.round(capsuleHeight * 0.40));
     }
   }
   readonly property real textPointSize: {
@@ -196,6 +199,8 @@ Item {
   }
 
   readonly property real dynamicWidth: {
+    // Explicitly access pillText to ensure re-evaluation when text changes
+    var _ = pillText;
     if (!showText)
       return capsuleHeight;
     if (useFixedWidth)
@@ -354,11 +359,15 @@ Item {
                 verticalAlignment: Text.AlignVCenter
                 color: hovered ? Color.mOnHover : (pillTextIconColor.a > 0 ? pillTextIconColor : Color.mOnSurface)
                 onTextChanged: {
+                  // Always reset scroll position and flags on text change
+                  titleContainer.isScrolling = false;
+                  titleContainer.isResetting = false;
+                  scrollContainer.scrollX = 0;
+
                   if (scrollingMode === "always") {
-                    titleContainer.isScrolling = false;
-                    titleContainer.isResetting = false;
-                    scrollContainer.scrollX = 0;
                     scrollStartTimer.restart();
+                  } else {
+                    titleContainer.updateScrollingState();
                   }
                 }
               }
@@ -464,66 +473,19 @@ Item {
   function openPanel() {
     if (!pluginApi)
       return;
-    pluginApi.withCurrentScreen(s => {
-                                  pluginApi.openPanel(s, pill);
-                                });
+    pluginApi.togglePanel(root.screen, pill);
   }
 
   function openPluginSettings() {
-    if (!pluginApi)
+    if (!pluginApi || !root.screen)
       return;
 
     var popupMenuWindow = popupWindow();
-
-    function instantiateDialog(component) {
-      var parentItem = popupMenuWindow ? popupMenuWindow.dialogParent : Overlay.overlay;
-      var dialog = component.createObject(parentItem, {
-                                            "showToastOnSave": true
-                                          });
-      if (!dialog) {
-        Logger.e("HomeAssistantWidget", "Failed to instantiate plugin settings dialog:", component.errorString());
-        return;
-      }
-
-      dialog.openPluginSettings(pluginApi.manifest);
-
-      if (popupMenuWindow) {
-        popupMenuWindow.hasDialog = true;
-        popupMenuWindow.open();
-        dialog.closed.connect(() => {
-                                popupMenuWindow.hasDialog = false;
-                                popupMenuWindow.close();
-                              });
-      }
-
-      dialog.closed.connect(() => dialog.destroy());
+    if (popupMenuWindow) {
+      popupMenuWindow.close();
     }
 
-    function handleReady(component) {
-      instantiateDialog(component);
-    }
-
-    if (!settingsPopupComponent) {
-      settingsPopupComponent = Qt.createComponent(Quickshell.shellDir + "/Widgets/NPluginSettingsPopup.qml");
-    }
-
-    if (settingsPopupComponent.status === Component.Ready) {
-      handleReady(settingsPopupComponent);
-    } else if (settingsPopupComponent.status === Component.Loading) {
-      var handler = function settingsComponentStatusChanged() {
-        if (settingsPopupComponent.status === Component.Ready) {
-          settingsPopupComponent.statusChanged.disconnect(handler);
-          handleReady(settingsPopupComponent);
-        } else if (settingsPopupComponent.status === Component.Error) {
-          Logger.e("HomeAssistantWidget", "Failed to load plugin settings dialog:", settingsPopupComponent.errorString());
-          settingsPopupComponent.statusChanged.disconnect(handler);
-          settingsPopupComponent = null;
-        }
-      };
-      settingsPopupComponent.statusChanged.connect(handler);
-    } else {
-      Logger.e("HomeAssistantWidget", "Failed to load plugin settings dialog:", settingsPopupComponent.errorString());
-      settingsPopupComponent = null;
-    }
+    BarService.openPluginSettings(root.screen, pluginApi.manifest);
   }
 }
+

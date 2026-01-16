@@ -1,12 +1,12 @@
 {
   "id": "homeassistant",
   "name": "Home Assistant",
-  "version": "0.1.0",
+  "version": "0.1.2",
   "minNoctaliaVersion": "3.6.0",
   "author": "habibe",
   "license": "MIT",
   "repository": "https://github.com/habibe/noctalia-shell",
-  "description": "Control Home Assistant media players from your desktop",
+  "description": "Control Home Assistant media players from your bar.",
   "entryPoints": {
     "main": "Main.qml",
     "panel": "Panel.qml",
