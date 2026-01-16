@@ -1,7 +1,7 @@
 {
   "id": "swww-picker",
   "name": "SWWW Wallpaper Picker",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "author": "habibe",
   "description": "Cycle wallpapers using swww with manual and automatic controls.",
   "entryPoints": {
@@ -21,7 +21,8 @@
       "transitionFps": 60,
       "transitionStep": 90,
       "shuffleMode": false,
-      "showWallpaperName": true
+      "showWallpaperName": true,
+      "gridColumns": 2
     }
   }
 }

@@ -1,7 +1,6 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
-import Qt5Compat.GraphicalEffects
 import qs.Commons
 import qs.Modules.Panels.Settings
 import qs.Services.UI
@@ -11,13 +10,14 @@ Item {
   id: root
 
   property var pluginApi: null
-  property var screen: null
+  readonly property var screen: pluginApi?.panelOpenScreen || null
 
-  readonly property bool allowAttach: true
-  readonly property int contentPreferredWidth: Math.round(480 * Style.uiScaleRatio)
+  readonly property int activeGridColumns: pluginMain?.gridColumns || 2
+  readonly property int contentPreferredWidth: Math.round((activeGridColumns === 1 ? 280 : (activeGridColumns === 2 ? 400 : 540)) * Style.uiScaleRatio)
+
   readonly property int contentPreferredHeight: Math.min(
     mainColumn.implicitHeight + (Style.marginL * 2),
-    560 * Style.uiScaleRatio
+    600 * Style.uiScaleRatio
   )
 
   readonly property var pluginMain: pluginApi?.mainInstance
@@ -48,10 +48,12 @@ Item {
     ? Color.mOnPrimary
     : Color.mOnSurface
 
-  readonly property int minThumbWidth: Math.round(120 * Style.uiScaleRatio)
-  readonly property real thumbAspect: 110 / 140
-  readonly property int gridColumns: Math.max(1, Math.floor((wallpaperFlickable.width + Style.marginS) / (minThumbWidth + Style.marginS)))
-  readonly property int thumbWidth: Math.max(minThumbWidth, Math.floor((wallpaperFlickable.width - (gridColumns - 1) * Style.marginS) / gridColumns))
+  readonly property real thumbAspect: 0.6
+  readonly property int gridColumns: activeGridColumns
+  readonly property int thumbWidth: {
+    const available = contentPreferredWidth - (Style.marginL * 2) - (Style.marginM * 2);
+    return Math.floor((available - (gridColumns - 1) * Style.marginS) / gridColumns);
+  }
   readonly property int thumbHeight: Math.round(thumbWidth * thumbAspect)
   property int thumbReloadToken: 0
 
@@ -77,7 +79,7 @@ Item {
   function trOrDefault(key, fallback) {
     if (pluginApi && pluginApi.tr) {
       const value = pluginApi.tr(key);
-      if (value && !value.startsWith("##"))
+      if (value && !value.startsWith("##") && !value.startsWith("!!"))
         return value;
     }
     return fallback;
@@ -119,7 +121,7 @@ Item {
 
           NText {
             Layout.fillWidth: true
-            text: trOrDefault("title", "Wallpaper Picker")
+            text: trOrDefault("title", "Swww Picker")
             font.weight: Style.fontWeightBold
             pointSize: Style.fontSizeL
             color: Color.mOnSurface
@@ -127,14 +129,20 @@ Item {
           }
 
           NText {
+            visible: !isAvailable
             Layout.fillWidth: true
-            text: isAvailable
-              ? (wallpapers.length + " " + trOrDefault("status.wallpapers", "wallpapers"))
-              : trOrDefault("errors.daemon-not-running", "swww daemon not running")
+            text: trOrDefault("errors.daemon-not-running", "swww daemon not running")
             color: Color.mOnSurfaceVariant
             pointSize: Style.fontSizeS
             elide: Text.ElideRight
           }
+        }
+
+        NIconButton {
+          icon: "layout-grid"
+          baseSize: Style.baseWidgetSize * 0.8
+          tooltipText: trOrDefault("actions.toggle-layout", "Toggle Layout")
+          onClicked: pluginMain?.toggleGridColumns()
         }
 
         NIconButton {
@@ -146,71 +154,12 @@ Item {
       }
     }
 
-    // Control buttons
-    NBox {
-      Layout.fillWidth: true
-      Layout.preferredHeight: controlsRow.implicitHeight + (Style.marginM * 2)
-
-      RowLayout {
-        id: controlsRow
-        anchors.fill: parent
-        anchors.margins: Style.marginM
-        spacing: Style.marginS
-
-        NButton {
-          text: trOrDefault("actions.random", "Random")
-          enabled: isAvailable && hasWallpapers
-          implicitHeight: Math.round(32 * Style.uiScaleRatio)
-          Layout.fillWidth: true
-          onClicked: pluginMain?.random()
-        }
-
-        NButton {
-          text: autoCycleEnabled
-            ? trOrDefault("status.auto-cycle-on", "Auto-cycle on")
-            : trOrDefault("status.auto-cycle-off", "Auto-cycle off")
-          enabled: isAvailable
-          implicitHeight: Math.round(32 * Style.uiScaleRatio)
-          Layout.fillWidth: true
-          onClicked: pluginMain?.toggleAutoCycle()
-        }
-
-        NButton {
-          text: trOrDefault("actions.shuffle", "Shuffle")
-          enabled: isAvailable
-          implicitHeight: Math.round(32 * Style.uiScaleRatio)
-          Layout.fillWidth: true
-          onClicked: pluginMain?.toggleShuffleMode()
-        }
-      }
-    }
-
-    RowLayout {
-      Layout.fillWidth: true
-      spacing: Style.marginS
-
-      NText {
-        text: trOrDefault("sections.gallery", "Gallery")
-        pointSize: Style.fontSizeM
-        font.weight: Style.fontWeightMedium
-        color: Color.mOnSurface
-      }
-
-      Item { Layout.fillWidth: true }
-
-      NText {
-        text: wallpapers.length + " " + trOrDefault("status.wallpapers", "wallpapers")
-        pointSize: Style.fontSizeS
-        color: Color.mOnSurfaceVariant
-      }
-    }
-
     // Wallpaper grid
     NBox {
       Layout.fillWidth: true
       Layout.preferredHeight: Math.min(
         wallpaperFlow.implicitHeight + (Style.marginM * 2),
-        320 * Style.uiScaleRatio
+        480 * Style.uiScaleRatio
       )
       Layout.minimumHeight: thumbHeight + Style.marginM * 2
 
@@ -219,13 +168,13 @@ Item {
         anchors.fill: parent
         anchors.margins: Style.marginM
         clip: true
-        contentWidth: width
+        contentWidth: wallpaperFlow.width
         contentHeight: wallpaperFlow.height
         boundsBehavior: Flickable.StopAtBounds
 
         Flow {
           id: wallpaperFlow
-          width: parent.width
+          width: contentPreferredWidth - (Style.marginL * 2) - (Style.marginM * 2)
           spacing: Style.marginS
 
           Repeater {
@@ -243,15 +192,14 @@ Item {
                 return parts[parts.length - 1] || "";
               }
               function reloadThumbnail() {
-                thumbImage.source = "";
-                Qt.callLater(() => {
-                  thumbImage.source = "file://" + modelData;
-                });
+                thumbImage.source = "file://" + modelData;
               }
 
               width: thumbWidth
               height: thumbHeight
+
               radius: Style.radiusM
+
               color: isCurrent
                 ? Qt.rgba(Color.mPrimary.r, Color.mPrimary.g, Color.mPrimary.b, 0.15)
                 : (hovered ? Qt.rgba(Color.mPrimary.r, Color.mPrimary.g, Color.mPrimary.b, 0.08) : Color.mSurface)
@@ -267,30 +215,17 @@ Item {
                 anchors.margins: Style.borderS
                 radius: Style.radiusM - Style.borderS
                 color: Color.mSurfaceVariant
+                clip: true
 
                 Image {
                   id: thumbImage
                   anchors.fill: parent
-                  source: ""
+                  source: "file://" + modelData
                   fillMode: Image.PreserveAspectCrop
                   asynchronous: true
-                  sourceSize.width: thumbWidth * 2
-                  sourceSize.height: thumbHeight * 2
-                  cache: false
-                  visible: false
-                }
-
-                Rectangle {
-                  id: thumbMask
-                  anchors.fill: parent
-                  radius: Style.radiusM
-                  visible: false
-                }
-
-                OpacityMask {
-                  anchors.fill: parent
-                  source: thumbImage
-                  maskSource: thumbMask
+                  sourceSize.width: 400 * Style.uiScaleRatio
+                  sourceSize.height: 240 * Style.uiScaleRatio
+                  visible: status === Image.Ready
                 }
 
                 Rectangle {
@@ -349,8 +284,6 @@ Item {
                 }
               }
 
-              Component.onCompleted: reloadThumbnail()
-
               Connections {
                 target: root
                 function onThumbReloadTokenChanged() {
@@ -377,36 +310,6 @@ Item {
         pointSize: Style.fontSizeS
         horizontalAlignment: Text.AlignHCenter
         wrapMode: Text.WordWrap
-      }
-    }
-
-    // Status bar
-    NBox {
-      Layout.fillWidth: true
-      Layout.preferredHeight: statusRow.implicitHeight + (Style.marginS * 2)
-      visible: isAvailable && hasWallpapers
-
-      RowLayout {
-        id: statusRow
-        anchors.fill: parent
-        anchors.margins: Style.marginS
-        spacing: Style.marginS
-
-        NText {
-          Layout.fillWidth: true
-          text: trOrDefault("status.selected", "Selected") + ": " +
-            (currentWallpaperName !== "" ? currentWallpaperName : trOrDefault("status.none", "None"))
-          color: Color.mOnSurfaceVariant
-          pointSize: Style.fontSizeS
-          elide: Text.ElideRight
-        }
-
-        NText {
-          visible: shuffleMode
-          text: trOrDefault("status.shuffle-on", "Shuffle on")
-          color: Color.mSecondary
-          pointSize: Style.fontSizeS
-        }
       }
     }
   }

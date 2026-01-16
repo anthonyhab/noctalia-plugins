@@ -58,6 +58,9 @@ Item {
   readonly property bool showWallpaperName:
     pluginApi?.pluginSettings?.showWallpaperName !== false
 
+  readonly property int gridColumns:
+    pluginApi?.pluginSettings?.gridColumns ?? defaultSettings.gridColumns ?? 2
+
   // Helper: expand ~ to $HOME
   function expandHome(path) {
     if (!path || typeof path !== "string")
@@ -102,6 +105,18 @@ Item {
     scanProcess.running = true;
   }
 
+  // Helper to get transition type (handles random exclusion of 'none')
+  function getEffectiveTransition() {
+    if (transitionType !== "random")
+      return transitionType;
+    
+    const types = [
+      "simple", "fade", "grow", "center", "outer", 
+      "wipe", "wave", "left", "right", "top", "bottom"
+    ];
+    return types[Math.floor(Math.random() * types.length)];
+  }
+
   // Set wallpaper with swww
   function setWallpaper(imagePath) {
     if (!imagePath || !available) {
@@ -120,7 +135,7 @@ Item {
 
     swwwProcess.command = [
       "swww", "img", imagePath,
-      "--transition-type", transitionType,
+      "--transition-type", getEffectiveTransition(),
       "--transition-duration", transitionDuration.toString(),
       "--transition-fps", transitionFps.toString(),
       "--transition-step", transitionStep.toString()
@@ -159,7 +174,7 @@ Item {
       applying = true;
       swwwProcess.command = [
         "swww", "img", prev,
-        "--transition-type", transitionType,
+        "--transition-type", getEffectiveTransition(),
         "--transition-duration", transitionDuration.toString(),
         "--transition-fps", transitionFps.toString(),
         "--transition-step", transitionStep.toString()
@@ -213,6 +228,15 @@ Item {
   // Toggle shuffle mode
   function toggleShuffleMode() {
     mutatePluginSettings(s => s.shuffleMode = !shuffleMode);
+    pluginApi.saveSettings();
+  }
+
+  // Toggle grid columns
+  function toggleGridColumns() {
+    mutatePluginSettings(s => {
+      let current = s.gridColumns ?? 2;
+      s.gridColumns = (current % 3) + 1;
+    });
     pluginApi.saveSettings();
   }
 
@@ -315,7 +339,7 @@ Item {
       if (code !== 0) {
         Logger.e("SwwwPicker", "Failed to set wallpaper, exit code: " + code);
         ToastService.showError(
-          pluginApi?.tr("title") || "Wallpaper Picker",
+          "Swww Picker",
           pluginApi?.tr("errors.failed-set") || "Failed to set wallpaper"
         );
       }

@@ -1,5 +1,5 @@
 {
-  "title": "Wallpaper Picker",
+  "title": "Swww Picker",
   "actions": {
     "next": "Next wallpaper",
     "previous": "Previous wallpaper",
@@ -9,7 +9,12 @@
     "refresh": "Refresh",
     "enable-auto": "Enable auto-cycle",
     "disable-auto": "Disable auto-cycle",
+    "toggle-layout": "Change layout",
+    "shuffle": "Shuffle",
     "shuffle-on": "Shuffle mode (on)"
+  },
+  "sections": {
+    "gallery": "Gallery"
   },
   "tooltips": {
     "unavailable": "swww daemon not available\nRun: swww-daemon",
@@ -25,8 +30,12 @@
     "no-wallpapers": "No wallpapers found\nCheck your wallpapers directory in settings",
     "wallpapers": "wallpapers",
     "auto-cycle-on": "Auto-cycle on",
+    "auto-cycle-off": "Auto-cycle off",
     "daemon-running": "swww daemon running",
-    "daemon-stopped": "swww daemon not running"
+    "daemon-stopped": "swww daemon not running",
+    "selected": "Selected",
+    "none": "None",
+    "shuffle-on": "Shuffle on"
   },
   "settings": {
     "description": "Configure wallpaper cycling with swww.",

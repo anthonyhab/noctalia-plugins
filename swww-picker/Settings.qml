@@ -158,8 +158,7 @@ ColumnLayout {
       { "key": "right", "name": "Slide right" },
       { "key": "top", "name": "Slide top" },
       { "key": "bottom", "name": "Slide bottom" },
-      { "key": "random", "name": "Random" },
-      { "key": "none", "name": "None (instant)" }
+      { "key": "random", "name": "Random" }
     ]
     currentKey: root.transitionType
     onSelected: key => root.transitionType = key
