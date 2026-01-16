@@ -9,9 +9,20 @@ Item {
   id: root
 
   property var pluginApi: null
-  property var screen: null
+  readonly property var screen: pluginApi?.panelOpenScreen || null
 
-  readonly property bool allowAttach: true
+  readonly property bool allowAttach: Settings.data.ui.panelsAttachedToBar
+  readonly property string barPosition: Settings.data.bar.position
+
+  // Panel positioning (passed to PluginPanelSlot)
+  // When not attached, default to top-centered to prevent resizing from jumping vertically
+  property bool panelAnchorHorizontalCenter: true
+  property bool panelAnchorVerticalCenter: allowAttach ? (barPosition === "left" || barPosition === "right") : false
+  property bool panelAnchorTop: allowAttach ? (barPosition === "top") : true
+  property bool panelAnchorBottom: allowAttach && (barPosition === "bottom")
+  property bool panelAnchorLeft: allowAttach && (barPosition === "left")
+  property bool panelAnchorRight: allowAttach && (barPosition === "right")
+
   readonly property int contentPreferredWidth: Math.round(340 * Style.uiScaleRatio)
   readonly property int contentPreferredHeight: mainColumn.implicitHeight + (Style.marginL * 2)
   readonly property real maxListHeight: 300 * Style.uiScaleRatio
@@ -21,7 +32,8 @@ Item {
   function trOrDefault(key, fallback) {
     if (pluginApi && pluginApi.tr) {
       const value = pluginApi.tr(key);
-      if (value && !value.startsWith("##"))
+      const isPlaceholder = value && value.startsWith("!!") && value.endsWith("!!");
+      if (value && !value.startsWith("##") && !isPlaceholder)
         return value;
     }
     return fallback;
@@ -32,12 +44,72 @@ Item {
   readonly property string noThemesText: trOrDefault("errors.no-themes", "No themes found")
 
   readonly property bool isActive: pluginApi?.pluginSettings?.active || false
+  readonly property bool showSearchInput: pluginApi?.pluginSettings?.showSearchInput !== false
 
-  readonly property color secondaryColor: Color.mSecondary !== undefined ? Color.mSecondary : Color.mPrimary
+  onVisibleChanged: {
+    if (visible) {
+      searchQuery = "";
+      if (searchInput) {
+        searchInput.text = "";
+        if (showSearchInput) {
+          searchInput.forceActiveFocus();
+        }
+      }
+    }
+  }
+
+  property string themeFilter: "all"
+  property string searchQuery: ""
+
+  readonly property string themeFilterLabel: themeFilter === "dark"
+                                          ? trOrDefault("filters.dark", "Dark")
+                                          : (themeFilter === "light"
+                                             ? trOrDefault("filters.light", "Light")
+                                             : trOrDefault("filters.all", "All"))
+
+  readonly property var filteredThemes: {
+    const themes = pluginMain?.availableThemes || [];
+    let filtered = themes;
+
+    if (themeFilter !== "all") {
+      filtered = filtered.filter(theme => {
+        const mode = typeof theme === "object" ? theme.mode : "";
+        return mode === themeFilter;
+      });
+    }
+
+    if (searchQuery.trim() !== "") {
+      const query = searchQuery.toLowerCase().trim();
+      filtered = filtered.filter(theme => {
+        const name = (typeof theme === "string" ? theme : theme.name).toLowerCase();
+        return name.includes(query);
+      });
+    }
+
+    return filtered;
+  }
+
+  function preferredThemeFilter() {
+    const hour = new Date().getHours();
+    return (hour >= 18 || hour < 6) ? "dark" : "light";
+  }
+
+  function cycleThemeFilter() {
+    searchQuery = "";
+    if (searchInput) searchInput.text = "";
+
+    if (themeFilter === "all") {
+      themeFilter = preferredThemeFilter();
+    } else {
+      themeFilter = themeFilter === "light" ? "dark" : "light";
+    }
+  }
 
   ColumnLayout {
     id: mainColumn
-    anchors.fill: parent
+    anchors.top: parent.top
+    anchors.left: parent.left
+    anchors.right: parent.right
     anchors.margins: Style.marginL
     spacing: Style.marginM
 
@@ -67,23 +139,29 @@ Item {
         }
 
         Rectangle {
-          width: Style.fontSizeM
-          height: Style.fontSizeM
-          radius: width / 2
-          color: isActive ? Color.mPrimary : Color.mError
+          id: themeFilterButton
+          Layout.preferredHeight: Style.baseWidgetSize * 0.8
+          Layout.preferredWidth: filterLabel.implicitWidth + (Style.marginM * 2)
+          radius: Style.radiusM
+          color: filterHover.containsMouse ? Qt.rgba(Color.mPrimary.r, Color.mPrimary.g, Color.mPrimary.b, 0.08) : Color.mSurface
           border.width: Style.borderS
-          border.color: Color.mOutline
+          border.color: filterHover.containsMouse ? Color.mPrimary : Color.mOutline
+
+          NText {
+            id: filterLabel
+            anchors.centerIn: parent
+            text: themeFilterLabel
+            pointSize: Style.fontSizeS
+            font.weight: Style.fontWeightMedium
+            color: Color.mOnSurface
+          }
 
           MouseArea {
+            id: filterHover
             anchors.fill: parent
+            hoverEnabled: true
             cursorShape: Qt.PointingHandCursor
-            onClicked: {
-              if (isActive) {
-                pluginMain?.deactivate();
-              } else {
-                pluginMain?.activate();
-              }
-            }
+            onClicked: cycleThemeFilter()
           }
         }
 
@@ -92,6 +170,77 @@ Item {
           baseSize: Style.baseWidgetSize * 0.8
           tooltipText: trOrDefault("tooltips.close", "Close")
           onClicked: pluginApi?.closePanel(root.screen)
+        }
+      }
+    }
+
+    // Search bar
+    NBox {
+      visible: showSearchInput
+      Layout.fillWidth: true
+      Layout.preferredHeight: Math.round(34 * Style.uiScaleRatio)
+      color: Color.mSurfaceVariant
+
+      RowLayout {
+        anchors.fill: parent
+        anchors.leftMargin: Style.marginM
+        anchors.rightMargin: Style.marginS
+        spacing: Style.marginS
+
+        NIcon {
+          icon: "search"
+          pointSize: Style.fontSizeS
+          color: Color.mOnSurfaceVariant
+          Layout.alignment: Qt.AlignVCenter
+        }
+
+        TextField {
+          id: searchInput
+          Layout.fillWidth: true
+          Layout.fillHeight: true
+          Layout.alignment: Qt.AlignVCenter
+          text: searchQuery
+          color: Color.mOnSurface
+          font.family: Settings.data.ui.fontDefault
+          font.pointSize: Style.fontSizeS * (Settings.data.ui.fontDefaultScale * Style.uiScaleRatio)
+          font.weight: Style.fontWeightMedium
+          verticalAlignment: TextInput.AlignVCenter
+          selectByMouse: true
+          selectionColor: Color.mPrimary
+          selectedTextColor: Color.mOnPrimary
+          background: null
+          leftPadding: 0
+          rightPadding: 0
+          topPadding: 0
+          bottomPadding: 0
+
+          onTextChanged: {
+            if (searchQuery !== text)
+              searchQuery = text
+          }
+
+          NText {
+            text: trOrDefault("panel.search-placeholder", "Search themes...")
+            visible: searchInput.text === "" && !searchInput.activeFocus
+            color: Color.mOnSurfaceVariant
+            anchors.fill: parent
+            verticalAlignment: Text.AlignVCenter
+            pointSize: Style.fontSizeS
+          }
+
+          Component.onCompleted: forceActiveFocus()
+        }
+
+        NIconButton {
+          icon: "circle-x"
+          visible: searchQuery !== ""
+          baseSize: Style.baseWidgetSize * 0.65
+          Layout.alignment: Qt.AlignVCenter
+          onClicked: {
+            searchQuery = "";
+            searchInput.text = "";
+            searchInput.forceActiveFocus();
+          }
         }
       }
     }
@@ -115,7 +264,7 @@ Item {
           spacing: Style.marginS
 
           Repeater {
-            model: pluginMain?.availableThemes || []
+            model: filteredThemes
 
             delegate: Rectangle {
               id: entry
@@ -187,7 +336,7 @@ Item {
           NText {
             Layout.fillWidth: true
             Layout.preferredHeight: Style.baseWidgetSize * 2
-            visible: !pluginMain?.availableThemes || pluginMain.availableThemes.length === 0
+            visible: !filteredThemes || filteredThemes.length === 0
             text: noThemesText
             pointSize: Style.fontSizeM
             color: Color.mOnSurfaceVariant

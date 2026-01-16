@@ -57,20 +57,15 @@ Item {
     const currentTheme = pluginMain?.themeName || "";
     return pluginApi?.tr("tooltips.active", { "theme": currentTheme }) || ("Theme: " + currentTheme);
   }
-  readonly property var palette: typeof Color !== "undefined" ? Color : null
-  readonly property color fallbackSurfaceLow: "#1f1f1f"
-  readonly property color fallbackSurfaceHigh: "#262626"
-  readonly property color fallbackOnSurface: "#f0f0f0"
 
   readonly property color pillBackgroundColor: {
     if (!isActive)
-      return palette?.mSurfaceContainerLow ?? fallbackSurfaceLow;
+      return Color.mSurfaceVariant;
     if (!isAvailable)
-      return palette?.mSurfaceContainerHigh ?? fallbackSurfaceHigh;
+      return Color.mSurfaceVariant;
     return Qt.rgba(0, 0, 0, 0);
   }
-  readonly property color pillTextIconColor: (!isActive || !isAvailable) ? (palette?.mOnSurface ?? fallbackOnSurface) : Qt.rgba(0, 0, 0, 0)
-  property var settingsPopupComponent: null
+  readonly property color pillTextIconColor: (!isActive || !isAvailable) ? Color.mOnSurface : Qt.rgba(0, 0, 0, 0)
 
   implicitWidth: pill.width
   implicitHeight: pill.height
@@ -117,14 +112,14 @@ Item {
     oppositeDirection: BarService.getPillDirection(root)
     icon: iconName
     text: pillText
-    tooltipText: tooltipText
+    tooltipText: root.tooltipText
     forceOpen: !isBarVertical && isActive && isAvailable && pillText !== ""
     forceClose: !isActive || (!isAvailable && pillText === "")
     customBackgroundColor: pillBackgroundColor
     customTextIconColor: pillTextIconColor
     onClicked: {
       TooltipService.hide();
-      openPanel();
+      pluginApi?.togglePanel(root.screen, pill);
     }
     onRightClicked: {
       TooltipService.hide();
@@ -140,115 +135,15 @@ Item {
     }
   }
 
-  function pluginPanelForScreen(screen) {
-    if (!pluginApi || !screen)
-      return null;
-    const slots = ["pluginPanel1", "pluginPanel2"];
-    for (var i = 0; i < slots.length; i++) {
-      var panel = PanelService.getPanel(slots[i], screen);
-      if (panel && panel.currentPluginId === pluginApi.pluginId) {
-        return panel;
-      }
-    }
-    return null;
-  }
-
-  function openPanel() {
-    if (!pluginApi)
-      return;
-    pluginApi.withCurrentScreen(screen => {
-                                  var panel = pluginPanelForScreen(screen);
-                                  if (panel && panel.isPanelOpen) {
-                                    panel.toggle(pill);
-                                    return;
-                                  }
-                                  pluginApi.openPanel(screen, pill);
-                                });
-  }
-
   function openPluginSettings() {
-    if (!pluginApi)
+    if (!pluginApi || !root.screen)
       return;
-
-    var popupMenuWindow = popupWindow();
-
-    function instantiateDialog(component) {
-      var parentItem = popupMenuWindow ? popupMenuWindow.dialogParent : Overlay.overlay;
-      var dialog = component.createObject(parentItem, {
-                                            "showToastOnSave": true
-                                          });
-      if (!dialog) {
-        Logger.e("OmarchyWidget", "Failed to instantiate plugin settings dialog:", component.errorString());
-        return;
-      }
-
-      dialog.openPluginSettings(pluginApi.manifest);
-
-      if (popupMenuWindow) {
-        popupMenuWindow.hasDialog = true;
-        popupMenuWindow.open();
-        dialog.closed.connect(() => {
-                                popupMenuWindow.hasDialog = false;
-                                popupMenuWindow.close();
-                              });
-      }
-
-      dialog.closed.connect(() => dialog.destroy());
-    }
-
-    function handleReady(component) {
-      instantiateDialog(component);
-    }
-
-    if (!settingsPopupComponent) {
-      settingsPopupComponent = Qt.createComponent(Quickshell.shellDir + "/Widgets/NPluginSettingsPopup.qml");
-    }
-
-    if (settingsPopupComponent.status === Component.Ready) {
-      handleReady(settingsPopupComponent);
-    } else if (settingsPopupComponent.status === Component.Loading) {
-      var handler = function settingsComponentStatusChanged() {
-        if (settingsPopupComponent.status === Component.Ready) {
-          settingsPopupComponent.statusChanged.disconnect(handler);
-          handleReady(settingsPopupComponent);
-        } else if (settingsPopupComponent.status === Component.Error) {
-          Logger.e("OmarchyWidget", "Failed to load plugin settings dialog:", settingsPopupComponent.errorString());
-          settingsPopupComponent.statusChanged.disconnect(handler);
-          settingsPopupComponent = null;
-        }
-      };
-      settingsPopupComponent.statusChanged.connect(handler);
-    } else {
-      Logger.e("OmarchyWidget", "Failed to load plugin settings dialog:", settingsPopupComponent.errorString());
-      settingsPopupComponent = null;
-    }
+    BarService.openPluginSettings(root.screen, pluginApi.manifest);
   }
 
   function selectRandomTheme() {
     if (!pluginMain || !isAvailable || !isActive)
       return;
-    const themes = pluginMain.availableThemes;
-    if (themes.length === 0) {
-      Logger.w("OmarchyWidget", "No themes available");
-      return;
-    }
-
-    const currentThemeName = pluginMain.themeName;
-    const otherThemes = themes.filter(theme => {
-      const name = typeof theme === 'string' ? theme : theme.name;
-      return name !== currentThemeName;
-    });
-
-    if (otherThemes.length === 0) {
-      Logger.w("OmarchyWidget", "No other themes available to switch to");
-      return;
-    }
-
-    const randomIndex = Math.floor(Math.random() * otherThemes.length);
-    const randomTheme = otherThemes[randomIndex];
-    const randomName = typeof randomTheme === 'string' ? randomTheme : randomTheme.name;
-
-    Logger.d("OmarchyWidget", "Random theme:", randomName);
-    pluginMain.setTheme(randomName);
+    pluginMain.randomTheme();
   }
 }

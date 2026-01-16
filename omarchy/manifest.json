@@ -1,7 +1,7 @@
 {
   "id": "omarchy",
   "name": "Omarchy Integration",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "author": "habibe",
   "description": "Sync Noctalia colors from Omarchy themes.",
   "entryPoints": {
@@ -16,7 +16,8 @@
       "active": false,
       "themeSetCommand": "",
       "omarchyConfigDir": "",
-      "showThemeName": true
+      "showThemeName": true,
+      "showSearchInput": true
     }
   }
 }

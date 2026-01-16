@@ -27,6 +27,10 @@
     "show-theme-name": {
       "label": "Show theme name in bar widget",
       "desc": "If disabled, only the Omarchy icon is shown in the bar."
+    },
+    "show-search-input": {
+      "label": "Show search input in panel",
+      "desc": "If enabled, a search field will appear in the panel to filter themes."
     }
   },
   "tooltips": {
@@ -51,7 +55,8 @@
     "auto-applying": "Auto-applying Omarchy theme"
   },
   "panel": {
-    "settings-hint": "Configure Omarchy paths via Settings → Plugins → Omarchy."
+    "settings-hint": "Configure Omarchy paths via Settings → Plugins → Omarchy.",
+    "search-placeholder": "Search themes..."
   },
   "settings": {
     "description": "Set how Noctalia locates Omarchy and manage the plugin state.",
