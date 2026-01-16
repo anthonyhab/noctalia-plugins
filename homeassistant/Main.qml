@@ -37,6 +37,21 @@ Item {
     return currentState[selectedMediaPlayer] || null;
   }
 
+  readonly property int supportedFeatures: selectedPlayerState?.attributes?.supported_features || 0
+  readonly property bool canPause: !!(supportedFeatures & 1)
+  readonly property bool canSeek: !!(supportedFeatures & 2)
+  readonly property bool canVolumeSet: !!(supportedFeatures & 4)
+  readonly property bool canVolumeMute: !!(supportedFeatures & 8)
+  readonly property bool canPrevious: !!(supportedFeatures & 16)
+  readonly property bool canNext: !!(supportedFeatures & 32)
+  readonly property bool canTurnOn: !!(supportedFeatures & 128)
+  readonly property bool canTurnOff: !!(supportedFeatures & 256)
+  readonly property bool canVolumeStep: !!(supportedFeatures & 1024)
+  readonly property bool canStop: !!(supportedFeatures & 4096)
+  readonly property bool canPlay: !!(supportedFeatures & 16384)
+  readonly property bool canShuffle: !!(supportedFeatures & 32768)
+  readonly property bool canRepeat: !!(supportedFeatures & 262144)
+
   readonly property string playbackState: selectedPlayerState?.state || "unavailable"
   readonly property bool isPlaying: playbackState === "playing"
   readonly property bool isPaused: playbackState === "paused"
@@ -141,14 +156,17 @@ Item {
     const xhr = new XMLHttpRequest();
     xhr.onreadystatechange = function () {
       if (xhr.readyState === XMLHttpRequest.DONE) {
+        let response = null;
         try {
-          const response = xhr.status === 200 ? JSON.parse(xhr.responseText) : null;
-          if (callback)
-            callback(xhr.status, response);
+          if (xhr.status === 200 && xhr.responseText) {
+            response = JSON.parse(xhr.responseText);
+          }
         } catch (e) {
-          Logger.e("HomeAssistant", "Failed to parse response:", e);
-          if (callback)
-            callback(xhr.status, null);
+          Logger.e("HomeAssistant", "Failed to parse JSON response:", e);
+        }
+
+        if (callback) {
+          callback(xhr.status, response);
         }
       }
     };
@@ -276,7 +294,7 @@ Item {
     sendHttpRequest("POST", endpoint, data, function (status, response) {
       if (status !== 200) {
         Logger.e("HomeAssistant", "Service call failed:", domain, service, status);
-        ToastService.show(pluginApi?.tr("errors.service-failed") || "Service call failed", "error");
+        ToastService.showError(friendlyName, pluginApi?.tr("errors.service-failed") || "Service call failed");
       } else {
         Logger.d("HomeAssistant", "Service call successful:", domain, service);
       }
@@ -374,7 +392,7 @@ Item {
     if (!selectedMediaPlayer)
       return;
     callService("media_player", "volume_mute", selectedMediaPlayer, {
-                  is_volume_muted: !isVolumeMuted
+                  is_volume_mute: !isVolumeMuted
                 });
     updateSelectedPlayerAttribute("is_volume_muted", !isVolumeMuted);
   }
