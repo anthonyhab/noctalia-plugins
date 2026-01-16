@@ -18,6 +18,7 @@ ColumnLayout {
   property string themeSetCommand: ""
   property string configDir: ""
   property bool showThemeName: true
+  property bool showSearchInput: true
   readonly property var pluginMain: pluginApi?.mainInstance
   readonly property var defaultSettings: pluginApi?.manifest?.metadata?.defaultSettings || ({})
 
@@ -53,18 +54,26 @@ ColumnLayout {
     themeSetCommand = getSetting("themeSetCommand", "") || "";
     configDir = getSetting("omarchyConfigDir", "") || "";
     showThemeName = getSetting("showThemeName", true) !== false;
+    showSearchInput = getSetting("showSearchInput", true) !== false;
   }
 
   onPluginApiChanged: syncFromPlugin()
   Component.onCompleted: syncFromPlugin()
+
+  Connections {
+    target: pluginApi
+    function onPluginSettingsChanged() {
+      syncFromPlugin();
+    }
+  }
 
   function saveSettings() {
     if (!pluginApi)
       return;
 
     var settings = pluginApi.pluginSettings || {};
-    var refreshNeeded = false;
     var changed = false;
+    var refreshNeeded = false;
 
     var trimmedCommand = themeSetCommand.trim();
     if ((settings.themeSetCommand || "") !== trimmedCommand) {
@@ -80,14 +89,20 @@ ColumnLayout {
       changed = true;
     }
 
-    if (!!settings.showThemeName !== showThemeName) {
+    if (settings.showThemeName !== showThemeName) {
       settings.showThemeName = showThemeName;
+      changed = true;
+    }
+
+    if (settings.showSearchInput !== showSearchInput) {
+      settings.showSearchInput = showSearchInput;
       changed = true;
     }
 
     if (!changed)
       return;
 
+    // Re-assign to trigger bindings and save
     pluginApi.pluginSettings = settings;
     pluginApi.saveSettings();
 
@@ -136,6 +151,13 @@ ColumnLayout {
     description: pluginApi?.tr("fields.show-theme-name.desc") || "Disable to hide the current theme label next to the Omarchy icon."
     checked: root.showThemeName
     onToggled: checked => root.showThemeName = checked
+  }
+
+  NToggle {
+    label: pluginApi?.tr("fields.show-search-input.label") || "Show search input in panel"
+    description: pluginApi?.tr("fields.show-search-input.desc") || "Enable fuzzy search for themes in the Omarchy panel."
+    checked: root.showSearchInput
+    onToggled: checked => root.showSearchInput = checked
   }
 
   NDivider {

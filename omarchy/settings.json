@@ -5,5 +5,6 @@
   "useThemeSurface": true,
   "showThemeName": true,
   "_prevUseWallpaperColors": false,
-  "_prevPredefinedScheme": "Tokyo Night"
+  "_prevPredefinedScheme": "Tokyo Night",
+  "showSearchInput": true
 }

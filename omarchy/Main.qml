@@ -150,9 +150,15 @@ Item {
   function scanThemes() {
     Logger.i("Omarchy", "Scanning themes using omarchy-theme-list");
 
-    // Just use omarchy-theme-list to get theme names
-    // No need to parse colors - omarchy-theme-set will handle that
-    const cmd = "omarchy-theme-list";
+    // Use omarchy-theme-list and derive light/dark mode from theme files
+    const themesDirEsc = omarchyThemesDir.replace(/'/g, "'\\''");
+    const stockThemesDirEsc = (omarchyPath + "/themes").replace(/'/g, "'\\''");
+    const cmd = "omarchy-theme-list | while IFS= read -r name; do " +
+                "[ -z \"$name\" ] && continue; " +
+                "theme_dir=$(echo \"$name\" | sed -E 's/<[^>]+>//g' | tr '[:upper:]' '[:lower:]' | tr ' ' '-'); " +
+                "if [ -f '" + themesDirEsc + "/$theme_dir/light.mode' ] || [ -f '" + stockThemesDirEsc + "/$theme_dir/light.mode' ]; then mode=light; else mode=dark; fi; " +
+                "printf '%s|%s\\n' \"$name\" \"$mode\"; " +
+                "done";
     Logger.d("Omarchy", "Theme scan command:", cmd);
     themesProcess.command = ["bash", "-c", cmd];
     themesProcess.running = true;
@@ -183,7 +189,7 @@ Item {
 
   function applyCurrentTheme() {
     if (!available) {
-      ToastService.showError(pluginApi?.tr("title") || "Omarchy", pluginApi?.tr("errors.missing-config") || "Omarchy config not found");
+      ToastService.showError("Omarchy", pluginApi?.tr("errors.missing-config") || "Omarchy config not found");
       return false;
     }
 
@@ -369,17 +375,30 @@ Item {
         return;
       }
 
-      const themeNames = output.trim().split("\n").filter(name => name && name.trim());
-      Logger.i("Omarchy", "Found", themeNames.length, "themes:", themeNames.join(", "));
+      const themeLines = output.trim().split("\n").filter(line => line && line.trim());
+      const themeNames = [];
 
       // Create theme entries with just names (colors parsed by omarchy-theme-set)
       const themes = [];
-      for (var i = 0; i < themeNames.length; i++) {
+      for (var i = 0; i < themeLines.length; i++) {
+        const line = themeLines[i];
+        const parts = line.split("|");
+        const themeName = parts[0]?.trim();
+        if (!themeName)
+          continue;
+        const detectedMode = parts[1]?.trim();
+        const normalizedName = themeName.replace(/<[^>]+>/g, "").trim().toLowerCase().replace(/\s+/g, "-");
+        const cachedScheme = SchemeCache.getScheme(normalizedName);
+        const mode = cachedScheme?.mode || detectedMode || "dark";
+        themeNames.push(themeName);
         themes.push({
-          "name": themeNames[i],
-          "colors": []  // No preview colors needed
+          "name": themeName,
+          "colors": [],  // No preview colors needed
+          "mode": mode
         });
       }
+
+      Logger.i("Omarchy", "Found", themeNames.length, "themes:", themeNames.join(", "));
 
       Logger.i("Omarchy", "Theme list:", themes.length, "themes");
       availableThemes = themes;
@@ -405,7 +424,7 @@ Item {
     running: false
     onExited: function (code) {
       if (code !== 0) {
-        ToastService.showError(pluginApi?.tr("title") || "Omarchy", pluginApi?.tr("errors.failed-theme-set") || "Failed to switch theme");
+        ToastService.showError("Omarchy", pluginApi?.tr("errors.failed-theme-set") || "Failed to switch theme");
         return;
       }
       refreshThemeName();
@@ -424,7 +443,7 @@ Item {
       if (code !== 0) {
         applying = false;
         Logger.e("Omarchy", "Failed to read alacritty config, exit code:", code);
-        ToastService.showError(pluginApi?.tr("title") || "Omarchy", pluginApi?.tr("errors.failed-read") || "Failed to read theme colors");
+        ToastService.showError("Omarchy", pluginApi?.tr("errors.failed-read") || "Failed to read theme colors");
         return;
       }
 
@@ -435,7 +454,7 @@ Item {
       if (!parsed) {
         applying = false;
         Logger.e("Omarchy", "parseColorsToml returned null");
-        ToastService.showError(pluginApi?.tr("title") || "Omarchy", pluginApi?.tr("errors.failed-read") || "Failed to read theme colors");
+        ToastService.showError("Omarchy", pluginApi?.tr("errors.failed-read") || "Failed to read theme colors");
         return;
       }
 
@@ -496,7 +515,7 @@ Item {
       applying = false;
       if (code !== 0) {
         Logger.e("Omarchy", "Failed to write scheme file, exit code:", code);
-        ToastService.showError(pluginApi?.tr("title") || "Omarchy", pluginApi?.tr("errors.failed-apply") || "Failed to apply scheme");
+        ToastService.showError("Omarchy", pluginApi?.tr("errors.failed-apply") || "Failed to apply scheme");
         return;
       }
 
@@ -521,6 +540,48 @@ Item {
     }
   }
 
+  function cycleTheme() {
+    const themes = root.availableThemes || [];
+    if (themes.length === 0)
+      return;
+
+    let currentIndex = -1;
+    for (let i = 0; i < themes.length; i++) {
+      const entry = themes[i];
+      const name = typeof entry === "string" ? entry : entry.name;
+      if (name === root.themeName) {
+        currentIndex = i;
+        break;
+      }
+    }
+
+    const nextIndex = (currentIndex + 1) % themes.length;
+    const nextTheme = themes[nextIndex];
+    const nextName = typeof nextTheme === "string" ? nextTheme : nextTheme.name;
+    root.setTheme(nextName);
+  }
+
+  function randomTheme() {
+    const themes = root.availableThemes || [];
+    if (themes.length === 0)
+      return;
+
+    // Filter out the currently active theme
+    const otherThemes = themes.filter(theme => {
+      const name = typeof theme === "string" ? theme : theme.name;
+      return name !== root.themeName;
+    });
+
+    // If no other themes available, can't pick a different one
+    if (otherThemes.length === 0)
+      return;
+
+    const randomIndex = Math.floor(Math.random() * otherThemes.length);
+    const randomTheme = otherThemes[randomIndex];
+    const randomName = typeof randomTheme === "string" ? randomTheme : randomTheme.name;
+    root.setTheme(randomName);
+  }
+
   IpcHandler {
     target: "omarchy"
 
@@ -542,45 +603,11 @@ Item {
     }
 
     function cycleTheme() {
-      const themes = root.availableThemes || [];
-      if (themes.length === 0)
-        return;
-
-      let currentIndex = -1;
-      for (let i = 0; i < themes.length; i++) {
-        const entry = themes[i];
-        const name = typeof entry === "string" ? entry : entry.name;
-        if (name === root.themeName) {
-          currentIndex = i;
-          break;
-        }
-      }
-
-      const nextIndex = (currentIndex + 1) % themes.length;
-      const nextTheme = themes[nextIndex];
-      const nextName = typeof nextTheme === "string" ? nextTheme : nextTheme.name;
-      root.setTheme(nextName);
+      root.cycleTheme();
     }
 
     function randomTheme() {
-      const themes = root.availableThemes || [];
-      if (themes.length === 0)
-        return;
-
-      // Filter out the currently active theme
-      const otherThemes = themes.filter(theme => {
-        const name = typeof theme === "string" ? theme : theme.name;
-        return name !== root.themeName;
-      });
-
-      // If no other themes available, can't pick a different one
-      if (otherThemes.length === 0)
-        return;
-
-      const randomIndex = Math.floor(Math.random() * otherThemes.length);
-      const randomTheme = otherThemes[randomIndex];
-      const randomName = typeof randomTheme === "string" ? randomTheme : randomTheme.name;
-      root.setTheme(randomName);
+      root.randomTheme();
     }
   }
 
