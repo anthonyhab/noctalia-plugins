@@ -6,6 +6,7 @@ import Quickshell
 import Quickshell.Io
 import qs.Commons
 import qs.Widgets
+import "ColorUtils.js" as ColorUtils
 
 Item {
   id: root
@@ -23,6 +24,27 @@ Item {
   property bool revealPassword: false
   property bool capsLockOn: false
   property bool animateIn: false
+
+  // --- 0. RICH CONTEXT DATA ---
+  readonly property var requestor: request?.requestor ?? null
+  readonly property var subject: request?.subject ?? null
+  
+  readonly property string displayAction: {
+    if (!hasRequest || !request.message) return "authenticate";
+    const msg = request.message;
+    // Common polkit message patterns:
+    // "Authentication is needed to run `/usr/bin/echo' as the super user"
+    const runMatch = msg.match(/run `([^']+)'/);
+    if (runMatch && runMatch[1]) {
+        const parts = runMatch[1].split('/');
+        return "run " + parts[parts.length - 1];
+    }
+    
+    // Default to a cleaned up version of the message if it's short
+    if (msg.length < 40) return msg.toLowerCase();
+    
+    return "perform this action";
+  }
 
   // Signal to request closing the container (window or panel)
   signal closeRequested()
@@ -61,10 +83,8 @@ Item {
   readonly property int overlayButton: Math.round(baseSize * 0.75)
 
   // Radius Logic:
-  // - Outer: XL (from theme)
-  // - Inner: XL - P_OUTER (perfectly concentric)
-  readonly property int radiusOuter: getStyle("radiusXL", 24)
-  readonly property int radiusInner: Math.max(getStyle("radiusS", 4), radiusOuter - padOuter)
+  // Use standard radii from Style to respect user's container radius settings.
+  readonly property int radiusInner: getStyle("radiusM", 8)
 
   // --- 2. THEME HELPERS ---
 
@@ -131,10 +151,27 @@ Item {
     }
   }
 
-  // --- 4. UI STRUCTURE ---
+    // --- 4. UI STRUCTURE ---
 
   implicitWidth: Math.round(400 * getStyle("uiScaleRatio", 1.0))
   implicitHeight: Math.max(mainColumn.implicitHeight + (padOuter * 2), stableHeight > 0 ? stableHeight : 0)
+
+  // Fallback Icon Square component
+  component FallbackIcon: NBox {
+    property string letter: ""
+    property string key: ""
+    implicitWidth: iconTile * 1.5
+    implicitHeight: width
+    radius: radiusInner
+    color: ColorUtils.getStableColor(key, ColorUtils.getVibrantPalette(true)) // Assuming dark mode for now, should check theme
+    NText {
+        anchors.centerIn: parent
+        text: letter
+        font.weight: getStyle("fontWeightBold", 700)
+        pointSize: Math.round(parent.width * 0.5)
+        color: "white"
+    }
+  }
 
   ColumnLayout {
     id: mainColumn
@@ -150,86 +187,110 @@ Item {
     }
     Behavior on opacity { NumberAnimation { duration: getStyle("animationNormal", 200); easing.type: Easing.OutCubic } }
     
-    // Icon Section
-    Item {
-      visible: useBigLayout
-      Layout.fillWidth: true
-      Layout.preferredHeight: bigLockIcon.height
-      Layout.topMargin: unit
-
-      NIcon {
-        id: bigLockIcon
-        anchors.centerIn: parent
-        icon: successState ? "circle-check" : (hasRequest ? "lock" : "shield")
-        pointSize: Math.round(getStyle("fontSizeXXXL", 32) * 1.5)
-        color: getColor("mPrimary", "blue")
-      }
-    }
-
-    // Title Section
-    NText {
-      visible: useBigLayout
-      Layout.fillWidth: true
-      horizontalAlignment: Text.AlignHCenter
-      text: successState ? trOrDefault("status.authenticated", "Authenticated") : trOrDefault("title", "Polkit Authentication")
-      font.weight: getStyle("fontWeightBold", 700)
-      pointSize: getStyle("fontSizeXL", 20)
-      color: getColor("mOnSurface", "black")
-    }
-
-    // Compact Header
-    Rectangle {
-        id: headerCard
-        visible: !useBigLayout
+    // Visual Identity Section (1Password Style)
+    ColumnLayout {
+        visible: !successState && hasRequest
         Layout.fillWidth: true
-        implicitHeight: headerRow.implicitHeight + (padInner * 2)
-        color: getColor("mSurfaceVariant", "#eee")
-        radius: radiusInner
-        border.color: getColor("mOutline", "#ccc")
-        border.width: 1
-
+        spacing: unit
+        
+        // Visual Connection Row
         RowLayout {
-            id: headerRow
-            anchors.fill: parent
-            anchors.margins: padInner
-            spacing: padInner
-
-            Rectangle {
-                Layout.preferredWidth: iconTile
-                Layout.preferredHeight: iconTile
-                Layout.alignment: Qt.AlignVCenter
-                radius: Math.max(4, radiusInner - 4)
+            Layout.alignment: Qt.AlignHCenter
+            spacing: gapItems
+            
+            // Requestor Icon
+            Item {
+                Layout.preferredWidth: iconTile * 1.5
+                Layout.preferredHeight: width
+                
+                NIcon {
+                    anchors.fill: parent
+                    visible: requestor && requestor.iconName
+                    icon: requestor ? requestor.iconName : ""
+                    pointSize: Math.round(parent.width * 0.8)
+                    color: getColor("mPrimary", "blue")
+                }
+                
+                FallbackIcon {
+                    anchors.fill: parent
+                    visible: !requestor || !requestor.iconName
+                    letter: requestor ? requestor.fallbackLetter : "?"
+                    key: requestor ? requestor.fallbackKey : "unknown"
+                }
+            }
+            
+            // Connection line with check
+            RowLayout {
+                spacing: 0
+                Rectangle { width: unit * 2; height: 1; color: getColor("mOutline", "#ccc") }
+                NBox {
+                    width: unit * 2; height: width; radius: width/2; color: "green"; border.width: 0
+                    NIcon { anchors.centerIn: parent; icon: "check"; pointSize: 8; color: "white" }
+                }
+                Rectangle { width: unit * 2; height: 1; color: getColor("mOutline", "#ccc") }
+            }
+            
+            // Polkit Icon (Providing App)
+            NBox {
+                Layout.preferredWidth: iconTile * 1.5
+                Layout.preferredHeight: width
+                radius: width/2
                 color: Qt.alpha(getColor("mPrimary", "blue"), 0.1)
-                NIcon { anchors.centerIn: parent; icon: "lock"; pointSize: 16; color: getColor("mPrimary", "blue") }
-            }
-
-            NText {
-                Layout.fillWidth: true
-                Layout.alignment: Qt.AlignVCenter
-                text: trOrDefault("status.request", "Authentication Required")
-                font.weight: getStyle("fontWeightBold", 700)
-                pointSize: getStyle("fontSizeM", 14)
-                color: getColor("mOnSurface", "black")
-                elide: Text.ElideRight
-            }
-
-            NIconButton {
-                Layout.preferredWidth: iconTile
-                Layout.preferredHeight: Layout.preferredWidth
-                Layout.alignment: Qt.AlignVCenter
-                icon: "x"; baseSize: Layout.preferredWidth; colorBg: "transparent"
-                onClicked: {
-                    if (hasRequest && !busy) {
-                        pluginMain?.requestClose();
-                        passwordInput.text = "";
-                    }
+                border.width: 0
+                NIcon {
+                    anchors.centerIn: parent
+                    icon: "lock"
+                    pointSize: Math.round(parent.width * 0.5)
+                    color: getColor("mPrimary", "blue")
                 }
             }
         }
+        
+        // Instructional Message
+        NText {
+            Layout.fillWidth: true
+            horizontalAlignment: Text.AlignHCenter
+            wrapMode: Text.WordWrap
+            text: {
+                const app = requestor ? "<b>" + requestor.displayName + "</b>" : "An application";
+                return "Allow " + app + " to " + displayAction;
+            }
+            textFormat: Text.RichText
+            pointSize: getStyle("fontSizeM", 14)
+            color: getColor("mOnSurface", "black")
+        }
     }
 
+    // Success State Section
+    ColumnLayout {
+      visible: successState
+      Layout.fillWidth: true
+      spacing: unit
+      
+      NIcon {
+        Layout.alignment: Qt.AlignHCenter
+        icon: "circle-check"
+        pointSize: Math.round(getStyle("fontSizeXXXL", 32) * 1.5)
+        color: "green"
+      }
+      
+      NText {
+        Layout.fillWidth: true
+        horizontalAlignment: Text.AlignHCenter
+        text: trOrDefault("status.authenticated", "Authenticated")
+        font.weight: getStyle("fontWeightBold", 700)
+        pointSize: getStyle("fontSizeXL", 20)
+        color: getColor("mOnSurface", "black")
+      }
+    }
+
+    // Compact Header (Fallback for when no request)
+    NBox {
+        id: headerCard
+        visible: !hasRequest && !successState
+
     // Identity Card
-    Rectangle {
+    NBox {
       visible: hasRequest && !successState && (displayUser.length > 0 || commandPath !== "")
       Layout.fillWidth: true
       implicitHeight: contextCol.implicitHeight + (padInner * 2)
@@ -252,8 +313,9 @@ Item {
             Item {
                 width: Math.round(baseSize * 0.8)
                 height: width
-                Rectangle {
+                NBox {
                     anchors.fill: parent; radius: width / 2; color: getColor("mSecondaryContainer", "#ddd")
+                    border.width: 0
                     NIcon { anchors.centerIn: parent; visible: avatarImage.status !== Image.Ready; icon: "user"; pointSize: 12 }
                 }
                 NImageRounded {
@@ -281,7 +343,7 @@ Item {
             NText { text: displayUser; font.weight: 500; pointSize: 14 }
         }
 
-        Rectangle { visible: displayUser.length > 0 && commandPath !== ""; Layout.fillWidth: true; Layout.preferredHeight: 1; color: getColor("mOutline", "#ccc"); opacity: 0.1 }
+        NDivider { visible: displayUser.length > 0 && commandPath !== ""; Layout.fillWidth: true }
 
         NText {
             visible: commandPath !== ""; Layout.fillWidth: true; horizontalAlignment: Text.AlignHCenter
@@ -291,7 +353,7 @@ Item {
     }
 
     // Password Input
-    Rectangle {
+    NBox {
       id: inputWrapper
       Layout.fillWidth: true
       implicitHeight: passwordInput.implicitHeight + (padInner * 2)
@@ -345,7 +407,13 @@ Item {
       text: busy ? trOrDefault("status.processing", "Verifying...") : trOrDefault("actions.authenticate", "Authenticate")
       enabled: !busy && passwordInput.text.length > 0
       
-      Component.onCompleted: { if (authButton.background) authButton.background.radius = radiusInner; }
+      Binding {
+        target: authButton.background || null
+        property: "radius"
+        value: radiusInner
+        when: authButton.background !== undefined
+      }
+
       onClicked: if (hasRequest && pluginMain) pluginMain.submitPassword(passwordInput.text)
 
       NIcon {

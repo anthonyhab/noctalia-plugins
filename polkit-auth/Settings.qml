@@ -88,14 +88,14 @@ ColumnLayout {
   }
 
   NText {
-    text: pluginApi?.tr("settings.description") || "Connect to the Noctalia polkit agent over IPC."
+    text: pluginApi?.tr("settings.description") ?? "Connect to the Noctalia polkit agent over IPC."
     wrapMode: Text.WordWrap
     color: Color.mOnSurface
   }
 
   NTextInput {
-    label: pluginApi?.tr("settings.poll-interval") || "Poll interval (ms)"
-    description: pluginApi?.tr("settings.poll-interval-desc") || "How frequently the plugin checks for new authentication requests. Lower values are more responsive."
+    label: pluginApi?.tr("settings.poll-interval") ?? "Poll interval (ms)"
+    description: pluginApi?.tr("settings.poll-interval-desc") ?? "How frequently the plugin checks for new authentication requests. Lower values are more responsive."
     placeholderText: "100"
     text: root.valuePollInterval
     inputItem.inputMethodHints: Qt.ImhDigitsOnly
@@ -103,8 +103,8 @@ ColumnLayout {
   }
 
   NToggle {
-    label: pluginApi?.tr("settings.sync-panel-mode") || "Sync panel mode with shell"
-    description: pluginApi?.tr("settings.sync-panel-mode-desc") || "Automatically use the same panel mode as the main shell settings."
+    label: pluginApi?.tr("settings.sync-panel-mode") ?? "Sync panel mode with shell"
+    description: pluginApi?.tr("settings.sync-panel-mode-desc") ?? "Automatically use the same panel mode as the main shell settings."
     checked: root.valueSyncPanelModeWithShell
     onToggled: checked => root.valueSyncPanelModeWithShell = checked
   }
@@ -127,36 +127,36 @@ ColumnLayout {
   NDivider { Layout.fillWidth: true }
 
   NToggle {
-    label: pluginApi?.tr("settings.auto-open") || "Auto-open panel"
-    description: pluginApi?.tr("settings.auto-open-desc") || "Show the panel immediately when a request arrives."
+    label: pluginApi?.tr("settings.auto-open") ?? "Auto-open panel"
+    description: pluginApi?.tr("settings.auto-open-desc") ?? "Show the panel immediately when a request arrives."
     checked: root.valueAutoOpenPanel
     onToggled: checked => root.valueAutoOpenPanel = checked
   }
 
   NToggle {
-    label: pluginApi?.tr("settings.auto-close-success") || "Close on success"
-    description: pluginApi?.tr("settings.auto-close-success-desc") || "Close the panel after a successful authentication."
+    label: pluginApi?.tr("settings.auto-close-success") ?? "Close on success"
+    description: pluginApi?.tr("settings.auto-close-success-desc") ?? "Close the panel after a successful authentication."
     checked: root.valueAutoCloseOnSuccess
     onToggled: checked => root.valueAutoCloseOnSuccess = checked
   }
 
   NToggle {
-    label: pluginApi?.tr("settings.show-success-animation") || "Show success animation"
-    description: pluginApi?.tr("settings.show-success-animation-desc") || "Keep the dialog visible briefly after success."
+    label: pluginApi?.tr("settings.show-success-animation") ?? "Show success animation"
+    description: pluginApi?.tr("settings.show-success-animation-desc") ?? "Keep the dialog visible briefly after success."
     checked: root.valueShowSuccessAnimation
     onToggled: checked => root.valueShowSuccessAnimation = checked
   }
 
   NToggle {
-    label: pluginApi?.tr("settings.auto-close-cancel") || "Close on cancel"
-    description: pluginApi?.tr("settings.auto-close-cancel-desc") || "Close the panel when a request is cancelled."
+    label: pluginApi?.tr("settings.auto-close-cancel") ?? "Close on cancel"
+    description: pluginApi?.tr("settings.auto-close-cancel-desc") ?? "Close the panel when a request is cancelled."
     checked: root.valueAutoCloseOnCancel
     onToggled: checked => root.valueAutoCloseOnCancel = checked
   }
 
   NTextInput {
-    label: pluginApi?.tr("settings.success-animation-duration") || "Success animation duration (ms)"
-    description: pluginApi?.tr("settings.success-animation-duration-desc") || "How long the success state is shown before closing."
+    label: pluginApi?.tr("settings.success-animation-duration") ?? "Success animation duration (ms)"
+    description: pluginApi?.tr("settings.success-animation-duration-desc") ?? "How long the success state is shown before closing."
     placeholderText: "300"
     text: root.valueSuccessAnimationDuration
     inputItem.inputMethodHints: Qt.ImhDigitsOnly
