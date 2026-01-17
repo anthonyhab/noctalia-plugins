@@ -125,12 +125,14 @@ Item {
         spacing: Style.marginM
 
         NIcon {
+          Layout.alignment: Qt.AlignVCenter
           icon: "palette"
           pointSize: Style.fontSizeXXL
           color: Color.mPrimary
         }
 
         NText {
+          Layout.alignment: Qt.AlignVCenter
           Layout.fillWidth: true
           text: titleText
           font.weight: Style.fontWeightBold
@@ -140,7 +142,8 @@ Item {
 
         Rectangle {
           id: themeFilterButton
-          Layout.preferredHeight: Math.round(Style.baseWidgetSize * 0.8)
+          Layout.alignment: Qt.AlignVCenter
+          Layout.preferredHeight: Style.toOdd(Style.baseWidgetSize * 0.8)
           Layout.preferredWidth: filterLabel.implicitWidth + (Style.marginM * 2)
           radius: Style.radiusM
           color: filterHover.containsMouse ? Qt.rgba(Color.mPrimary.r, Color.mPrimary.g, Color.mPrimary.b, 0.08) : Color.mSurface
@@ -150,7 +153,6 @@ Item {
           NText {
             id: filterLabel
             anchors.centerIn: parent
-            anchors.verticalCenterOffset: -1
             text: themeFilterLabel
             pointSize: Style.fontSizeS
             font.weight: Style.fontWeightMedium
@@ -167,6 +169,7 @@ Item {
         }
 
         NIconButton {
+          Layout.alignment: Qt.AlignVCenter
           icon: "close"
           baseSize: Style.baseWidgetSize * 0.8
           tooltipText: trOrDefault("tooltips.close", "Close")
