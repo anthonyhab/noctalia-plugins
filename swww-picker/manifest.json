@@ -1,14 +1,21 @@
 {
   "id": "swww-picker",
   "name": "SWWW Wallpaper Picker",
-  "version": "0.2.0",
+  "version": "0.2.2",
+  "minNoctaliaVersion": "3.6.0",
   "author": "habibe",
+  "license": "MIT",
+  "repository": "https://github.com/anthonyhab/noctalia-plugins",
   "description": "Cycle wallpapers using swww with manual and automatic controls.",
+  "tags": ["Bar", "Desktop", "System"],
   "entryPoints": {
     "main": "Main.qml",
     "panel": "Panel.qml",
     "barWidget": "BarWidget.qml",
     "settings": "Settings.qml"
+  },
+  "dependencies": {
+    "plugins": []
   },
   "metadata": {
     "allowUserSettings": true,

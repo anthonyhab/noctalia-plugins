@@ -2,13 +2,20 @@
   "id": "omarchy",
   "name": "Omarchy Integration",
   "version": "0.2.2",
+  "minNoctaliaVersion": "3.6.0",
   "author": "habibe",
+  "license": "MIT",
+  "repository": "https://github.com/anthonyhab/noctalia-plugins",
   "description": "Sync Noctalia colors from Omarchy themes.",
+  "tags": ["Bar", "System"],
   "entryPoints": {
     "main": "Main.qml",
     "panel": "Panel.qml",
     "barWidget": "BarWidget.qml",
     "settings": "Settings.qml"
+  },
+  "dependencies": {
+    "plugins": []
   },
   "metadata": {
     "allowUserSettings": true,
