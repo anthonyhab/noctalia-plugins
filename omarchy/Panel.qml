@@ -140,7 +140,7 @@ Item {
 
         Rectangle {
           id: themeFilterButton
-          Layout.preferredHeight: Style.baseWidgetSize * 0.8
+          Layout.preferredHeight: Math.round(Style.baseWidgetSize * 0.8)
           Layout.preferredWidth: filterLabel.implicitWidth + (Style.marginM * 2)
           radius: Style.radiusM
           color: filterHover.containsMouse ? Qt.rgba(Color.mPrimary.r, Color.mPrimary.g, Color.mPrimary.b, 0.08) : Color.mSurface
@@ -150,6 +150,7 @@ Item {
           NText {
             id: filterLabel
             anchors.centerIn: parent
+            anchors.verticalCenterOffset: -1
             text: themeFilterLabel
             pointSize: Style.fontSizeS
             font.weight: Style.fontWeightMedium
