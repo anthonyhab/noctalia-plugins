@@ -91,14 +91,16 @@ Item {
 
   ColumnLayout {
     id: mainColumn
-    anchors.fill: parent
+    anchors.top: parent.top
+    anchors.left: parent.left
+    anchors.right: parent.right
     anchors.margins: Style.marginL
     spacing: Style.marginM
 
     // --- Header ---
     NBox {
       Layout.fillWidth: true
-      Layout.preferredHeight: headerRow.implicitHeight + (Style.marginM * 2)
+      implicitHeight: headerRow.implicitHeight + (Style.marginM * 2)
 
       RowLayout {
         id: headerRow
@@ -137,12 +139,14 @@ Item {
       }
     }
 
-    // --- Media Content ---
+    // --- Media Content Block ---
     NBox {
       Layout.fillWidth: true
+      implicitHeight: metadataColumn.implicitHeight + (Style.marginM * 2)
       visible: isConnected && (mediaTitle !== "" || entityPicture !== "")
 
       ColumnLayout {
+        id: metadataColumn
         anchors.fill: parent
         anchors.margins: Style.marginM
         spacing: Style.marginM
@@ -150,10 +154,11 @@ Item {
         // Album Art
         NBox {
           Layout.fillWidth: true
-          Layout.preferredHeight: width
+          Layout.preferredHeight: width * 0.56 // 16:9 like
           Layout.maximumHeight: 200 * Style.uiScaleRatio
           visible: entityPicture !== "" && !albumArtFailed
-          color: Color.mSurfaceVariant
+          color: Color.mSurface
+          radius: Style.radiusM
           clip: true
           Image {
             anchors.fill: parent
@@ -168,7 +173,7 @@ Item {
         // Metadata
         ColumnLayout {
           Layout.fillWidth: true
-          spacing: Style.marginXXS
+          spacing: Style.marginXS
           NText {
             Layout.fillWidth: true
             text: mediaTitle || (pluginApi?.tr("media.no-media") || "Nothing playing")
@@ -188,200 +193,267 @@ Item {
             elide: Text.ElideRight
             horizontalAlignment: Text.AlignHCenter
           }
-          NText {
+        }
+      }
+    }
+
+    // --- Playback Controls (Progress + Transport) ---
+    NBox {
+      Layout.fillWidth: true
+      implicitHeight: playbackColumn.implicitHeight + (Style.marginM * 2)
+      visible: isConnected
+
+      ColumnLayout {
+        id: playbackColumn
+        anchors.fill: parent
+        anchors.margins: Style.marginM
+        spacing: Style.marginM
+
+        // Progress
+        ColumnLayout {
+          Layout.fillWidth: true
+          spacing: Style.marginS
+          visible: canSeek && mediaDuration > 0
+          
+          NSlider {
             Layout.fillWidth: true
-            visible: mediaAlbum !== ""
-            text: mediaAlbum
-            pointSize: Style.fontSizeS
-            color: Color.mOnSurfaceVariant
-            elide: Text.ElideRight
-            horizontalAlignment: Text.AlignHCenter
-            opacity: 0.6
+            from: 0
+            to: mediaDuration
+            value: calculatedPosition
+            enabled: isConnected && canSeek
+            heightRatio: 0.4 // Smaller knob
+            cutoutColor: Color.mSurfaceVariant
+            onPressedChanged: if (!pressed && Math.abs(value - calculatedPosition) > 1) pluginMain?.seek(value);
+          }
+          RowLayout {
+            Layout.fillWidth: true
+            NText {
+              text: formatTime(calculatedPosition)
+              pointSize: Style.fontSizeXS
+              color: Color.mOnSurfaceVariant
+              family: Settings.data.ui.fontFixed
+              Layout.preferredWidth: Math.round(Style.marginL * 3)
+              horizontalAlignment: Text.AlignLeft
+            }
+            Item { Layout.fillWidth: true }
+            NText {
+              text: formatTime(mediaDuration)
+              pointSize: Style.fontSizeXS
+              color: Color.mOnSurfaceVariant
+              family: Settings.data.ui.fontFixed
+              Layout.preferredWidth: Math.round(Style.marginL * 3)
+              horizontalAlignment: Text.AlignRight
+            }
+          }
+        }
+
+        // Transport
+        RowLayout {
+          Layout.alignment: Qt.AlignHCenter
+          spacing: Style.marginM
+
+          readonly property real btnSize: Style.baseWidgetSize * 1.0
+
+          NIconButton {
+            visible: canShuffle
+            icon: "arrows-shuffle"
+            baseSize: parent.btnSize
+            colorFg: shuffleEnabled ? Color.mSecondary : Qt.alpha(Color.mOnSurfaceVariant, 0.6)
+            colorBg: "transparent"
+            colorBgHover: Color.mHover
+            onClicked: pluginMain?.toggleShuffle()
+          }
+          NIconButton {
+            visible: canPrevious
+            icon: "player-track-prev"
+            baseSize: parent.btnSize
+            colorFg: Color.mOnSurface
+            colorBg: "transparent"
+            colorBgHover: Color.mHover
+            onClicked: pluginMain?.mediaPrevious()
+          }
+          NIconButton {
+            icon: isPlaying ? "player-pause" : "player-play"
+            baseSize: parent.btnSize * 1.2
+            colorBg: Color.mPrimary
+            colorFg: Color.mOnPrimary
+            onClicked: pluginMain?.mediaPlayPause()
+          }
+          NIconButton {
+            visible: canNext
+            icon: "player-track-next"
+            baseSize: parent.btnSize
+            colorFg: Color.mOnSurface
+            colorBg: "transparent"
+            colorBgHover: Color.mHover
+            onClicked: pluginMain?.mediaNext()
+          }
+          NIconButton {
+            visible: canRepeat
+            icon: repeatMode === "one" ? "repeat-1" : "repeat"
+            baseSize: parent.btnSize
+            colorFg: repeatMode !== "off" ? Color.mSecondary : Qt.alpha(Color.mOnSurfaceVariant, 0.6)
+            colorBg: "transparent"
+            colorBgHover: Color.mHover
+            onClicked: pluginMain?.cycleRepeat()
           }
         }
       }
     }
 
-    // --- Progress Bar ---
+    // --- Audio & Device Controls ---
     NBox {
       Layout.fillWidth: true
-      visible: isConnected && canSeek && mediaDuration > 0
+      implicitHeight: audioColumn.implicitHeight + (Style.marginM * 2)
+      visible: isConnected && (canVolumeSet || canVolumeMute || (pluginMain?.mediaPlayers?.length || 0) > 1)
+
       ColumnLayout {
+        id: audioColumn
         anchors.fill: parent
         anchors.margins: Style.marginM
-        spacing: Style.marginS
-        NSlider {
-          Layout.fillWidth: true
-          from: 0
-          to: mediaDuration
-          value: calculatedPosition
-          enabled: isConnected && canSeek
-          onPressedChanged: if (!pressed && Math.abs(value - calculatedPosition) > 1) pluginMain?.seek(value);
-        }
+        spacing: Style.marginM
+
+        // Volume
         RowLayout {
           Layout.fillWidth: true
-          NText { text: formatTime(calculatedPosition); pointSize: Style.fontSizeXS; color: Color.mOnSurfaceVariant; family: Settings.data.ui.fontFixed }
-          Item { Layout.fillWidth: true }
-          NText { text: formatTime(mediaDuration); pointSize: Style.fontSizeXS; color: Color.mOnSurfaceVariant; family: Settings.data.ui.fontFixed }
-        }
-      }
-    }
-
-    // --- Transport Controls (Uniform Size) ---
-    NBox {
-      Layout.fillWidth: true
-      visible: isConnected
-      RowLayout {
-        anchors.centerIn: parent
-        anchors.margins: Style.marginM
-        spacing: Style.marginM
-
-        readonly property real btnSize: Style.baseWidgetSize * 1.1
-
-        NIconButton {
-          visible: canShuffle
-          icon: "arrows-shuffle"
-          baseSize: parent.btnSize
-          colorFg: shuffleEnabled ? Color.mSecondary : Color.mPrimary
-          colorBg: shuffleEnabled ? Qt.rgba(Color.mSecondary.r, Color.mSecondary.g, Color.mSecondary.b, 0.15) : Color.mSurfaceVariant
-          onClicked: pluginMain?.toggleShuffle()
-        }
-        NIconButton {
-          visible: canPrevious
-          icon: "player-track-prev"
-          baseSize: parent.btnSize
-          onClicked: pluginMain?.mediaPrevious()
-        }
-        NIconButton {
-          icon: isPlaying ? "player-pause" : "player-play"
-          baseSize: parent.btnSize
-          colorBg: Color.mPrimary
-          colorFg: Color.mOnPrimary
-          onClicked: pluginMain?.mediaPlayPause()
-        }
-        NIconButton {
-          visible: canNext
-          icon: "player-track-next"
-          baseSize: parent.btnSize
-          onClicked: pluginMain?.mediaNext()
-        }
-        NIconButton {
-          visible: canRepeat
-          icon: repeatMode === "one" ? "repeat-1" : "repeat"
-          baseSize: parent.btnSize
-          colorFg: repeatMode !== "off" ? Color.mSecondary : Color.mPrimary
-          colorBg: repeatMode !== "off" ? Qt.rgba(Color.mSecondary.r, Color.mSecondary.g, Color.mSecondary.b, 0.15) : Color.mSurfaceVariant
-          onClicked: pluginMain?.cycleRepeat()
-        }
-      }
-    }
-
-    // --- Volume Control ---
-    NBox {
-      Layout.fillWidth: true
-      visible: isConnected && (canVolumeSet || canVolumeMute)
-      RowLayout {
-        anchors.fill: parent
-        anchors.margins: Style.marginM
-        spacing: Style.marginM
-        NIconButton {
-          visible: canVolumeMute
-          icon: isVolumeMuted ? "volume-off" : (volumeLevel > 0.5 ? "volume" : "volume-2")
-          baseSize: Style.baseWidgetSize * 0.9
-          onClicked: pluginMain?.toggleMute()
-        }
-        NSlider {
-          id: volumeSlider
-          Layout.fillWidth: true
-          visible: canVolumeSet
-          from: 0; to: 1; value: localVolumeLevel
-          enabled: isConnected && !isVolumeMuted
-          onMoved: localVolumeLevel = value
-          onPressedChanged: if (!pressed) pluginMain?.setVolume(localVolumeLevel);
-        }
-        NText {
-          visible: canVolumeSet
-          text: Math.round(localVolumeLevel * 100) + "%"
-          pointSize: Style.fontSizeXS
-          color: Color.mOnSurfaceVariant
-          family: Settings.data.ui.fontFixed
-          Layout.preferredWidth: Math.round(40 * Style.uiScaleRatio)
-          horizontalAlignment: Text.AlignRight
-        }
-      }
-    }
-
-    // --- Device Selector (Unified) ---
-    NBox {
-      Layout.fillWidth: true
-      visible: isConnected && (pluginMain?.mediaPlayers?.length || 0) > 1
-      RowLayout {
-        anchors.fill: parent
-        anchors.margins: Style.marginM
-        spacing: Style.marginM
-
-        NIcon {
-          icon: "devices"
-          pointSize: Style.fontSizeL
-          color: Color.mPrimary
-        }
-
-        ComboBox {
-          id: deviceSelector
-          Layout.fillWidth: true
-          flat: true
-          model: pluginMain?.mediaPlayers?.map(p => ({ "key": p.entity_id, "name": p.friendly_name || p.entity_id })) || []
-          currentIndex: {
-            const selected = pluginMain?.selectedMediaPlayer || "";
-            for (var i = 0; i < model.length; i++) if (model[i].key === selected) return i;
-            return 0;
-          }
-          onActivated: {
-            var item = model[currentIndex];
-            if (item && item.key) pluginMain?.selectMediaPlayer(item.key);
-          }
-
-          background: Item {} // Transparent background, reliance on NBox
-
-          contentItem: NText {
-            leftPadding: 0
-            verticalAlignment: Text.AlignVCenter
-            text: deviceSelector.currentIndex >= 0 ? deviceSelector.model[deviceSelector.currentIndex].name : ""
-            color: Color.mOnSurface
-            font.weight: Style.fontWeightMedium
-            elide: Text.ElideRight
-          }
-
-          indicator: NIcon {
-            x: deviceSelector.width - width
-            y: (deviceSelector.height - height) / 2
-            icon: "selector"
-            pointSize: Style.fontSizeM
-            color: Color.mOnSurfaceVariant
-          }
+          spacing: Style.marginM
+          visible: canVolumeSet || canVolumeMute
           
-          popup: Popup {
-            y: deviceSelector.height + Style.marginS
-            width: deviceSelector.width
-            implicitHeight: Math.min(200 * Style.uiScaleRatio, listview.contentHeight + (Style.marginM * 2))
-            padding: Style.marginS
-            background: NBox { color: Color.mSurfaceVariant; border.color: Color.mOutline }
-            contentItem: ListView {
-                id: listview
-                clip: true
-                model: deviceSelector.model
-                delegate: Rectangle {
-                    width: listview.width
-                    height: Math.round(40 * Style.uiScaleRatio)
-                    color: index === deviceSelector.currentIndex ? Color.mHover : "transparent"
-                    radius: Style.radiusS
-                    NText {
-                        anchors.fill: parent; anchors.leftMargin: Style.marginM
-                        text: modelData.name; verticalAlignment: Text.AlignVCenter
-                        color: index === deviceSelector.currentIndex ? Color.mOnHover : Color.mOnSurface
-                    }
-                    MouseArea { anchors.fill: parent; onClicked: { deviceSelector.currentIndex = index; deviceSelector.activated(index); deviceSelector.popup.close(); } }
+          NIconButton {
+            visible: canVolumeMute
+            icon: isVolumeMuted ? "volume-off" : (volumeLevel > 0.5 ? "volume" : "volume-2")
+            baseSize: Style.baseWidgetSize * 0.9
+            colorBg: "transparent"
+            onClicked: pluginMain?.toggleMute()
+          }
+          NSlider {
+            id: volumeSlider
+            Layout.fillWidth: true
+            visible: canVolumeSet
+            from: 0; to: 1; value: localVolumeLevel
+            enabled: isConnected && !isVolumeMuted
+            heightRatio: 0.4 // Smaller knob
+            cutoutColor: Color.mSurfaceVariant
+            onMoved: localVolumeLevel = value
+            onPressedChanged: if (!pressed) pluginMain?.setVolume(localVolumeLevel);
+          }
+          NText {
+            visible: canVolumeSet
+            text: Math.round(localVolumeLevel * 100) + "%"
+            pointSize: Style.fontSizeXS
+            color: Color.mOnSurfaceVariant
+            family: Settings.data.ui.fontFixed
+            Layout.preferredWidth: Math.round(Style.marginL * 3)
+            Layout.rightMargin: Style.marginXS
+            horizontalAlignment: Text.AlignRight
+          }
+        }
+
+        // Device Select
+        RowLayout {
+          Layout.fillWidth: true
+          spacing: Style.marginM
+          visible: (pluginMain?.mediaPlayers?.length || 0) > 1
+
+          NIcon {
+            icon: "devices"
+            pointSize: Style.fontSizeM
+            color: Color.mSecondary
+          }
+
+          // Custom dropdown (avoids Qt ComboBox system styling)
+          Item {
+            Layout.fillWidth: true
+            implicitHeight: Style.capsuleHeight
+
+            Rectangle {
+              id: deviceButton
+              anchors.fill: parent
+              color: deviceButtonMA.containsMouse ? Color.mHover : Qt.alpha(Color.mSurface, 0.3)
+              radius: Style.radiusM
+              border.color: Color.mOutline
+              border.width: Style.borderS
+
+              NText {
+                anchors.fill: parent
+                anchors.leftMargin: Style.marginM
+                anchors.rightMargin: Style.marginL
+                verticalAlignment: Text.AlignVCenter
+                text: {
+                  const players = pluginMain?.mediaPlayers || []
+                  const selected = pluginMain?.selectedMediaPlayer || ""
+                  for (var i = 0; i < players.length; i++) {
+                    if (players[i].entity_id === selected)
+                      return players[i].friendly_name || players[i].entity_id
+                  }
+                  return players[0]?.friendly_name || "Select Device"
                 }
+                color: Color.mOnSurface
+                font.weight: Style.fontWeightMedium
+                elide: Text.ElideRight
+              }
+
+              NIcon {
+                anchors.right: parent.right
+                anchors.rightMargin: Style.marginM
+                anchors.verticalCenter: parent.verticalCenter
+                icon: "selector"
+                pointSize: Style.fontSizeS
+                color: Color.mOnSurfaceVariant
+              }
+
+              MouseArea {
+                id: deviceButtonMA
+                anchors.fill: parent
+                hoverEnabled: true
+                onClicked: devicePopup.open()
+              }
+            }
+
+            Popup {
+              id: devicePopup
+              y: deviceButton.height + Style.marginS
+              width: deviceButton.width
+              implicitHeight: Math.min(Style.capsuleHeight * 5, deviceListView.contentHeight + (Style.marginM * 2))
+              padding: Style.marginS
+
+              background: NBox {
+                color: Color.mSurfaceVariant
+                border.color: Color.mOutline
+              }
+
+              contentItem: ListView {
+                id: deviceListView
+                clip: true
+                model: pluginMain?.mediaPlayers || []
+
+                delegate: Rectangle {
+                  width: deviceListView.width
+                  height: Style.capsuleHeight
+                  radius: Style.radiusS
+                  color: deviceDelegateMA.containsMouse ? Color.mHover : "transparent"
+
+                  NText {
+                    anchors.fill: parent
+                    anchors.leftMargin: Style.marginM
+                    text: modelData.friendly_name || modelData.entity_id
+                    verticalAlignment: Text.AlignVCenter
+                    color: deviceDelegateMA.containsMouse ? Color.mOnHover : Color.mOnSurface
+                    font.weight: modelData.entity_id === pluginMain?.selectedMediaPlayer
+                      ? Style.fontWeightBold : Style.fontWeightMedium
+                  }
+
+                  MouseArea {
+                    id: deviceDelegateMA
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    onClicked: {
+                      pluginMain?.selectMediaPlayer(modelData.entity_id)
+                      devicePopup.close()
+                    }
+                  }
+                }
+              }
             }
           }
         }

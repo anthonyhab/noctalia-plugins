@@ -121,7 +121,7 @@ Item {
 
           NText {
             Layout.fillWidth: true
-            text: trOrDefault("title", "Swww Picker")
+            text: trOrDefault("title", "Wallpapers")
             font.weight: Style.fontWeightBold
             pointSize: Style.fontSizeL
             color: Color.mOnSurface
