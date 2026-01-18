@@ -141,6 +141,18 @@ Use optional chaining for translations:
 text: pluginApi?.tr("translationKey") ?? "Fallback"
 ```
 
+## QML Syntax & Safety
+
+### Strict Syntax Rules
+- **NO SEMICOLONS**: Do not use semicolons (`;`) to terminate properties or between sibling objects. Only use them within JavaScript blocks (functions/handlers) if absolutely necessary.
+- **NO CONVERSION ONE-LINERS**: Avoid collapsing multiple properties or complex objects into a single line. QML parsers in this environment are strict.
+- **VIRTUAL LINTING**: Always run `qmllint` and `qmlformat -i` on any modified QML files before committing.
+
+### Defensive Code
+- Always wrap complex property lookups in `root` or `pluginApi` properties to avoid `undefined` warnings.
+- Use `!!value` for boolean properties to ensure strict type matching.
+- Use `(val && val.prop) || fallback` for string/color properties to prevent `undefined` assignment errors.
+
 ## Common Pitfalls (from Official Repo)
 
 Lessons from bugs fixed in `noctalia-dev/noctalia-plugins`:
