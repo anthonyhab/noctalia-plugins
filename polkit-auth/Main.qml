@@ -152,7 +152,8 @@ Item {
           }
         }
         Qt.callLater(pollImmediately);
-      } else if (response.type === "complete") {
+      } else       if (response.type === "complete") {
+        console.log("Main: Request complete RAW response: " + JSON.stringify(response));
         const isSuccess = response.result === "success";
         const isCancelled = response.result === "cancelled";
         handleRequestComplete(response.id, isSuccess, isCancelled);
@@ -485,21 +486,24 @@ Item {
     visible: false
     color: Color.mSurface
 
-    implicitWidth: Math.round(420 * Style.uiScaleRatio)
-    implicitHeight: Math.round(480 * Style.uiScaleRatio)
+    readonly property int windowWidth: Math.round(420 * Style.uiScaleRatio)
+    readonly property int windowHeight: Math.round(450 * Style.uiScaleRatio)
+
+    implicitWidth: windowWidth
+    implicitHeight: windowHeight
+    minimumSize: Qt.size(windowWidth, windowHeight)
 
     AuthContent {
       id: floatingAuthContent
       anchors.fill: parent
       pluginMain: root
-      request: root.currentRequest
+      incomingRequest: root.currentRequest
       busy: root.responseInFlight
       agentAvailable: root.agentAvailable
       statusText: root.agentStatus
       errorText: root.lastError
       onCloseRequested: root.requestClose()
     }
-
   }
 
   Component.onCompleted: {

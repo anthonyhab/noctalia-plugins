@@ -24,18 +24,13 @@ Item {
   readonly property bool panelAnchorRight: attachToBar && barPosition === "right"
 
   readonly property int contentPreferredWidth: Math.round(400 * Style.uiScaleRatio)
-  readonly property int contentPreferredHeight: {
-    const baseHeight = authContent.implicitHeight;
-    const minHeight = Math.round(280 * Style.uiScaleRatio);
-    const maxHeight = Math.round(520 * Style.uiScaleRatio);
-    return Math.max(minHeight, Math.min(baseHeight, maxHeight));
-  }
+  readonly property int contentPreferredHeight: authContent.implicitHeight
 
   AuthContent {
     id: authContent
     anchors.fill: parent
     pluginMain: root.pluginMain
-    request: pluginMain?.currentRequest ?? null
+    incomingRequest: pluginMain?.currentRequest ?? null
     busy: pluginMain?.responseInFlight ?? false
     agentAvailable: pluginMain?.agentAvailable ?? true
     statusText: pluginMain?.agentStatus ?? ""
