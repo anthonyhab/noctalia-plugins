@@ -51,6 +51,7 @@ ColumnLayout {
   property bool valueAutoCloseOnSuccess: getSetting("autoCloseOnSuccess", true)
   property bool valueShowSuccessAnimation: getSetting("showSuccessAnimation", true)
   property bool valueAutoCloseOnCancel: getSetting("autoCloseOnCancel", true)
+  property bool valueShowDetailsByDefault: getSetting("showDetailsByDefault", false)
   property string valueSuccessAnimationDuration: getSetting("successAnimationDuration", 300).toString()
 
   readonly property var pluginMain: pluginApi?.mainInstance
@@ -76,6 +77,7 @@ ColumnLayout {
       pluginApi.pluginSettings.autoCloseOnSuccess = valueAutoCloseOnSuccess;
       pluginApi.pluginSettings.showSuccessAnimation = valueShowSuccessAnimation;
       pluginApi.pluginSettings.autoCloseOnCancel = valueAutoCloseOnCancel;
+      pluginApi.pluginSettings.showDetailsByDefault = valueShowDetailsByDefault;
       pluginApi.pluginSettings.successAnimationDuration = parseInt(valueSuccessAnimationDuration, 10) || 300;
 
       pluginApi.saveSettings();
@@ -131,6 +133,13 @@ ColumnLayout {
     description: pluginApi?.tr("settings.auto-open-desc") ?? "Show the panel immediately when a request arrives."
     checked: root.valueAutoOpenPanel
     onToggled: checked => root.valueAutoOpenPanel = checked
+  }
+
+  NToggle {
+    label: pluginApi?.tr("settings.show-details") ?? "Show details expander"
+    description: pluginApi?.tr("settings.show-details-desc") ?? "Allow the diagnostics details expander in the auth panel."
+    checked: root.valueShowDetailsByDefault
+    onToggled: checked => root.valueShowDetailsByDefault = checked
   }
 
   NToggle {
