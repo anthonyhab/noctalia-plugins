@@ -15,6 +15,8 @@
     "agent-unavailable": "Polkit agent not reachable",
     "auth-command": "Authentication is required to run this command as the super user.",
     "authenticated": "Authenticated",
+    "timed-out": "Request Timed Out",
+    "timed-out-detail": "This authentication request is no longer valid.",
     "fingerprint-or": "or",
     "fingerprint-hint": "Touch fingerprint sensor"
   },
@@ -36,7 +38,8 @@
     "cancel": "Cancel",
     "close": "Close",
     "show-details": "Show details",
-    "hide-details": "Hide details"
+    "hide-details": "Hide details",
+    "copy-details": "Copy Details"
   },
   "errors": {
     "auth-failed": "Authentication failed",
