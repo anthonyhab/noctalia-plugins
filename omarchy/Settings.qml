@@ -78,7 +78,6 @@ ColumnLayout {
     var trimmedCommand = themeSetCommand.trim();
     if ((settings.themeSetCommand || "") !== trimmedCommand) {
       settings.themeSetCommand = trimmedCommand;
-      refreshNeeded = true;
       changed = true;
     }
 
@@ -158,6 +157,22 @@ ColumnLayout {
     description: pluginApi?.tr("fields.show-search-input.desc") || "Enable fuzzy search for themes in the Omarchy panel."
     checked: root.showSearchInput
     onToggled: checked => root.showSearchInput = checked
+  }
+
+  NToggle {
+    label: pluginApi?.tr("fields.debug-logging.label") || "Enable debug logging"
+    description: pluginApi?.tr("fields.debug-logging.desc") || "Logs extra diagnostics to help troubleshoot theme parsing and scheme application."
+    checked: getSetting("debugLogging", false) === true
+    onToggled: checked => {
+      if (!pluginApi)
+        return;
+      var settings = pluginApi.pluginSettings || {};
+      if (settings.debugLogging === checked)
+        return;
+      settings.debugLogging = checked;
+      pluginApi.pluginSettings = settings;
+      pluginApi.saveSettings();
+    }
   }
 
   NDivider {

@@ -21,6 +21,7 @@
     "allowUserSettings": true,
     "defaultSettings": {
       "active": false,
+      "debugLogging": false,
       "themeSetCommand": "",
       "omarchyConfigDir": "",
       "showThemeName": true,
