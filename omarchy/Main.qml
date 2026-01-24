@@ -11,30 +11,59 @@ import qs.Services.UI
 Item {
   id: root
 
-  visible: false
-
   property var pluginApi: null
+
+  visible: false
 
   property bool available: false
   property bool applying: false
+  property bool pendingApplyAfterCurrent: false
   property string themeName: ""
   property var availableThemes: []
   property bool suppressSettingsSignal: false
   property bool pendingReloadApply: false
+  property bool pendingReloadApplyAvailabilityReady: false
+  property bool pendingReloadApplyThemeReady: false
   property var pendingAlacrittyColors: null
+  property bool ignoreNextPluginSettingsChanged: false
 
-  readonly property var defaultSettings: pluginApi?.manifest?.metadata?.defaultSettings || ({})
+  property bool observedActive: false
+  property string observedConfigDir: ""
+  property string observedThemeSetCommand: ""
+
+  readonly property bool debugLogging: pluginApi?.pluginSettings?.debugLogging === true
+
   readonly property string schemeDisplayName: pluginApi?.manifest?.metadata?.schemeName || "Omarchy"
+  readonly property string schemeKey: {
+    const name = schemeDisplayName || "Omarchy"
+    return name.replace(/[\\/]/g, "-").trim()
+  }
   readonly property string schemeFolder: {
     const baseDir = ColorSchemeService.downloadedSchemesDirectory || (Settings.configDir + "colorschemes");
     const normalizedBase = baseDir.endsWith("/") ? baseDir.slice(0, -1) : baseDir;
-    const pluginId = pluginApi?.pluginId || "omarchy";
-    return normalizedBase + "/" + pluginId;
+    return normalizedBase + "/" + schemeKey;
   }
-  readonly property string schemeOutputPath: schemeFolder + "/" + schemeDisplayName + ".json"
+  readonly property string schemeOutputPath: schemeFolder + "/" + schemeKey + ".json"
   readonly property string schemeOutputDir: schemeFolder
-  readonly property string previousWallpaperKey: "_prevUseWallpaperColors"
-  readonly property string previousSchemeKey: "_prevPredefinedScheme"
+
+  property bool savedPreferencesLoaded: false
+  property bool hasSavedColorPreferences: false
+  property bool savedUseWallpaperColors: false
+  property string savedPredefinedScheme: ""
+  property bool pendingRememberPreferences: false
+  property bool pendingRememberWallpaper: false
+  property string pendingRememberScheme: ""
+  property bool autoAppliedOnStartup: false
+
+  readonly property string colorPreferencesDir: {
+    const baseDir = Settings.configDir || "";
+    if (!baseDir)
+      return ""
+    const normalizedBase = baseDir.endsWith("/") ? baseDir.slice(0, -1) : baseDir;
+    const pluginId = pluginApi?.pluginId || "omarchy";
+    return normalizedBase + "/plugins/" + pluginId;
+  }
+  readonly property string colorPreferencesPath: colorPreferencesDir ? (colorPreferencesDir + "/omarchy-color-preferences.json") : ""
 
   readonly property string omarchyConfigDir: {
     const configured = pluginApi?.pluginSettings?.omarchyConfigDir;
@@ -53,7 +82,6 @@ Item {
 
   readonly property string omarchyConfigPath: omarchyConfigDir + "current/theme/colors.toml"
   readonly property string omarchyHyprlandPath: omarchyConfigDir + "current/theme/hyprland.conf"
-  readonly property string omarchyThemePath: omarchyConfigDir + "current/theme"
   readonly property string omarchyThemeNamePath: omarchyConfigDir + "current/theme.name"
   readonly property string omarchyThemesDir: omarchyConfigDir + "themes"
   readonly property string omarchyPath: {
@@ -61,6 +89,44 @@ Item {
     if (home && home !== "")
       return home + "/.local/share/omarchy";
     return "~/.local/share/omarchy";
+  }
+
+  function normalizeThemeKey(name) {
+    if (!name || typeof name !== "string")
+      return ""
+    return name.replace(/<[^>]+>/g, "").trim().toLowerCase().replace(/\s+/g, "-")
+  }
+
+  function logDebug() {
+    if (!debugLogging)
+      return
+    Logger.d.apply(Logger, ["Omarchy"].concat(Array.prototype.slice.call(arguments)))
+  }
+
+  function setNoctaliaDarkMode(isDarkMode) {
+    if (Settings.data.colorSchemes.darkMode === isDarkMode)
+      return false
+
+    // Prevent ColorSchemeService's onDarkModeChanged handler from re-applying the
+    // previous predefined scheme while we are mid-apply (it triggers template generation).
+    const wasWallpaper = !!Settings.data.colorSchemes.useWallpaperColors
+    Settings.data.colorSchemes.useWallpaperColors = true
+    Settings.data.colorSchemes.darkMode = isDarkMode
+    Settings.data.colorSchemes.useWallpaperColors = wasWallpaper
+    return true
+  }
+
+  function runShell(process, shell, script, args) {
+    if (!process)
+      return false
+    if (!shell || !script)
+      return false
+    var command = [shell, "-c", script]
+    if (args && args.length > 0)
+      command = command.concat(["--"].concat(args))
+    process.command = command
+    process.running = true
+    return true
   }
 
   readonly property string themeSetCommand: {
@@ -98,41 +164,86 @@ Item {
     return settings;
   }
 
+  function loadSavedColorPreferences() {
+    if (savedPreferencesLoaded || stateReadProcess.running)
+      return
+    if (!colorPreferencesPath) {
+      savedPreferencesLoaded = true
+      maybeAutoApply()
+      return
+    }
+    runShell(stateReadProcess, "sh", "cat \"$1\" 2>/dev/null || true", [colorPreferencesPath])
+  }
+
+  function persistColorPreferences(useWallpaperColors, predefinedScheme) {
+    if (!colorPreferencesPath)
+      return
+    const payload = {
+      "useWallpaperColors": !!useWallpaperColors,
+      "predefinedScheme": predefinedScheme || ""
+    }
+    const jsonContent = JSON.stringify(payload, null, 2)
+    const writeCmd = "mkdir -p \"$1\" && cat > \"$2\" << 'OMARCHY_PREFS_EOF'\n" + jsonContent + "\nOMARCHY_PREFS_EOF\n"
+    runShell(stateWriteProcess, "sh", writeCmd, [colorPreferencesDir, colorPreferencesPath])
+  }
+
+  function clearSavedColorPreferences() {
+    if (!colorPreferencesPath)
+      return
+    runShell(stateClearProcess, "sh", "rm -f \"$1\"", [colorPreferencesPath])
+  }
+
   function rememberColorPreferences() {
     if (!pluginApi)
-      return false;
-    var settings = pluginApi.pluginSettings || {};
-    if (settings[previousWallpaperKey] !== undefined)
-      return false;
-    mutatePluginSettings(s => {
-                           s[previousWallpaperKey] = Settings.data.colorSchemes.useWallpaperColors;
-                           s[previousSchemeKey] = Settings.data.colorSchemes.predefinedScheme || "";
-                         });
-    return true;
+      return false
+    if (hasSavedColorPreferences)
+      return false
+
+    const useWallpaper = !!Settings.data.colorSchemes.useWallpaperColors
+    const scheme = Settings.data.colorSchemes.predefinedScheme || ""
+
+    if (!savedPreferencesLoaded) {
+      pendingRememberPreferences = true
+      pendingRememberWallpaper = useWallpaper
+      pendingRememberScheme = scheme
+      loadSavedColorPreferences()
+      return true
+    }
+
+    hasSavedColorPreferences = true
+    savedUseWallpaperColors = useWallpaper
+    savedPredefinedScheme = scheme
+    persistColorPreferences(useWallpaper, scheme)
+    return true
   }
 
   function restoreColorPreferences() {
     if (!pluginApi)
-      return false;
-    var settings = pluginApi.pluginSettings || {};
-    if (settings[previousWallpaperKey] === undefined)
-      return false;
-    var prevWallpaper = settings[previousWallpaperKey];
-    var prevScheme = settings[previousSchemeKey] || "";
-    mutatePluginSettings(s => {
-                           delete s[previousWallpaperKey];
-                           delete s[previousSchemeKey];
-                         });
+      return false
+    if (!hasSavedColorPreferences && !pendingRememberPreferences)
+      return false
 
-    Settings.data.colorSchemes.useWallpaperColors = prevWallpaper;
-    Settings.data.colorSchemes.predefinedScheme = prevScheme || Settings.data.colorSchemes.predefinedScheme;
+    const prevWallpaper = hasSavedColorPreferences ? savedUseWallpaperColors : pendingRememberWallpaper
+    const prevScheme = hasSavedColorPreferences ? savedPredefinedScheme : pendingRememberScheme
+
+    hasSavedColorPreferences = false
+    savedUseWallpaperColors = false
+    savedPredefinedScheme = ""
+    pendingRememberPreferences = false
+    pendingRememberWallpaper = false
+    pendingRememberScheme = ""
+
+    clearSavedColorPreferences()
+
+    Settings.data.colorSchemes.useWallpaperColors = prevWallpaper
+    Settings.data.colorSchemes.predefinedScheme = prevScheme || Settings.data.colorSchemes.predefinedScheme
 
     if (prevWallpaper) {
-      AppThemeService.generate();
+      AppThemeService.generate()
     } else if (Settings.data.colorSchemes.predefinedScheme) {
-      ColorSchemeService.applyScheme(Settings.data.colorSchemes.predefinedScheme);
+      ColorSchemeService.applyScheme(Settings.data.colorSchemes.predefinedScheme)
     }
-    return true;
+    return true
   }
 
   function refresh() {
@@ -141,33 +252,66 @@ Item {
     refreshThemeName();
   }
 
+  function scheduleReloadApply() {
+    pendingReloadApply = true
+    pendingReloadApplyAvailabilityReady = false
+    pendingReloadApplyThemeReady = false
+    refresh()
+  }
+
+  function maybeRunPendingReloadApply() {
+    if (!pendingReloadApply)
+      return
+    if (!pendingReloadApplyAvailabilityReady || !pendingReloadApplyThemeReady)
+      return
+    pendingReloadApply = false
+    if (pluginApi?.pluginSettings?.active)
+      applyCurrentTheme()
+  }
+
+  function maybeAutoApply() {
+    if (autoAppliedOnStartup)
+      return
+    if (!savedPreferencesLoaded)
+      return
+    if (!pluginApi?.pluginSettings?.active)
+      return
+    if (!available)
+      return
+    autoAppliedOnStartup = true
+    Logger.i("Omarchy", "Auto-applying theme on startup")
+    Qt.callLater(applyCurrentTheme)
+  }
+
+  function captureObservedSettings() {
+    const settings = pluginApi?.pluginSettings || ({})
+    observedActive = !!settings.active
+    observedConfigDir = (settings.omarchyConfigDir || "").trim()
+    observedThemeSetCommand = (settings.themeSetCommand || "").trim()
+  }
+
   function checkAvailability() {
     // Check for both colors.toml and theme.name file
-    availabilityProcess.command = ["bash", "-c", "[ -f '" + omarchyConfigPath.replace(/'/g, "'\\''") + "' ] && [ -f '" + omarchyThemeNamePath.replace(/'/g, "'\\''") + "' ]"];
-    availabilityProcess.running = true;
+    runShell(availabilityProcess, "bash", "[ -f \"$1\" ] && [ -f \"$2\" ]", [omarchyConfigPath, omarchyThemeNamePath])
   }
 
   function scanThemes() {
     Logger.i("Omarchy", "Scanning themes using omarchy-theme-list");
 
     // Use omarchy-theme-list and derive light/dark mode from theme files
-    const themesDirEsc = omarchyThemesDir.replace(/'/g, "'\\''");
-    const stockThemesDirEsc = (omarchyPath + "/themes").replace(/'/g, "'\\''");
-    const cmd = "omarchy-theme-list | while IFS= read -r name; do " +
+    const cmd = "themes_dir=\"$1\"; stock_dir=\"$2\"; " +
+                "omarchy-theme-list | while IFS= read -r name; do " +
                 "[ -z \"$name\" ] && continue; " +
                 "theme_dir=$(echo \"$name\" | sed -E 's/<[^>]+>//g' | tr '[:upper:]' '[:lower:]' | tr ' ' '-'); " +
-                "if [ -f '" + themesDirEsc + "/$theme_dir/light.mode' ] || [ -f '" + stockThemesDirEsc + "/$theme_dir/light.mode' ]; then mode=light; else mode=dark; fi; " +
+                "if [ -f \"$themes_dir/$theme_dir/light.mode\" ] || [ -f \"$stock_dir/$theme_dir/light.mode\" ]; then mode=light; else mode=dark; fi; " +
                 "printf '%s|%s\\n' \"$name\" \"$mode\"; " +
                 "done";
-    Logger.d("Omarchy", "Theme scan command:", cmd);
-    themesProcess.command = ["bash", "-c", cmd];
-    themesProcess.running = true;
+    logDebug("Theme scan command:", cmd)
+    runShell(themesProcess, "bash", cmd, [omarchyThemesDir, omarchyPath + "/themes"])
   }
 
   function refreshThemeName() {
-    const themeNamePathEsc = omarchyThemeNamePath.replace(/'/g, "'\\''");
-    themeNameProcess.command = ["sh", "-c", "cat '" + themeNamePathEsc + "' 2>/dev/null || true"];
-    themeNameProcess.running = true;
+    runShell(themeNameProcess, "sh", "cat \"$1\" 2>/dev/null || true", [omarchyThemeNamePath])
   }
 
   function activate() {
@@ -175,6 +319,7 @@ Item {
       return false;
     rememberColorPreferences();
     mutatePluginSettings(s => s.active = true);
+    ignoreNextPluginSettingsChanged = true
     pluginApi.saveSettings();
     return applyCurrentTheme();
   }
@@ -184,6 +329,7 @@ Item {
       return;
     mutatePluginSettings(s => s.active = false);
     restoreColorPreferences();
+    ignoreNextPluginSettingsChanged = true
     pluginApi.saveSettings();
   }
 
@@ -193,22 +339,26 @@ Item {
       return false;
     }
 
-    if (rememberColorPreferences()) {
-      pluginApi.saveSettings();
+    if (applying) {
+      pendingApplyAfterCurrent = true
+      return true
     }
+
+    rememberColorPreferences()
     Settings.data.colorSchemes.useWallpaperColors = false;
 
     applying = true;
 
     const cacheCompatible = SchemeCache.isCompatible(ThemePipeline.PIPELINE_VERSION);
     if (themeName && cacheCompatible) {
-      const cached = SchemeCache.getScheme(themeName);
+      const cacheKey = normalizeThemeKey(themeName)
+      const cached = cacheKey ? SchemeCache.getScheme(cacheKey) : null
       if (cached?.palette && cached?.mode) {
         Logger.i("Omarchy", "Using cached scheme for:", themeName);
         const isDarkMode = cached.mode === "dark";
         if (Settings.data.colorSchemes.darkMode !== isDarkMode) {
           Logger.i("Omarchy", "Auto-switching Noctalia dark mode to:", isDarkMode);
-          Settings.data.colorSchemes.darkMode = isDarkMode;
+          setNoctaliaDarkMode(isDarkMode)
         }
         writeSchemeFile(cached);
         return true;
@@ -233,7 +383,7 @@ Item {
 
   function parseColorsToml(content) {
     Logger.i("Omarchy", "Parsing colors.toml, content length:", content.length);
-    Logger.d("Omarchy", "First 500 chars:", content.slice(0, 500));
+    logDebug("First 500 chars:", content.slice(0, 500))
 
     function extractColorFromLine(line) {
       // Match both formats: color = "#ffffff" and color = "0xffffff"
@@ -247,7 +397,7 @@ Item {
 
     const colors = {};
     const lines = content.split("\n");
-    Logger.d("Omarchy", "Parsing", lines.length, "lines");
+    logDebug("Parsing", lines.length, "lines")
 
     for (var i = 0; i < lines.length; i++) {
       const line = lines[i].trim();
@@ -261,7 +411,7 @@ Item {
         if (keyMatch) {
           const key = keyMatch[1];
           colors[key] = color;
-          Logger.d("Omarchy", "Found", key, ":", color);
+          logDebug("Found", key, ":", color)
         }
       }
     }
@@ -270,11 +420,11 @@ Item {
 
     if (!colors.background) {
       Logger.e("Omarchy", "PARSE FAILED: No background color found");
-      Logger.d("Omarchy", "First 500 chars of content:", content.slice(0, 500));
+      logDebug("First 500 chars of content:", content.slice(0, 500))
     }
     if (!colors.foreground) {
       Logger.e("Omarchy", "PARSE FAILED: No foreground color found");
-      Logger.d("Omarchy", "First 500 chars of content:", content.slice(0, 500));
+      logDebug("First 500 chars of content:", content.slice(0, 500))
     }
 
     if (!colors.background || !colors.foreground)
@@ -304,13 +454,13 @@ Item {
           if (hexMatch) {
             // Take first 6 chars for RGB, ignore alpha if present
             const hex = hexMatch[1].slice(0, 6);
-            Logger.d("Omarchy", "Found Hyprland border color:", "#" + hex);
+            logDebug("Found Hyprland border color:", "#" + hex)
             return "#" + hex.toLowerCase();
           }
         }
       }
     }
-    Logger.d("Omarchy", "No Hyprland border color found, using default");
+    logDebug("No Hyprland border color found, using default")
     return null;
   }
 
@@ -336,13 +486,10 @@ Item {
     };
 
     const jsonContent = JSON.stringify(wrappedScheme, null, 2);
-    Logger.d("Omarchy", "Writing scheme JSON, length:", jsonContent.length);
-    const dirEsc = schemeOutputDir.replace(/'/g, "'\\''");
-    const outPathEsc = schemeOutputPath.replace(/'/g, "'\\''");
-    const writeCmd = "mkdir -p '" + dirEsc + "' && cat > '" + outPathEsc + "' << 'OMARCHY_SCHEME_EOF'\n" + jsonContent + "\nOMARCHY_SCHEME_EOF\n";
-    Logger.d("Omarchy", "Scheme write command:", writeCmd);
-    schemeWriteProcess.command = ["sh", "-c", writeCmd];
-    schemeWriteProcess.running = true;
+    logDebug("Writing scheme JSON, length:", jsonContent.length)
+    const writeCmd = "mkdir -p \"$1\" && cat > \"$2\" << 'OMARCHY_SCHEME_EOF'\n" + jsonContent + "\nOMARCHY_SCHEME_EOF\n";
+    logDebug("Scheme write command:", writeCmd)
+    runShell(schemeWriteProcess, "sh", writeCmd, [schemeOutputDir, schemeOutputPath])
   }
 
   Process {
@@ -350,6 +497,63 @@ Item {
     running: false
     onExited: function (code) {
       available = (code === 0);
+      maybeAutoApply()
+      if (root.pendingReloadApply) {
+        root.pendingReloadApplyAvailabilityReady = true
+        root.maybeRunPendingReloadApply()
+      }
+    }
+  }
+
+  Process {
+    id: stateReadProcess
+    running: false
+    stdout: StdioCollector {}
+    onExited: function (code) {
+      const output = (stdout.text || "").trim()
+      savedPreferencesLoaded = true
+
+      if (output !== "") {
+        try {
+          const parsed = JSON.parse(output)
+          if (parsed && typeof parsed === "object") {
+            hasSavedColorPreferences = true
+            savedUseWallpaperColors = !!parsed.useWallpaperColors
+            savedPredefinedScheme = parsed.predefinedScheme || ""
+            pendingRememberPreferences = false
+          }
+        } catch (e) {
+          Logger.w("Omarchy", "Failed to parse saved color preferences:", String(e))
+        }
+      } else if (pendingRememberPreferences) {
+        hasSavedColorPreferences = true
+        savedUseWallpaperColors = pendingRememberWallpaper
+        savedPredefinedScheme = pendingRememberScheme
+        pendingRememberPreferences = false
+        persistColorPreferences(savedUseWallpaperColors, savedPredefinedScheme)
+      }
+
+      maybeAutoApply()
+    }
+  }
+
+  Process {
+    id: stateWriteProcess
+    running: false
+    onExited: function (code) {
+      if (code !== 0) {
+        Logger.w("Omarchy", "Failed to persist color preferences, exit code:", code)
+      }
+    }
+  }
+
+  Process {
+    id: stateClearProcess
+    running: false
+    onExited: function (code) {
+      if (code !== 0) {
+        Logger.w("Omarchy", "Failed to clear saved color preferences, exit code:", code)
+      }
     }
   }
 
@@ -367,7 +571,7 @@ Item {
       }
 
       const output = stdout.text || "";
-      Logger.d("Omarchy", "Theme scan output length:", output.length);
+      logDebug("Theme scan output length:", output.length)
 
       if (!output) {
         Logger.w("Omarchy", "Theme scan returned empty output");
@@ -387,7 +591,7 @@ Item {
         if (!themeName)
           continue;
         const detectedMode = parts[1]?.trim();
-        const normalizedName = themeName.replace(/<[^>]+>/g, "").trim().toLowerCase().replace(/\s+/g, "-");
+        const normalizedName = normalizeThemeKey(themeName)
         const cachedScheme = SchemeCache.getScheme(normalizedName);
         const mode = cachedScheme?.mode || detectedMode || "dark";
         themeNames.push(themeName);
@@ -412,9 +616,8 @@ Item {
     onExited: function (code) {
       themeName = (stdout.text || "").trim();
       if (root.pendingReloadApply) {
-        root.pendingReloadApply = false;
-        if (pluginApi?.pluginSettings?.active)
-          applyCurrentTheme();
+        root.pendingReloadApplyThemeReady = true
+        root.maybeRunPendingReloadApply()
       }
     }
   }
@@ -427,9 +630,11 @@ Item {
         ToastService.showError("Omarchy", pluginApi?.tr("errors.failed-theme-set") || "Failed to switch theme");
         return;
       }
-      refreshThemeName();
-      if (pluginApi?.pluginSettings?.active)
-        applyCurrentTheme();
+      if (pluginApi?.pluginSettings?.active) {
+        scheduleReloadApply()
+      } else {
+        refreshThemeName()
+      }
     }
   }
 
@@ -448,7 +653,7 @@ Item {
       }
 
       const content = stdout.text || "";
-      Logger.d("Omarchy", "Read", content.length, "bytes from", omarchyConfigPath);
+      logDebug("Read", content.length, "bytes from", omarchyConfigPath)
 
       const parsed = parseColorsToml(content);
       if (!parsed) {
@@ -495,13 +700,13 @@ Item {
 
       Logger.i("Omarchy", "Generating color scheme");
       const schemeResult = ThemePipeline.generateScheme(parsed, ColorsConvert);
-      Logger.d("Omarchy", "Detected mode:", schemeResult.mode);
+      logDebug("Detected mode:", schemeResult.mode)
 
       // Auto-sync dark mode setting
       const isDarkMode = schemeResult.mode === "dark";
       if (Settings.data.colorSchemes.darkMode !== isDarkMode) {
         Logger.i("Omarchy", "Auto-switching Noctalia dark mode to:", isDarkMode);
-        Settings.data.colorSchemes.darkMode = isDarkMode;
+        setNoctaliaDarkMode(isDarkMode)
       }
       writeSchemeFile(schemeResult);
     }
@@ -516,26 +721,20 @@ Item {
       if (code !== 0) {
         Logger.e("Omarchy", "Failed to write scheme file, exit code:", code);
         ToastService.showError("Omarchy", pluginApi?.tr("errors.failed-apply") || "Failed to apply scheme");
+        if (pendingApplyAfterCurrent) {
+          pendingApplyAfterCurrent = false
+          Qt.callLater(applyCurrentTheme)
+        }
         return;
       }
 
       Logger.i("Omarchy", "Scheme file written successfully to:", schemeOutputPath);
-      // Trigger scheme application with a small delay
-      applyDelayTimer.start();
-    }
-  }
+      Settings.data.colorSchemes.useWallpaperColors = false
+      ColorSchemeService.applyScheme(schemeOutputPath)
 
-  Timer {
-    id: applyDelayTimer
-    interval: 100
-    repeat: false
-    onTriggered: {
-      Logger.d("Omarchy", "Applying color scheme after write delay");
-      ColorSchemeService.loadColorSchemes();
-      ColorSchemeService.applyScheme(schemeOutputPath);
-      Settings.data.colorSchemes.useWallpaperColors = false;
-      if (Settings.data.colorSchemes.predefinedScheme !== schemeDisplayName) {
-        Settings.data.colorSchemes.predefinedScheme = schemeDisplayName;
+      if (pendingApplyAfterCurrent) {
+        pendingApplyAfterCurrent = false
+        Qt.callLater(applyCurrentTheme)
       }
     }
   }
@@ -546,10 +745,11 @@ Item {
       return;
 
     let currentIndex = -1;
+    const currentKey = normalizeThemeKey(root.themeName)
     for (let i = 0; i < themes.length; i++) {
       const entry = themes[i];
       const name = typeof entry === "string" ? entry : entry.name;
-      if (name === root.themeName) {
+      if (normalizeThemeKey(name) === currentKey) {
         currentIndex = i;
         break;
       }
@@ -567,9 +767,10 @@ Item {
       return;
 
     // Filter out the currently active theme
+    const currentKey = normalizeThemeKey(root.themeName)
     const otherThemes = themes.filter(theme => {
       const name = typeof theme === "string" ? theme : theme.name;
-      return name !== root.themeName;
+      return normalizeThemeKey(name) !== currentKey
     });
 
     // If no other themes available, can't pick a different one
@@ -586,8 +787,7 @@ Item {
     target: "omarchy"
 
     function reload() {
-      root.pendingReloadApply = true;
-      root.refresh();
+      root.scheduleReloadApply()
     }
 
     function toggle() {
@@ -611,23 +811,86 @@ Item {
     }
   }
 
-  Component.onCompleted: {
-    refresh();
+  IpcHandler {
+    target: "plugin:omarchy"
 
-    // Auto-apply theme if plugin is active on startup
-    if (pluginApi?.pluginSettings?.active && available) {
-      Logger.i("Omarchy", "Auto-applying theme on startup");
-      Qt.callLater(applyCurrentTheme);
+    function reload() {
+      root.scheduleReloadApply()
     }
+
+    function toggle() {
+      if (pluginApi?.pluginSettings?.active) {
+        root.deactivate()
+      } else {
+        root.activate()
+      }
+    }
+
+    function setTheme(themeName: string) {
+      root.setTheme(themeName)
+    }
+
+    function cycleTheme() {
+      root.cycleTheme()
+    }
+
+    function randomTheme() {
+      root.randomTheme()
+    }
+  }
+
+  Component.onCompleted: {
+    loadSavedColorPreferences()
+    refresh();
+    captureObservedSettings()
+    maybeAutoApply()
   }
 
   Connections {
     target: pluginApi
     function onPluginSettingsChanged() {
+      if (root.ignoreNextPluginSettingsChanged) {
+        root.ignoreNextPluginSettingsChanged = false
+        root.captureObservedSettings()
+        return
+      }
       if (root.suppressSettingsSignal)
         return;
-      if (pluginApi?.pluginSettings?.active) {
-        Qt.callLater(applyCurrentTheme);
+
+      const settings = pluginApi?.pluginSettings || ({})
+      const nextActive = !!settings.active
+      const nextConfigDir = (settings.omarchyConfigDir || "").trim()
+      const nextThemeSetCommand = (settings.themeSetCommand || "").trim()
+
+      const activeChanged = nextActive !== root.observedActive
+      const configDirChanged = nextConfigDir !== root.observedConfigDir
+      const themeSetCommandChanged = nextThemeSetCommand !== root.observedThemeSetCommand
+
+      root.observedActive = nextActive
+      root.observedConfigDir = nextConfigDir
+      root.observedThemeSetCommand = nextThemeSetCommand
+
+      if (activeChanged) {
+        if (nextActive) {
+          rememberColorPreferences()
+          root.scheduleReloadApply()
+        } else {
+          restoreColorPreferences()
+        }
+        return
+      }
+
+      if (configDirChanged) {
+        if (nextActive) {
+          root.scheduleReloadApply()
+        } else {
+          root.refresh()
+        }
+        return
+      }
+
+      if (themeSetCommandChanged) {
+        return
       }
     }
   }
