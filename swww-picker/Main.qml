@@ -107,14 +107,20 @@ Item {
 
   // Helper to get transition type (handles random exclusion of 'none')
   function getEffectiveTransition() {
-    if (transitionType !== "random")
-      return transitionType;
-    
     const types = [
-      "simple", "fade", "grow", "center", "outer", 
+      "simple", "fade", "grow", "center", "outer",
       "wipe", "wave", "left", "right", "top", "bottom"
     ];
-    return types[Math.floor(Math.random() * types.length)];
+
+    let selected;
+    if (transitionType === "random") {
+      selected = types[Math.floor(Math.random() * types.length)];
+    } else {
+      selected = transitionType;
+    }
+
+    // Ensure we never return "none" or invalid values
+    return types.includes(selected) ? selected : "grow";
   }
 
   // Set wallpaper with swww
@@ -343,6 +349,25 @@ Item {
           pluginApi?.tr("errors.failed-set") || "Failed to set wallpaper"
         );
       }
+    }
+  }
+
+  IpcHandler {
+    target: "plugin:swww-picker"
+
+    function togglePanel() {
+      if (!pluginApi)
+        return
+
+      pluginApi.withCurrentScreen(screen => {
+        if (pluginApi.panelOpenScreen) {
+          pluginApi.closePanel(pluginApi.panelOpenScreen)
+          return
+        }
+
+        // No sourceItem provided => opens centered on the target screen.
+        pluginApi.openPanel(screen)
+      })
     }
   }
 
