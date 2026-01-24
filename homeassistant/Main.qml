@@ -27,7 +27,12 @@ Item {
   property var currentState: null
   property bool cacheHydrated: false
   property bool settingsReady: false
-  readonly property var stickyAttributeKeys: ["media_title", "media_artist", "media_album_name", "entity_picture", "media_duration", "media_position", "media_position_updated_at", "volume_level", "is_volume_muted", "shuffle", "repeat", "friendly_name"]
+  // Keys we persist to cache for offline/fast startup UI
+  readonly property var cachedAttributeKeys: ["media_title", "media_artist", "media_album_name", "entity_picture", "media_duration", "media_position", "media_position_updated_at", "volume_level", "is_volume_muted", "shuffle", "repeat", "friendly_name"]
+
+  // Keys we allow to "stick" across refreshes when missing.
+  // Keep this list conservative to avoid stale media metadata when a new item doesn't provide all fields.
+  readonly property var mergeStickyAttributeKeys: ["volume_level", "is_volume_muted", "shuffle", "repeat", "friendly_name"]
   property var volumeOverrides: ({})
 
   // Computed properties for current media player
@@ -538,8 +543,8 @@ Item {
     const merged = Object.assign({}, incomingAttributes || {});
     const priorState = previousState && previousState[entityId] ? previousState[entityId] : null;
     const priorAttributes = priorState?.attributes || {};
-    for (let i = 0; i < stickyAttributeKeys.length; i++) {
-      const key = stickyAttributeKeys[i];
+    for (let i = 0; i < mergeStickyAttributeKeys.length; i++) {
+      const key = mergeStickyAttributeKeys[i];
       if (!hasValidAttribute(merged, key) && hasValidAttribute(priorAttributes, key)) {
         merged[key] = priorAttributes[key];
       }
@@ -557,8 +562,8 @@ Item {
     const picked = {};
     if (!attributes)
       return picked;
-    for (let i = 0; i < stickyAttributeKeys.length; i++) {
-      const key = stickyAttributeKeys[i];
+    for (let i = 0; i < cachedAttributeKeys.length; i++) {
+      const key = cachedAttributeKeys[i];
       if (hasValidAttribute(attributes, key)) {
         picked[key] = attributes[key];
       }
