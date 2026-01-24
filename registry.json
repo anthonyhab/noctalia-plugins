@@ -26,13 +26,13 @@
     {
       "id": "polkit-auth",
       "name": "Polkit Authentication",
-      "version": "0.1.1",
+      "version": "0.2.0",
       "author": "habibe",
       "description": "Use Noctalia panels as your Polkit authentication agent.",
       "repository": "https://github.com/anthonyhab/noctalia-plugins/",
       "minNoctaliaVersion": "3.6.0",
       "license": "MIT",
-      "lastUpdated": "2026-01-16T12:00:00Z"
+      "lastUpdated": "2026-01-18T12:00:00Z"
     },
     {
       "id": "swww-picker",
