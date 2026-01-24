@@ -15,7 +15,7 @@
     {
       "id": "omarchy",
       "name": "Omarchy Integration",
-      "version": "0.2.2",
+      "version": "0.3.0",
       "author": "habibe",
       "description": "Sync Noctalia colors from Omarchy themes.",
       "repository": "https://github.com/anthonyhab/noctalia-plugins/",
