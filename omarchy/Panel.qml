@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
+import Qt5Compat.GraphicalEffects
 import qs.Commons
 import qs.Services.UI
 import qs.Widgets
@@ -376,7 +377,10 @@ Item {
               RowLayout {
                 id: rowLayout
                 anchors.fill: parent
-                anchors.margins: Style.marginS
+                anchors.leftMargin: Style.marginM
+                anchors.rightMargin: Style.marginS
+                anchors.topMargin: Style.marginS
+                anchors.bottomMargin: Style.marginS
                 spacing: Style.marginM
 
                 NText {
@@ -407,13 +411,22 @@ Item {
                   }
                 }
 
-                NText {
+                Rectangle {
                   Layout.alignment: Qt.AlignVCenter
-                  visible: entry.selected
-                  text: "⏎"
-                  pointSize: Style.fontSizeM
-                  font.weight: Style.fontWeightBold
-                  color: Color.mOnSurfaceVariant
+                  opacity: entry.selected ? 1 : 0
+                  width: Style.fontSizeM * 1.8
+                  height: Style.fontSizeM * 1.8
+                  radius: Style.radiusS
+                  color: Color.mSurfaceVariant
+                  border.width: Style.borderS
+                  border.color: Color.mOnSurfaceVariant
+
+                  NIcon {
+                    anchors.centerIn: parent
+                    icon: "corner-down-left"
+                    pointSize: Style.fontSizeS
+                    color: Color.mOnSurfaceVariant
+                  }
                 }
               }
 
