@@ -2,6 +2,10 @@
 theme-cache.json
 node_modules/
 
+# Local runtime settings
+settings.json
+omarchy-color-preferences.json
+
 # Test files
 test-*.js
 *-test.js
