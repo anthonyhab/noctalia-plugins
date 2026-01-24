@@ -1,7 +1,7 @@
 {
   "id": "polkit-auth",
   "name": "Polkit Authentication",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "minNoctaliaVersion": "3.6.0",
   "author": "habibe",
   "license": "MIT",
@@ -15,14 +15,9 @@
   "dependencies": { "plugins": [] },
   "metadata": {
     "defaultSettings": {
-      "pollInterval": 100,
       "settingsPanelMode": "centered",
-      "syncPanelModeWithShell": false,
-      "autoOpenPanel": true,
-      "autoCloseOnSuccess": true,
-      "showSuccessAnimation": true,
-      "autoCloseOnCancel": true,
-      "successAnimationDuration": 300
+      "showDetailsByDefault": false,
+      "closeInstantly": false
     }
   }
 }
