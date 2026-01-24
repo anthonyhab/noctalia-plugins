@@ -23,15 +23,15 @@ Item {
   readonly property bool panelAnchorLeft: attachToBar && barPosition === "left"
   readonly property bool panelAnchorRight: attachToBar && barPosition === "right"
 
-  readonly property int contentPreferredWidth: Math.round(400 * Style.uiScaleRatio)
+  readonly property int contentPreferredWidth: Math.round(360 * Style.uiScaleRatio)
   readonly property int contentPreferredHeight: authContent.implicitHeight
 
   AuthContent {
     id: authContent
     anchors.fill: parent
     pluginMain: root.pluginMain
-    incomingRequest: pluginMain?.currentRequest ?? null
-    busy: pluginMain?.responseInFlight ?? false
+    incomingSession: pluginMain?.currentSession ?? null
+    busy: (pluginMain?.sessionState ?? "idle") === "verifying"
     agentAvailable: pluginMain?.agentAvailable ?? true
     statusText: pluginMain?.agentStatus ?? ""
     errorText: pluginMain?.lastError ?? ""
