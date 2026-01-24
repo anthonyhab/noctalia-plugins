@@ -198,45 +198,56 @@ Item {
         spacing: Style.marginS
 
         // App Icon Container (Left - Squircle)
-        Item {
+        NBox {
             Layout.alignment: Qt.AlignVCenter
-            Layout.preferredWidth: 40 * Style.uiScaleRatio
-            Layout.preferredHeight: 40 * Style.uiScaleRatio
+            Layout.preferredWidth: 44 * Style.uiScaleRatio
+            Layout.preferredHeight: 44 * Style.uiScaleRatio
 
-            FallbackIcon {
-                anchors.fill: parent
-                isDark: flowRoot.isDark
-                letter: {
-                    if (requestor && requestor.fallbackLetter)
-                        return requestor.fallbackLetter;
+            radius: Style.radiusM
+            color: Color.mSurfaceVariant
+            border.color: flowRoot.activeColor
+            border.width: 1.5 * Style.uiScaleRatio
 
-                    if (safeLabel)
-                        return safeLabel.charAt(0);
+            // Removed obnoxious accent glow
 
-                    return "?";
-                }
-                key: {
-                    if (requestor && requestor.fallbackKey)
-                        return requestor.fallbackKey;
-
-                    if (safeLabel)
-                        return safeLabel.toLowerCase();
-
-                    return "unknown";
-                }
-                showLetter: !hasRequestorIcon
-                radius: Style.radiusL
-            }
-
-            NImageRounded {
+            Item {
                 anchors.fill: parent
                 anchors.margins: 6 * Style.uiScaleRatio
-                radius: Style.radiusM
-                visible: hasRequestorIcon
-                imagePath: requestorIconPath
-                imageFillMode: Image.PreserveAspectFit
-            }
+                
+                FallbackIcon {
+                    anchors.fill: parent
+                    visible: !hasRequestorIcon
+                    isDark: flowRoot.isDark
+                    letter: {
+                        if (requestor && requestor.fallbackLetter)
+                            return requestor.fallbackLetter;
 
+                        if (safeLabel)
+                            return safeLabel.charAt(0);
+
+                        return "?";
+                    }
+                    key: {
+                        if (requestor && requestor.fallbackKey)
+                            return requestor.fallbackKey;
+
+                        if (safeLabel)
+                            return safeLabel.toLowerCase();
+
+                        return "unknown";
+                    }
+                    showLetter: true
+                    radius: Style.radiusS
+                }
+
+                NImageRounded {
+                    anchors.fill: parent
+                    radius: Style.radiusS
+                    visible: hasRequestorIcon
+                    imagePath: requestorIconPath
+                    imageFillMode: Image.PreserveAspectFit
+                }
+            }
         }
 
         // Bitstream Connection
