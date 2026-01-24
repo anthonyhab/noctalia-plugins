@@ -49,6 +49,7 @@ Item {
   onVisibleChanged: {
     if (visible) {
       searchQuery = "";
+      selectedThemeIndex = -1
       if (searchInput) {
         searchInput.text = "";
         if (showSearchInput) {
@@ -60,6 +61,59 @@ Item {
 
   property string themeFilter: "all"
   property string searchQuery: ""
+  property int selectedThemeIndex: -1
+
+  readonly property bool selectionEnabled: showSearchInput
+                                         && searchInput
+                                         && searchInput.activeFocus
+                                         && filteredThemes
+                                         && filteredThemes.length > 0
+                                         && searchQuery.trim() !== ""
+
+  function clampSelection() {
+    if (!filteredThemes || filteredThemes.length === 0) {
+      selectedThemeIndex = -1
+      return
+    }
+
+    if (selectedThemeIndex < 0 || selectedThemeIndex >= filteredThemes.length) {
+      selectedThemeIndex = 0
+    }
+  }
+
+  function moveSelection(delta) {
+    if (!filteredThemes || filteredThemes.length === 0)
+      return
+
+    clampSelection()
+
+    const count = filteredThemes.length
+    selectedThemeIndex = (selectedThemeIndex + delta + count) % count
+  }
+
+  function selectedThemeName() {
+    if (!filteredThemes || filteredThemes.length === 0)
+      return ""
+
+    clampSelection()
+
+    const selected = filteredThemes[selectedThemeIndex]
+    return typeof selected === "string" ? selected : selected.name
+  }
+
+  function applySelectedTheme() {
+    if (!selectionEnabled)
+      return
+
+    const name = selectedThemeName()
+    if (!name)
+      return
+
+    pluginMain?.setTheme(name)
+    if (pluginApi) {
+      pluginApi.closePanel(root.screen)
+    }
+  }
 
   readonly property string themeFilterLabel: themeFilter === "dark"
                                           ? trOrDefault("filters.dark", "Dark")
@@ -88,6 +142,8 @@ Item {
 
     return filtered;
   }
+
+  onFilteredThemesChanged: clampSelection()
 
   function preferredThemeFilter() {
     const hour = new Date().getHours();
@@ -221,6 +277,33 @@ Item {
           onTextChanged: {
             if (searchQuery !== text)
               searchQuery = text
+
+            if (text.trim() === "") {
+              selectedThemeIndex = -1
+            } else {
+              selectedThemeIndex = 0
+            }
+          }
+
+          onAccepted: {
+            applySelectedTheme()
+          }
+
+          Keys.onPressed: function(event) {
+            if (!selectionEnabled)
+              return
+
+            if (event.key === Qt.Key_Down || event.key === Qt.Key_Tab) {
+              moveSelection(1)
+              event.accepted = true
+              return
+            }
+
+            if (event.key === Qt.Key_Up || event.key === Qt.Key_Backtab) {
+              moveSelection(-1)
+              event.accepted = true
+              return
+            }
           }
 
           NText {
@@ -280,13 +363,15 @@ Item {
               readonly property var themeColors: typeof theme === 'object' ? theme.colors : []
               readonly property bool isCurrentTheme: themeName === pluginMain?.themeName
               readonly property bool hovered: hoverArea.containsMouse
+              readonly property bool selected: root.selectionEnabled && root.selectedThemeIndex === entry.index
+              readonly property bool highlighted: hovered || selected
 
               Layout.fillWidth: true
               implicitHeight: rowLayout.implicitHeight + (Style.marginS * 2)
               radius: Style.radiusM
-              color: isCurrentTheme ? Qt.rgba(Color.mPrimary.r, Color.mPrimary.g, Color.mPrimary.b, 0.08) : (hovered ? Qt.rgba(Color.mPrimary.r, Color.mPrimary.g, Color.mPrimary.b, 0.05) : Color.mSurface)
+              color: isCurrentTheme ? Qt.rgba(Color.mPrimary.r, Color.mPrimary.g, Color.mPrimary.b, 0.08) : (highlighted ? Qt.rgba(Color.mPrimary.r, Color.mPrimary.g, Color.mPrimary.b, 0.05) : Color.mSurface)
               border.width: Style.borderS
-              border.color: isCurrentTheme ? Color.mPrimary : (hovered ? Color.mPrimary : Color.mOutline)
+              border.color: isCurrentTheme ? Color.mPrimary : (highlighted ? Color.mPrimary : Color.mOutline)
 
               RowLayout {
                 id: rowLayout
@@ -321,12 +406,26 @@ Item {
                     }
                   }
                 }
+
+                NText {
+                  Layout.alignment: Qt.AlignVCenter
+                  visible: entry.selected
+                  text: "⏎"
+                  pointSize: Style.fontSizeM
+                  font.weight: Style.fontWeightBold
+                  color: Color.mOnSurfaceVariant
+                }
               }
 
               MouseArea {
                 id: hoverArea
                 anchors.fill: parent
                 hoverEnabled: true
+                onEntered: {
+                  if (root.selectionEnabled) {
+                    root.selectedThemeIndex = entry.index
+                  }
+                }
                 onClicked: {
                   pluginMain?.setTheme(entry.themeName);
                   if (pluginApi) {
