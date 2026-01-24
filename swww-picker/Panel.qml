@@ -1,5 +1,6 @@
 import QtQuick
 import QtQuick.Controls
+import QtQuick.Effects
 import QtQuick.Layouts
 import qs.Commons
 import qs.Modules.Panels.Settings
@@ -180,13 +181,15 @@ Item {
           Repeater {
             model: wallpapers
 
-            delegate: Rectangle {
+            delegate: Item {
               id: thumbDelegate
               required property string modelData
               required property int index
 
               readonly property bool isCurrent: modelData === currentWallpaper
               readonly property bool hovered: thumbMouse.containsMouse
+              readonly property real borderWidth: isCurrent ? 2 : Style.borderS
+              readonly property color borderColor: isCurrent ? Color.mPrimary : (hovered ? Color.mPrimary : Color.mOutline)
               readonly property string fileName: {
                 const parts = modelData.split("/");
                 return parts[parts.length - 1] || "";
@@ -198,61 +201,87 @@ Item {
               width: thumbWidth
               height: thumbHeight
 
-              radius: Style.radiusM
+              Rectangle {
+                anchors.fill: parent
+                radius: Style.radiusM
+                color: Color.mSurfaceVariant
+                antialiasing: true
 
-              color: isCurrent
-                ? Qt.rgba(Color.mPrimary.r, Color.mPrimary.g, Color.mPrimary.b, 0.15)
-                : (hovered ? Qt.rgba(Color.mPrimary.r, Color.mPrimary.g, Color.mPrimary.b, 0.08) : Color.mSurface)
-              border.width: isCurrent ? 2 : Style.borderS
-              border.color: isCurrent ? Color.mPrimary : (hovered ? Color.mPrimary : Color.mOutline)
+                // Rounded clip for the thumbnail content (avoids rectangular `clip: true` edges).
+                Item {
+                  anchors.fill: parent
+                  layer.enabled: true
+                  layer.smooth: true
+                  layer.samples: 4
+                  layer.effect: MultiEffect {
+                    maskEnabled: true
+                    maskThresholdMin: 0.95
+                    maskSpreadAtMin: 0.04
+                    maskSource: ShaderEffectSource {
+                      sourceItem: Rectangle {
+                        width: thumbDelegate.width
+                        height: thumbDelegate.height
+                        radius: Style.radiusM
+                        color: "white"
+                        antialiasing: true
+                      }
+                    }
+                  }
 
-              Behavior on color {
-                ColorAnimation { duration: 140 }
+                  Image {
+                    id: thumbImage
+                    anchors.fill: parent
+                    source: "file://" + modelData
+                    fillMode: Image.PreserveAspectCrop
+                    asynchronous: true
+                    smooth: true
+                    sourceSize.width: 400 * Style.uiScaleRatio
+                    sourceSize.height: 240 * Style.uiScaleRatio
+                    visible: status === Image.Ready
+                  }
+
+                  Rectangle {
+                    anchors.fill: parent
+                    color: Color.mSurfaceVariant
+                    visible: thumbImage.status !== Image.Ready
+                    antialiasing: true
+                  }
+
+                  Rectangle {
+                    anchors.left: parent.left
+                    anchors.right: parent.right
+                    anchors.bottom: parent.bottom
+                    height: Math.round(24 * Style.uiScaleRatio)
+                    visible: hovered
+                    z: 2
+                    color: "transparent"
+
+                    gradient: Gradient {
+                      GradientStop { position: 0.0; color: Qt.rgba(0, 0, 0, 0) }
+                      GradientStop { position: 1.0; color: Qt.rgba(0, 0, 0, 0.55) }
+                    }
+
+                    NText {
+                      anchors.fill: parent
+                      anchors.margins: Style.marginS
+                      text: fileName
+                      pointSize: Style.fontSizeS
+                      color: Qt.rgba(1, 1, 1, 0.92)
+                      elide: Text.ElideMiddle
+                      horizontalAlignment: Text.AlignHCenter
+                      verticalAlignment: Text.AlignVCenter
+                    }
+                  }
+                }
               }
 
               Rectangle {
                 anchors.fill: parent
-                anchors.margins: Style.borderS
-                radius: Style.radiusM - Style.borderS
-                color: Color.mSurfaceVariant
-                clip: true
-
-                Image {
-                  id: thumbImage
-                  anchors.fill: parent
-                  source: "file://" + modelData
-                  fillMode: Image.PreserveAspectCrop
-                  asynchronous: true
-                  sourceSize.width: 400 * Style.uiScaleRatio
-                  sourceSize.height: 240 * Style.uiScaleRatio
-                  visible: status === Image.Ready
-                }
-
-                Rectangle {
-                  anchors.fill: parent
-                  color: Color.mSurfaceVariant
-                  visible: thumbImage.status !== Image.Ready
-                }
-
-                Rectangle {
-                  anchors.left: parent.left
-                  anchors.right: parent.right
-                  anchors.bottom: parent.bottom
-                  height: Math.round(24 * Style.uiScaleRatio)
-                  color: Qt.rgba(0, 0, 0, hovered ? 0.55 : 0)
-                  visible: hovered
-                  radius: Style.radiusM
-                  clip: true
-
-                  NText {
-                    anchors.fill: parent
-                    anchors.margins: Style.marginS
-                    text: fileName
-                    pointSize: Style.fontSizeS
-                    color: Qt.rgba(1, 1, 1, 0.92)
-                    elide: Text.ElideRight
-                  }
-                }
+                radius: Style.radiusM
+                color: "transparent"
+                border.width: thumbDelegate.borderWidth
+                border.color: thumbDelegate.borderColor
+                antialiasing: true
               }
 
               MouseArea {
@@ -262,25 +291,6 @@ Item {
                 cursorShape: Qt.PointingHandCursor
                 onClicked: {
                   pluginMain?.setWallpaper(modelData);
-                }
-              }
-
-              // Current indicator
-              Rectangle {
-                anchors.right: parent.right
-                anchors.bottom: parent.bottom
-                anchors.margins: 4
-                width: 14
-                height: 14
-                radius: 7
-                color: Color.mPrimary
-                visible: isCurrent
-
-                NIcon {
-                  anchors.centerIn: parent
-                  icon: "check"
-                  pointSize: 8
-                  color: Color.mOnPrimary
                 }
               }
 
