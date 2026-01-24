@@ -1,5 +1,6 @@
 import QtQuick
 import QtQuick.Controls
+import QtQuick.Effects
 import QtQuick.Layouts
 import qs.Commons
 import qs.Services.UI
@@ -151,24 +152,46 @@ Item {
         anchors.margins: Style.marginM
         spacing: Style.marginM
 
-        // Album Art
-        NBox {
-          Layout.fillWidth: true
-          Layout.preferredHeight: width * 0.56 // 16:9 like
-          Layout.maximumHeight: 200 * Style.uiScaleRatio
-          visible: entityPicture !== "" && !albumArtFailed
-          color: Color.mSurface
-          radius: Style.radiusM
-          clip: true
-          Image {
-            anchors.fill: parent
-            source: entityPicture
-            fillMode: Image.PreserveAspectCrop
-            asynchronous: true
-            visible: status === Image.Ready
-            onStatusChanged: if (status === Image.Error) albumArtFailed = true;
-          }
-        }
+	        // Album Art
+	        NBox {
+	          id: albumArtBox
+	          Layout.fillWidth: true
+	          Layout.preferredHeight: width * 0.56 // 16:9 like
+	          Layout.maximumHeight: 200 * Style.uiScaleRatio
+	          visible: entityPicture !== "" && !albumArtFailed
+	          color: Color.mSurface
+	          radius: Style.radiusM
+
+	          // Rounded clip for the album art (avoids rectangular `clip: true` edges).
+	          Item {
+	            anchors.fill: parent
+	            layer.enabled: true
+	            layer.smooth: true
+	            layer.effect: MultiEffect {
+	              maskEnabled: true
+	              maskThresholdMin: 0.95
+	              maskSpreadAtMin: 0.15
+	              maskSource: ShaderEffectSource {
+	                sourceItem: Rectangle {
+	                  width: albumArtBox.width
+	                  height: albumArtBox.height
+	                  radius: albumArtBox.radius
+	                  color: "white"
+	                }
+	              }
+	            }
+
+	            Image {
+	              anchors.fill: parent
+	              source: entityPicture
+	              fillMode: Image.PreserveAspectCrop
+	              asynchronous: true
+	              smooth: true
+	              visible: status === Image.Ready
+	              onStatusChanged: if (status === Image.Error) albumArtFailed = true
+	            }
+	          }
+	        }
 
         // Metadata
         ColumnLayout {
@@ -414,7 +437,10 @@ Item {
               id: devicePopup
               y: deviceButton.height + Style.marginS
               width: deviceButton.width
-              implicitHeight: Math.min(Style.capsuleHeight * 5, deviceListView.contentHeight + (Style.marginM * 2))
+              implicitHeight: Math.min(
+                Style.capsuleHeight * 5,
+                deviceListView.contentHeight + devicePopup.topPadding + devicePopup.bottomPadding
+              )
               padding: Style.marginS
 
               background: NBox {
