@@ -11,21 +11,7 @@ Item {
 
   // Settings getter with fallback to manifest defaults and error handling
   function getSetting(key, fallback) {
-    // Check if plugin API is available
-    if (!pluginApi) {
-      Logger.w("PolkitAuth", "Plugin API not available for settings access - using manifest defaults");
-      const defaultVal = pluginApi?.manifest?.metadata?.defaultSettings?.[key];
-      return defaultVal !== undefined ? defaultVal : fallback;
-    }
-
-    // Check if plugin settings are available
-    if (!pluginApi.pluginSettings) {
-      Logger.w("PolkitAuth", "Plugin settings not available - using manifest defaults");
-      const defaultVal = pluginApi?.manifest?.metadata?.defaultSettings?.[key];
-      return defaultVal !== undefined ? defaultVal : fallback;
-    }
-
-    // Original logic with additional safety checks
+    if (!pluginApi) return fallback;
     try {
       const userVal = pluginApi?.pluginSettings?.[key];
       if (userVal !== undefined && userVal !== null) return userVal;
@@ -38,64 +24,50 @@ Item {
     }
   }
 
-  readonly property int pollInterval: getSetting("pollInterval", 100)
-  readonly property bool autoOpenPanel: getSetting("autoOpenPanel", true)
-  readonly property bool autoCloseOnSuccess: getSetting("autoCloseOnSuccess", true)
-  readonly property bool autoCloseOnCancel: getSetting("autoCloseOnCancel", true)
-  readonly property bool showSuccessAnimation: getSetting("showSuccessAnimation", true)
-  readonly property string settingsPanelModeSaved: getSetting("settingsPanelMode", "centered")
-  readonly property bool syncPanelModeWithShell: getSetting("syncPanelModeWithShell", false)
-  readonly property string settingsPanelMode: syncPanelModeWithShell ? Settings.data.ui.settingsPanelMode : settingsPanelModeSaved
-  readonly property int successAnimationDuration: getSetting("successAnimationDuration", 300)
+  readonly property bool autoOpenPanel: true
+  readonly property bool autoCloseOnSuccess: true
+  readonly property bool autoCloseOnCancel: true
+  readonly property bool showSuccessAnimation: true
+  readonly property string settingsPanelMode: getSetting("settingsPanelMode", "centered")
+  readonly property bool showDetailsByDefault: getSetting("showDetailsByDefault", false)
+  readonly property bool closeInstantly: getSetting("closeInstantly", false)
+  readonly property int successAnimationDuration: closeInstantly ? 0 : 300
 
   readonly property string socketPath: {
     const runtimeDir = Quickshell.env("XDG_RUNTIME_DIR");
     return runtimeDir && runtimeDir.length > 0
-      ? (runtimeDir + "/noctalia-polkit-agent.sock")
+      ? (runtimeDir + "/noctalia-auth.sock")
       : "";
   }
 
-  // Debug information about plugin loading
-  readonly property string debugInfo: {
-    const apiStatus = pluginApi ? "Available" : "Not available";
-    const settingsStatus = pluginApi?.pluginSettings ? "Available" : "Not available";
-    const manifestId = pluginApi?.manifest?.id || "Unknown";
-    return "API: " + apiStatus + ", Settings: " + settingsStatus + ", Manifest ID: " + manifestId;
-  }
-
   property bool agentAvailable: false
+  property string agentVersion: "1.0"
   property string agentStatus: ""
   property string lastError: ""
 
-  property var currentRequest: null
-  property var requestQueue: []
-  property bool requestInFlight: false
-  property bool responseInFlight: false
-  property string pendingPassword: ""
-  property var socketQueue: []
-  property var pendingSocketRequest: null
-  property bool socketBusy: false
-  property bool socketResponseReceived: false
-  property string closeRequestedId: ""
+  // === STATE MACHINE ===
+  property string sessionState: "idle"
+  property string closeReason: ""
+  property var currentSession: null
+  property string currentSessionId: ""
+  property var sessionQueue: []
+  property bool sessionInFlight: false
+  property int retryCount: 0
+  property int reconnectDelay: 0
+  readonly property int maxReconnectDelay: 3000
+  property bool subscribed: false
+  property bool userRequestedClose: false
+  property bool isClosingUI: false
 
-  signal requestReceived()
-  signal requestCompleted(bool success)
+  signal sessionReceived()
+  signal sessionCompleted(bool success)
+  signal sessionRetry()
+
+  function clearError() {
+    lastError = ""
+  }
 
   function refresh() {
-    // Log debug information about plugin loading status
-    Logger.i("PolkitAuth", "Plugin refresh - " + debugInfo);
-    
-    // Check if we're running with composite key vs plain ID
-    if (pluginApi?.manifest?.id) {
-      const manifestId = pluginApi.manifest.id;
-      const expectedCompositePattern = /^[a-f0-9]{6}:.*$/;
-      if (expectedCompositePattern.test(manifestId)) {
-        Logger.d("PolkitAuth", "Running with composite key: " + manifestId);
-      } else {
-        Logger.d("PolkitAuth", "Running with plain ID: " + manifestId);
-      }
-    }
-    
     checkAgent();
   }
 
@@ -106,127 +78,235 @@ Item {
       return;
     }
 
-    enqueueSocketCommand({ type: "ping" }, function(ok, response) {
-      if (ok && response?.type === "pong") {
+    if (!agentSocket.connected) {
+      agentSocket.connected = true;
+    }
+  }
+
+  function sendCommand(message) {
+    if (!agentSocket.connected) {
+      Logger.w("PolkitAuth", "Cannot send command - not connected");
+      return false;
+    }
+    const data = JSON.stringify(message) + "\n";
+    agentSocket.write(data);
+    agentSocket.flush();
+    return true;
+  }
+
+  function handleMessage(response) {
+    if (!response) return;
+
+    switch (response.type) {
+      case "subscribed":
+        Logger.d("PolkitAuth", "Subscribed, active sessions: " + response.sessionCount);
+        subscribed = true;
         agentAvailable = true;
-        agentStatus = "";
+        reconnectDelay = 0;
+        break;
+
+      case "pong":
+        agentAvailable = true;
+        if (response.version) agentVersion = response.version;
+        break;
+
+      case "session.created":
+        handleSessionCreated(response);
+        break;
+
+      case "session.updated":
+        handleSessionUpdated(response);
+        break;
+
+      case "session.closed":
+        handleSessionClosed(response);
+        break;
+
+      case "ok":
+        break;
+
+      case "error":
+        Logger.e("PolkitAuth", "Agent error: " + response.message);
+        break;
+
+      default:
+        Logger.w("PolkitAuth", "Unknown message type: " + response.type);
+    }
+  }
+
+  function handleSessionCreated(event) {
+    Logger.d("PolkitAuth", "Session created: " + event.id + " source: " + event.source);
+
+    var session = {
+      id: event.id,
+      source: event.source,
+      message: event.context.message || "",
+      actionId: event.context.actionId || "",
+      user: event.context.user || "",
+      requestor: event.context.requestor || {},
+      description: event.context.description || "",
+      curRetry: event.context.curRetry || 0,
+      maxRetries: event.context.maxRetries || 3,
+      confirmOnly: event.context.confirmOnly || false,
+      prompt: "",
+      echo: true
+    };
+
+    if (currentSession) {
+      sessionQueue.push(session);
+      Logger.d("PolkitAuth", "Queued session, queue length: " + sessionQueue.length);
+    } else {
+      activateSession(session);
+    }
+  }
+
+  function handleSessionUpdated(event) {
+    if (!currentSession || currentSession.id !== event.id) {
+      Logger.w("PolkitAuth", "Update for unknown session: " + event.id);
+      return;
+    }
+
+    if (event.prompt) {
+      currentSession.prompt = event.prompt;
+      currentSession.echo = event.echo !== undefined ? event.echo : true;
+    }
+
+    if (event.error) {
+      lastError = event.error;
+      sessionState = "prompting";
+      retryCount++;
+      sessionRetry();
+      Logger.d("PolkitAuth", "Retry #" + retryCount + ": " + event.error);
+    } else if (sessionState === "verifying") {
+      sessionState = "prompting";
+    }
+
+    currentSessionChanged();
+  }
+
+  function handleSessionClosed(event) {
+    if (!currentSession || currentSession.id !== event.id) {
+      Logger.w("PolkitAuth", "Close for unknown session: " + event.id);
+      return;
+    }
+
+    const result = (event.result || "").toString()
+    const wasSuccess = result === "success"
+    const wasCancelled = result === "cancelled" || result === "canceled"
+
+    Logger.d("PolkitAuth", "Session closed: " + result);
+
+    if (wasSuccess) {
+      sessionState = "success";
+      closeReason = "success";
+    } else {
+      closeReason = wasCancelled ? "cancelled" : "error";
+      if (wasCancelled) {
+        lastError = "Cancelled";
+      } else if (event.error) {
+        lastError = event.error;
       } else {
-        agentAvailable = false;
-        agentStatus = pluginApi?.tr("status.agent-unavailable") ?? "Polkit agent not reachable";
+        lastError = pluginApi?.tr("errors.auth-failed") ?? "Authentication failed";
       }
-    });
-  }
-
-  function pollRequests() {
-    if (!agentAvailable)
-      return;
-
-    if (requestInFlight) {
-      pollRetryTimer.restart();
-      return;
     }
 
-    requestInFlight = true;
-    enqueueSocketCommand({ type: "next" }, function(ok, response) {
-      requestInFlight = false;
+    sessionCompleted(wasSuccess);
 
-      if (!ok) {
-        pollRetryTimer.restart();
-        return;
+    if (wasSuccess) {
+      if (!autoCloseOnSuccess) return
+      if (closeInstantly) {
+        transitionToIdle("success");
+      } else if (showSuccessAnimation) {
+        successTimer.restart()
+      } else {
+        transitionToIdle("success")
       }
+      return
+    }
 
-      if (!response || response.type === "empty") {
-        return;
-      }
+    // Session is closed and won't accept further input. If the agent immediately creates a new
+    // session (common for retries), switch to it without closing the UI to avoid flicker.
+    currentSession = null
+    currentSessionId = ""
 
-      if (response.type === "request") {
-        enqueueRequest(response);
-        Qt.callLater(pollImmediately);
-      } else if (response.type === "update") {
-        if (response.error) {
-          lastError = response.error;
-        }
-        if (response.id && currentRequest && currentRequest.id === response.id) {
-          if (response.prompt) {
-            currentRequest = Object.assign({}, currentRequest, { prompt: response.prompt });
-          }
-        }
-        Qt.callLater(pollImmediately);
-      } else       if (response.type === "complete") {
-        console.log("Main: Request complete RAW response: " + JSON.stringify(response));
-        const isSuccess = response.result === "success";
-        const isCancelled = response.result === "cancelled";
-        handleRequestComplete(response.id, isSuccess, isCancelled);
-        Qt.callLater(pollImmediately);
-      }
-    });
-  }
+    if (sessionQueue.length > 0) {
+      advanceSessionQueue()
+      return
+    }
 
-  function pollImmediately() {
-    if (agentAvailable && !requestInFlight) {
-      pollRequests();
+    sessionState = "idle"
+
+    if (wasCancelled && autoCloseOnCancel) {
+      transitionToIdle("cancelled")
     }
   }
 
-  function clearStaleState() {
-    if (currentRequest && !responseInFlight) {
-      currentRequest = null;
-      requestQueue = [];
-      lastError = "";
-    }
-  }
+  function activateSession(session) {
+    closeReason = "";
+    currentSession = session;
+    currentSessionId = session.id;
+    sessionState = "prompting";
+    successTimer.stop()
 
-  function enqueueRequest(request) {
-    if (!request || !request.id)
-      return;
-
-    const isDuplicate = requestQueue.some(r => r.id === request.id) ||
-                        (currentRequest && currentRequest.id === request.id);
-    if (isDuplicate) {
-      if (currentRequest && currentRequest.id === request.id) {
-        currentRequest = request;
-      }
-      return;
-    }
-
-    requestQueue = requestQueue.concat([request]);
-    requestReceived();
-
-    if (!currentRequest)
-      advanceQueue();
-  }
-
-  function advanceQueue() {
-    if (requestQueue.length === 0) {
-      currentRequest = null;
-      return;
-    }
-
-    const nextRequest = requestQueue[0];
-    requestQueue = requestQueue.slice(1);
-    lastError = "";
-    currentRequest = nextRequest;
-
-    if (autoOpenPanel && currentRequest) {
+    const isRetry = (session.curRetry || 0) > 0
+    if (!isRetry) lastError = "";
+    retryCount = 0;
+    sessionReceived();
+    
+    if (autoOpenPanel) {
       openPanelTimer.restart();
     }
   }
 
-  function openAuthUI() {
-    if (!currentRequest)
+  function submitPassword(password) {
+    if (!currentSession || sessionState !== "prompting") return;
+
+    sessionState = "verifying";
+    lastError = ""
+
+    sendCommand({
+      type: "session.respond",
+      id: currentSession.id,
+      response: password
+    });
+  }
+
+  function cancelSession() {
+    if (!currentSession) return;
+
+    sendCommand({
+      type: "session.cancel",
+      id: currentSession.id
+    });
+  }
+
+  function advanceSessionQueue() {
+    if (sessionQueue.length === 0) {
+      currentSession = null;
+      currentSessionId = "";
+      sessionState = "idle";
       return;
+    }
+
+    const nextSession = sessionQueue[0];
+    sessionQueue = sessionQueue.slice(1);
+    activateSession(nextSession);
+  }
+
+  function openAuthUI() {
+    if (!currentSession) return;
 
     if (settingsPanelMode === "window") {
       authWindow.visible = true;
     } else {
-      // "attached" and "centered" modes both use the panel system
-      pluginApi?.withCurrentScreen(function(screen) {
-        pluginApi?.openPanel(screen);
+      if (!pluginApi) return;
+      pluginApi.withCurrentScreen(function(screen) {
+        pluginApi.openPanel(screen);
       });
     }
   }
 
-  function closeAuthUI() {
+  function closeAuthUI(reason) {
     if (settingsPanelMode === "window") {
       authWindow.visible = false;
     } else {
@@ -236,93 +316,31 @@ Item {
     }
   }
 
-  function submitPassword(password) {
-    if (!currentRequest || responseInFlight)
-      return;
-
-    responseInFlight = true;
-    lastError = "";
-    pendingPassword = password;
-
-    enqueueSocketCommand({ type: "respond", id: currentRequest.id, response: password }, function(ok, response) {
-      responseInFlight = false;
-      pendingPassword = "";
-
-      if (!ok || response?.type !== "ok") {
-        lastError = pluginApi?.tr("errors.auth-failed") ?? "Authentication failed";
-      }
-
-      Qt.callLater(pollImmediately);
-    });
-  }
-
-  function cancelRequest() {
-    if (!currentRequest)
-      return false;
-
-    if (responseInFlight) {
-      lastError = pluginApi?.tr("errors.busy") ?? "Please wait...";
-      return false;
-    }
-
-    responseInFlight = true;
-    lastError = "";
-
-    enqueueSocketCommand({ type: "cancel", id: currentRequest.id }, function(ok, response) {
-      responseInFlight = false;
-
-      if (!ok || response?.type !== "ok") {
-        lastError = pluginApi?.tr("errors.cancel-failed") ?? "Failed to cancel request";
-        Qt.callLater(pollImmediately);
-        return;
-      }
-
-      Qt.callLater(pollImmediately);
-    });
-    return true;
-  }
-
   function requestClose() {
-    if (!currentRequest) {
-      closeAuthUI();
+    if (!currentSession) {
+      closeAuthUI("user-close");
       return;
     }
-
-    if (cancelRequest()) {
-      closeRequestedId = currentRequest.id;
-    }
+    cancelSession();
   }
 
-  function handleRequestComplete(requestId, success, wasCancelled) {
-    const shouldCloseForUser = closeRequestedId && closeRequestedId === requestId;
-    if (shouldCloseForUser) closeRequestedId = "";
+  function transitionToIdle(reason) {
+    Logger.d("PolkitAuth", "Transition to idle: " + reason);
+    isClosingUI = true;
+    closeAuthUI(reason);
+    // Delay state cleanup until after close animation completes
+    cleanupTimer.start();
+  }
 
-    if (currentRequest && currentRequest.id === requestId) {
-      requestCompleted(success);
-
-      if (success && autoCloseOnSuccess) {
-        lastError = "";
-        if (showSuccessAnimation) {
-          successTimer.restart();
-        } else {
-          currentRequest = null;
-          closeAuthUI();
-          advanceQueue();
-        }
-      } else {
-        currentRequest = null;
-        if (success) {
-           lastError = "";
-           if (autoCloseOnSuccess || shouldCloseForUser) closeAuthUI();
-        } else if (wasCancelled) {
-           lastError = "";
-           if (autoCloseOnCancel || shouldCloseForUser) closeAuthUI();
-        }
-        advanceQueue();
+  Timer {
+    id: reconnectTimer
+    interval: 100
+    repeat: false
+    onTriggered: {
+      if (!agentSocket.connected && socketPath) {
+        Logger.d("PolkitAuth", "Reconnecting... (delay: " + reconnectDelay + "ms)");
+        agentSocket.connected = true;
       }
-    } else {
-      if (shouldCloseForUser) closeAuthUI();
-      requestQueue = requestQueue.filter(r => r.id !== requestId);
     }
   }
 
@@ -330,29 +348,23 @@ Item {
     id: successTimer
     interval: root.successAnimationDuration
     repeat: false
-    onTriggered: {
-      if (currentRequest) {
-        currentRequest = null;
-        closeAuthUI();
-        advanceQueue();
-      }
-    }
+    onTriggered: transitionToIdle("success")
   }
 
   Timer {
-    id: pollTimer
-    interval: Math.max(50, root.pollInterval)
-    repeat: true
-    running: agentAvailable
-    onTriggered: pollRequests()
-  }
-
-  Timer {
-    id: pollRetryTimer
-    interval: 50
+    id: cleanupTimer
+    interval: Style.animationNormal || 300  // Match close animation duration
     repeat: false
-    running: false
-    onTriggered: pollRequests()
+    onTriggered: {
+      currentSession = null;
+      currentSessionId = "";
+      sessionState = "idle";
+      lastError = "";
+      closeReason = "";
+      userRequestedClose = false;
+      isClosingUI = false;
+      advanceSessionQueue();
+    }
   }
 
   Timer {
@@ -360,7 +372,13 @@ Item {
     interval: 3000
     repeat: true
     running: true
-    onTriggered: checkAgent()
+    onTriggered: {
+      if (agentSocket.connected && subscribed) {
+        sendCommand({ type: "ping" });
+      } else {
+        checkAgent();
+      }
+    }
   }
 
   Timer {
@@ -374,67 +392,31 @@ Item {
   Timer {
     id: staleRequestTimer
     interval: 30000
-    repeat: true
-    running: currentRequest !== null && !responseInFlight
+    repeat: false
+    running: sessionState === "prompting" || sessionState === "error" || sessionState === "verifying"
     onTriggered: {
-      if (currentRequest && !responseInFlight) {
-        Logger.w("PolkitAuth", "Request timed out, clearing stale state");
-        clearStaleState();
-      }
+      Logger.w("PolkitAuth", "Session timed out in state: " + sessionState);
+      closeReason = "timeout";
+      transitionToIdle("timeout");
+    }
+  }
+
+  onSessionStateChanged: {
+    if (sessionState !== "idle" && sessionState !== "success") {
+        staleRequestTimer.restart();
+    } else {
+        staleRequestTimer.stop();
     }
   }
 
   onAgentAvailableChanged: {
-    if (agentAvailable) {
-      Qt.callLater(pollImmediately);
-    }
+    // No-op - availability is now handled by connection/subscription
   }
 
   function enqueueSocketCommand(message, onResponse) {
-    if (!socketPath) {
-      onResponse?.(false, null);
-      return;
-    }
-
-    socketQueue = socketQueue.concat([{ payload: JSON.stringify(message), onResponse: onResponse }]);
-    startNextSocketCommand();
-  }
-
-  function startNextSocketCommand() {
-    if (socketBusy || socketQueue.length === 0)
-      return;
-
-    pendingSocketRequest = socketQueue[0];
-    socketQueue = socketQueue.slice(1);
-    socketBusy = true;
-    socketResponseReceived = false;
-    agentSocket.connected = true;
-    socketTimeout.restart();
-  }
-
-  function finishSocketCommand(ok, response) {
-    socketTimeout.stop();
-    socketResponseReceived = true;
-    agentSocket.connected = false;
-    socketBusy = false;
-    let parsed = null;
-    if (ok) {
-      const line = (response || "").trim();
-      if (!line) {
-        ok = false;
-      } else {
-        try {
-          parsed = JSON.parse(line);
-        } catch (e) {
-          Logger.e("PolkitAuth", "Failed to parse agent response:", e);
-          ok = false;
-        }
-      }
-    }
-    const cb = pendingSocketRequest?.onResponse;
-    pendingSocketRequest = null;
-    cb?.(ok, parsed);
-    Qt.callLater(startNextSocketCommand);
+    // Deprecated - replaced by sendCommand
+    sendCommand(message);
+    onResponse?.(true, { type: "ok" });
   }
 
   Socket {
@@ -444,42 +426,39 @@ Item {
 
     onConnectedChanged: {
       if (connected) {
-        if (!pendingSocketRequest) {
-          connected = false;
-          return;
-        }
+        Logger.d("PolkitAuth", "Connected to agent, subscribing...");
+        subscribed = false;
+        sendCommand({ type: "subscribe" });
+      } else {
+        Logger.w("PolkitAuth", "Disconnected from agent");
+        agentAvailable = false;
+        subscribed = false;
 
-        const data = pendingSocketRequest.payload + "\n";
-        write(data);
-        flush();
-        return;
-      }
-
-      if (socketBusy && !socketResponseReceived) {
-        finishSocketCommand(false, "");
+        // Exponential backoff reconnection
+        reconnectTimer.interval = Math.min(
+          reconnectDelay || 100,
+          maxReconnectDelay
+        );
+        reconnectDelay = Math.min(reconnectDelay * 2 || 100, maxReconnectDelay);
+        reconnectTimer.start();
       }
     }
 
     parser: SplitParser {
       onRead: function(line) {
         const response = (line || "").trim();
-        finishSocketCommand(true, response);
+        if (!response) return;
+
+        try {
+          const parsed = JSON.parse(response);
+          handleMessage(parsed);
+        } catch (e) {
+          Logger.e("PolkitAuth", "Failed to parse: " + e);
+        }
       }
     }
   }
 
-  Timer {
-    id: socketTimeout
-    interval: 1000
-    repeat: false
-    onTriggered: {
-      if (socketBusy && !socketResponseReceived) {
-        finishSocketCommand(false, "");
-      }
-    }
-  }
-
-  // Floating window mode
   FloatingWindow {
     id: authWindow
     title: "Authentication Required"
@@ -497,8 +476,8 @@ Item {
       id: floatingAuthContent
       anchors.fill: parent
       pluginMain: root
-      incomingRequest: root.currentRequest
-      busy: root.responseInFlight
+      incomingSession: root.currentSession
+      busy: root.sessionState === "verifying"
       agentAvailable: root.agentAvailable
       statusText: root.agentStatus
       errorText: root.lastError
@@ -507,10 +486,8 @@ Item {
   }
 
   Component.onCompleted: {
-    // Check if plugin API was properly initialized
     if (!pluginApi) {
-      Logger.e("PolkitAuth", "Plugin initialized without API - this indicates a loading issue");
-      // Try to continue with defaults
+      Logger.e("PolkitAuth", "Plugin initialized without API");
       Qt.callLater(refresh);
     } else {
       Logger.d("PolkitAuth", "Plugin initialized successfully with API");

@@ -2,33 +2,38 @@
 
 function getAppProfiles(Color) {
     return {
-        "1password": { color: "#0094F5", accentColor: "#0094F5", label: "1Password", glyph: "lock" },
-        "bitwarden": { color: "#175DDC", accentColor: "#175DDC", label: "Bitwarden", glyph: "lock" },
-        "keepassxc": { color: "#6A9955", accentColor: "#6A9955", label: "KeePassXC", glyph: "lock" },
-        "proton-pass": { color: "#6D4AFF", accentColor: "#6D4AFF", label: "Proton Pass", glyph: "lock" },
-        "gpg": { color: Color.mPrimary, accentColor: Color.mPrimary, label: "GPG", glyph: "key" },
-        "git": { color: "#F05032", accentColor: "#F05032", label: "Git", glyph: "brand-git" },
-        "kitty": { color: "#F49D1A", accentColor: "#F49D1A", label: "Kitty Terminal", glyph: "terminal-2" }
+        "1password": { color: "#0094F5", accentColor: "#0094F5", label: "1Password", glyph: "lock", kind: "vault" },
+        "bitwarden": { color: "#175DDC", accentColor: "#175DDC", label: "Bitwarden", glyph: "lock", kind: "vault" },
+        "keepassxc": { color: "#6A9955", accentColor: "#6A9955", label: "KeePassXC", glyph: "lock", kind: "vault" },
+        "proton-pass": { color: "#6D4AFF", accentColor: "#6D4AFF", label: "Proton Pass", glyph: "lock", kind: "vault" },
+        "gpg": { color: Color.mPrimary, accentColor: Color.mPrimary, label: "GPG", glyph: "key", kind: "system" },
+        "ssh": { color: Color.mPrimary, accentColor: Color.mPrimary, label: "SSH", glyph: "key", kind: "system" },
+        "git": { color: "#F05032", accentColor: "#F05032", label: "Git", glyph: "brand-git", kind: "system" },
+        "kitty": { color: "#F49D1A", accentColor: "#F49D1A", label: "Kitty Terminal", glyph: "terminal-2", kind: "system" }
     };
 }
 
 function getContextModel(request, requestor, subject, appProfiles, Color) {
-    if (!request || !request.id) return { color: Color.mPrimary, accentColor: Color.mPrimary, label: "System", glyph: "shield" };
+    if (!request || !request.id) return { color: Color.mPrimary, accentColor: Color.mPrimary, label: "System", glyph: "shield", kind: "system" };
 
     const actionId = (request.actionId || "").toLowerCase();
     const appName = (requestor && requestor.displayName || "").toLowerCase();
     const exe = (subject && subject.exe || "").toLowerCase();
-    const full = (actionId + " " + appName + " " + exe);
+    const msg = (request.message || "").toLowerCase();
+    const desc = (request.description || "").toLowerCase();
+    const kind = (request.hint && request.hint.kind || "").toLowerCase();
+    const full = (actionId + " " + appName + " " + exe + " " + msg + " " + desc + " " + kind);
 
     if (full.includes("1password")) return appProfiles["1password"];
     if (full.includes("bitwarden")) return appProfiles["bitwarden"];
     if (full.includes("keepassxc")) return appProfiles["keepassxc"];
     if (full.includes("proton-pass") || full.includes("protonpass")) return appProfiles["proton-pass"];
     if (full.includes("gpg") || full.includes("openpgp")) return appProfiles["gpg"];
+    if (full.includes("ssh") || full.includes("ssh-agent")) return appProfiles["ssh"];
     if (full.includes("git")) return appProfiles["git"];
     if (full.includes("kitty")) return appProfiles["kitty"];
 
-    return { color: Color.mPrimary, accentColor: Color.mPrimary, label: "System", glyph: "shield" };
+    return { color: Color.mPrimary, accentColor: Color.mPrimary, label: "System", glyph: "shield", kind: "system" };
 }
 
 function getRichContext(request, Color, secondaryAccent) {
@@ -95,4 +100,31 @@ function getDisplayAction(request, richContext, secondaryAccent) {
 
     if (msg.length < 40) return msg.toLowerCase();
     return "perform this action";
+}
+
+function getContextCardModel(contextModel, gpgInfo) {
+    if (gpgInfo !== null) {
+        return {
+            variant: "gpg",
+            accentColor: contextModel ? contextModel.accentColor : "#FFFFFF",
+            tileIcon: gpgInfo.isGithub ? "brand-github" : "key",
+            tileIconPointSize: 20,
+            name: gpgInfo.name || "Unknown",
+            email: gpgInfo.email || "",
+            meta: (gpgInfo.keyType && gpgInfo.keyId) ? (gpgInfo.keyType + " • " + gpgInfo.keyId) : ""
+        };
+    }
+
+    if (contextModel && contextModel.kind === "vault") {
+        return {
+            variant: "vault",
+            accentColor: contextModel.accentColor,
+            tileIcon: contextModel.glyph || "lock",
+            tileIconPointSize: 18,
+            label: contextModel.label || "Vault",
+            richText: "Unlock <b><font color='" + contextModel.accentColor + "'>" + contextModel.label + "</font></b> vault"
+        };
+    }
+
+    return null;
 }
