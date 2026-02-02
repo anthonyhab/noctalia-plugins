@@ -23,7 +23,8 @@
       "defaultMediaPlayer": "",
       "barWidgetMaxWidth": 200,
       "barWidgetUseFixedWidth": false,
-      "barWidgetScrollingMode": "hover"
+      "barWidgetScrollingMode": "hover",
+      "showVolumePercentage": false
     }
   }
 }
