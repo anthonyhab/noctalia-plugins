@@ -4,16 +4,24 @@ import QtQuick.Layouts
 import qs.Commons
 import qs.Widgets
 
-ColumnLayout {
-  id: root
-
+ScrollView {
+  id: scrollView
   property var pluginApi: null
 
-  spacing: Style.marginL
   implicitWidth: Math.round(520 * Style.uiScaleRatio)
   Layout.minimumWidth: implicitWidth
   Layout.maximumWidth: implicitWidth
   Layout.preferredWidth: implicitWidth
+  Layout.fillHeight: true
+
+  contentHeight: contentColumn.implicitHeight
+
+  ColumnLayout {
+    id: contentColumn
+    width: scrollView.width
+    spacing: Style.marginL
+
+    property alias pluginApi: scrollView.pluginApi
 
   // Local state - track changes before saving
   property string valueHaUrl: pluginApi?.pluginSettings?.haUrl || pluginApi?.manifest?.metadata?.defaultSettings?.haUrl || ""
@@ -40,12 +48,12 @@ ColumnLayout {
     }
 
     // Update the plugin settings object
-    pluginApi.pluginSettings.haUrl = root.valueHaUrl.trim().replace(/\/+$/, ""); // Remove trailing slashes
-    pluginApi.pluginSettings.haToken = root.valueHaToken.trim();
-    pluginApi.pluginSettings.defaultMediaPlayer = root.valueDefaultMediaPlayer;
-    pluginApi.pluginSettings.barWidgetMaxWidth = parseInt(root.valueBarWidgetMaxWidth, 10) || pluginApi?.manifest?.metadata?.defaultSettings?.barWidgetMaxWidth || 200;
-    pluginApi.pluginSettings.barWidgetUseFixedWidth = root.valueBarWidgetUseFixedWidth;
-    pluginApi.pluginSettings.barWidgetScrollingMode = root.valueBarWidgetScrollingMode;
+    pluginApi.pluginSettings.haUrl = contentColumn.valueHaUrl.trim().replace(/\/+$/, ""); // Remove trailing slashes
+    pluginApi.pluginSettings.haToken = contentColumn.valueHaToken.trim();
+    pluginApi.pluginSettings.defaultMediaPlayer = contentColumn.valueDefaultMediaPlayer;
+    pluginApi.pluginSettings.barWidgetMaxWidth = parseInt(contentColumn.valueBarWidgetMaxWidth, 10) || pluginApi?.manifest?.metadata?.defaultSettings?.barWidgetMaxWidth || 200;
+    pluginApi.pluginSettings.barWidgetUseFixedWidth = contentColumn.valueBarWidgetUseFixedWidth;
+    pluginApi.pluginSettings.barWidgetScrollingMode = contentColumn.valueBarWidgetScrollingMode;
 
     // Save to disk
     pluginApi.saveSettings();
@@ -116,19 +124,19 @@ ColumnLayout {
   NTextInput {
     label: pluginApi?.tr("settings.url") || "Home Assistant URL"
     placeholderText: pluginApi?.tr("settings.url-placeholder") || "http://homeassistant.local:8123"
-    text: root.valueHaUrl
+    text: contentColumn.valueHaUrl
     onTextChanged: {
-      root.valueHaUrl = text;
+      contentColumn.valueHaUrl = text;
     }
   }
 
   NTextInput {
     label: pluginApi?.tr("settings.token") || "Access Token"
     placeholderText: "eyJ0eXAiOiJKV1..."
-    text: root.valueHaToken
+    text: contentColumn.valueHaToken
     inputItem.echoMode: TextInput.Password
     onTextChanged: {
-      root.valueHaToken = text;
+      contentColumn.valueHaToken = text;
     }
   }
 
@@ -189,12 +197,12 @@ ColumnLayout {
       const players = pluginMain?.mediaPlayers || [];
       if (players.length === 0)
         return "";
-      const player = players.find(p => p.entity_id === root.valueDefaultMediaPlayer);
+      const player = players.find(p => p.entity_id === contentColumn.valueDefaultMediaPlayer);
       return player ? player.entity_id : "";
     }
 
     onSelected: key => {
-                  root.valueDefaultMediaPlayer = key;
+                  contentColumn.valueDefaultMediaPlayer = key;
                 }
   }
 
@@ -220,16 +228,16 @@ ColumnLayout {
     label: pluginApi?.tr("settings.bar-widget.max-width.label") || "Maximum width"
     description: pluginApi?.tr("settings.bar-widget.max-width.description") || "Sets the maximum horizontal size of the widget. The widget will shrink to fit shorter content."
     placeholderText: pluginApi?.manifest?.metadata?.defaultSettings?.barWidgetMaxWidth?.toString() || "200"
-    text: root.valueBarWidgetMaxWidth
+    text: contentColumn.valueBarWidgetMaxWidth
     inputItem.inputMethodHints: Qt.ImhDigitsOnly
-    onTextChanged: root.valueBarWidgetMaxWidth = text
+    onTextChanged: contentColumn.valueBarWidgetMaxWidth = text
   }
 
   NToggle {
     label: pluginApi?.tr("settings.bar-widget.use-fixed-width.label") || "Use fixed width"
     description: pluginApi?.tr("settings.bar-widget.use-fixed-width.description") || "When enabled, the widget will always use the maximum width instead of dynamically adjusting to content."
-    checked: root.valueBarWidgetUseFixedWidth
-    onToggled: checked => root.valueBarWidgetUseFixedWidth = checked
+    checked: contentColumn.valueBarWidgetUseFixedWidth
+    onToggled: checked => contentColumn.valueBarWidgetUseFixedWidth = checked
   }
 
   NComboBox {
@@ -249,11 +257,9 @@ ColumnLayout {
         "name": pluginApi?.tr("options.scrolling-modes.never") || "Never scroll"
       }
     ]
-    currentKey: root.valueBarWidgetScrollingMode
-    onSelected: key => root.valueBarWidgetScrollingMode = key
+    currentKey: contentColumn.valueBarWidgetScrollingMode
+    onSelected: key => contentColumn.valueBarWidgetScrollingMode = key
   }
 
-  Item {
-    Layout.fillHeight: true
   }
 }
