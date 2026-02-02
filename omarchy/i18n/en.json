@@ -31,6 +31,10 @@
     "show-search-input": {
       "label": "Show search input in panel",
       "desc": "If enabled, a search field will appear in the panel to filter themes."
+    },
+    "debug-logging": {
+      "label": "Enable debug logging",
+      "desc": "Logs extra diagnostics to help troubleshoot theme parsing and scheme application."
     }
   },
   "tooltips": {

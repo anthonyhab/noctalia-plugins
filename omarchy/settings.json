@@ -3,5 +3,6 @@
   "themeSetCommand": "~/.local/bin/theme-set",
   "omarchyConfigDir": "",
   "showThemeName": true,
-  "showSearchInput": true
+  "showSearchInput": true,
+  "debugLogging": true
 }

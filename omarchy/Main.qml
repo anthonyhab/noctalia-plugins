@@ -252,11 +252,14 @@ Item {
     refreshThemeName();
   }
 
-  function scheduleReloadApply() {
+  function scheduleReloadApply(includeThemeScan) {
     pendingReloadApply = true
     pendingReloadApplyAvailabilityReady = false
     pendingReloadApplyThemeReady = false
-    refresh()
+    checkAvailability()
+    if (includeThemeScan)
+      scanThemes()
+    refreshThemeName()
   }
 
   function maybeRunPendingReloadApply() {
@@ -296,7 +299,7 @@ Item {
   }
 
   function scanThemes() {
-    Logger.i("Omarchy", "Scanning themes using omarchy-theme-list");
+    logDebug("Scanning themes using omarchy-theme-list")
 
     // Use omarchy-theme-list and derive light/dark mode from theme files
     const cmd = "themes_dir=\"$1\"; stock_dir=\"$2\"; " +
@@ -345,7 +348,6 @@ Item {
     }
 
     rememberColorPreferences()
-    Settings.data.colorSchemes.useWallpaperColors = false;
 
     applying = true;
 
@@ -562,7 +564,7 @@ Item {
     running: false
     stdout: StdioCollector {}
     onExited: function (code) {
-      Logger.i("Omarchy", "themesProcess exited with code:", code);
+      logDebug("themesProcess exited with code:", code)
 
       if (code !== 0) {
         Logger.e("Omarchy", "Theme scanning failed, exit code:", code);
@@ -602,9 +604,7 @@ Item {
         });
       }
 
-      Logger.i("Omarchy", "Found", themeNames.length, "themes:", themeNames.join(", "));
-
-      Logger.i("Omarchy", "Theme list:", themes.length, "themes");
+      Logger.i("Omarchy", "Found", themeNames.length, "themes")
       availableThemes = themes;
     }
   }
@@ -729,8 +729,11 @@ Item {
       }
 
       Logger.i("Omarchy", "Scheme file written successfully to:", schemeOutputPath);
-      Settings.data.colorSchemes.useWallpaperColors = false
       ColorSchemeService.applyScheme(schemeOutputPath)
+      if (Settings.data.colorSchemes.useWallpaperColors) {
+        Settings.data.colorSchemes.predefinedScheme = schemeOutputPath
+        Settings.data.colorSchemes.useWallpaperColors = false
+      }
 
       if (pendingApplyAfterCurrent) {
         pendingApplyAfterCurrent = false
@@ -882,7 +885,7 @@ Item {
 
       if (configDirChanged) {
         if (nextActive) {
-          root.scheduleReloadApply()
+          root.scheduleReloadApply(true)
         } else {
           root.refresh()
         }
