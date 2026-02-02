@@ -4,24 +4,15 @@ import QtQuick.Layouts
 import qs.Commons
 import qs.Widgets
 
-ScrollView {
-  id: scrollView
+ColumnLayout {
+  id: root
+
   property var pluginApi: null
 
-  implicitWidth: Math.round(520 * Style.uiScaleRatio)
-  Layout.minimumWidth: implicitWidth
-  Layout.maximumWidth: implicitWidth
-  Layout.preferredWidth: implicitWidth
-  Layout.fillHeight: true
-
-  contentHeight: contentColumn.implicitHeight
-
-  ColumnLayout {
-    id: contentColumn
-    width: scrollView.width
-    spacing: Style.marginL
-
-    property alias pluginApi: scrollView.pluginApi
+  spacing: Style.marginL
+  Layout.fillWidth: true
+  Layout.minimumWidth: Math.round(520 * Style.uiScaleRatio)
+  Layout.preferredWidth: Layout.minimumWidth
 
   // Local state - track changes before saving
   property string valueHaUrl: pluginApi?.pluginSettings?.haUrl || pluginApi?.manifest?.metadata?.defaultSettings?.haUrl || ""
@@ -30,6 +21,7 @@ ScrollView {
   property string valueBarWidgetMaxWidth: (pluginApi?.pluginSettings?.barWidgetMaxWidth ?? pluginApi?.manifest?.metadata?.defaultSettings?.barWidgetMaxWidth ?? 200).toString()
   property bool valueBarWidgetUseFixedWidth: pluginApi?.pluginSettings?.barWidgetUseFixedWidth ?? pluginApi?.manifest?.metadata?.defaultSettings?.barWidgetUseFixedWidth ?? false
   property string valueBarWidgetScrollingMode: pluginApi?.pluginSettings?.barWidgetScrollingMode || pluginApi?.manifest?.metadata?.defaultSettings?.barWidgetScrollingMode || "hover"
+  property bool valueShowVolumePercentage: pluginApi?.pluginSettings?.showVolumePercentage ?? pluginApi?.manifest?.metadata?.defaultSettings?.showVolumePercentage ?? false
   property bool testingConnection: false
   property string testResult: ""
   property bool testSuccess: true
@@ -48,12 +40,13 @@ ScrollView {
     }
 
     // Update the plugin settings object
-    pluginApi.pluginSettings.haUrl = contentColumn.valueHaUrl.trim().replace(/\/+$/, ""); // Remove trailing slashes
-    pluginApi.pluginSettings.haToken = contentColumn.valueHaToken.trim();
-    pluginApi.pluginSettings.defaultMediaPlayer = contentColumn.valueDefaultMediaPlayer;
-    pluginApi.pluginSettings.barWidgetMaxWidth = parseInt(contentColumn.valueBarWidgetMaxWidth, 10) || pluginApi?.manifest?.metadata?.defaultSettings?.barWidgetMaxWidth || 200;
-    pluginApi.pluginSettings.barWidgetUseFixedWidth = contentColumn.valueBarWidgetUseFixedWidth;
-    pluginApi.pluginSettings.barWidgetScrollingMode = contentColumn.valueBarWidgetScrollingMode;
+    pluginApi.pluginSettings.haUrl = root.valueHaUrl.trim().replace(/\/+$/, ""); // Remove trailing slashes
+    pluginApi.pluginSettings.haToken = root.valueHaToken.trim();
+    pluginApi.pluginSettings.defaultMediaPlayer = root.valueDefaultMediaPlayer;
+    pluginApi.pluginSettings.barWidgetMaxWidth = parseInt(root.valueBarWidgetMaxWidth, 10) || pluginApi?.manifest?.metadata?.defaultSettings?.barWidgetMaxWidth || 200;
+    pluginApi.pluginSettings.barWidgetUseFixedWidth = root.valueBarWidgetUseFixedWidth;
+    pluginApi.pluginSettings.barWidgetScrollingMode = root.valueBarWidgetScrollingMode;
+    pluginApi.pluginSettings.showVolumePercentage = root.valueShowVolumePercentage;
 
     // Save to disk
     pluginApi.saveSettings();
@@ -67,43 +60,43 @@ ScrollView {
   }
 
   function testConnection() {
-    if (!valueHaUrl || !valueHaToken) {
-      testResult = pluginApi?.tr("errors.no-url") || "Please configure URL and token";
-      testSuccess = false;
+    if (!root.valueHaUrl || !root.valueHaToken) {
+      root.testResult = pluginApi?.tr("errors.no-url") || "Please configure URL and token";
+      root.testSuccess = false;
       return;
     }
 
-    testingConnection = true;
-    testResult = "";
-    testSuccess = true;
+    root.testingConnection = true;
+    root.testResult = "";
+    root.testSuccess = true;
 
     // Use XMLHttpRequest to test the REST API
     var xhr = new XMLHttpRequest();
     xhr.onreadystatechange = function () {
       if (xhr.readyState === XMLHttpRequest.DONE) {
-        testingConnection = false;
+        root.testingConnection = false;
         if (xhr.status === 200) {
-          testResult = pluginApi?.tr("settings.connection-success") || "Connected successfully";
-          testSuccess = true;
+          root.testResult = pluginApi?.tr("settings.connection-success") || "Connected successfully";
+          root.testSuccess = true;
         } else if (xhr.status === 401) {
-          testResult = pluginApi?.tr("errors.auth-invalid") || "Invalid access token";
-          testSuccess = false;
+          root.testResult = pluginApi?.tr("errors.auth-invalid") || "Invalid access token";
+          root.testSuccess = false;
         } else {
-          testResult = pluginApi?.tr("settings.connection-failed") || "Connection failed";
-          testSuccess = false;
+          root.testResult = pluginApi?.tr("settings.connection-failed") || "Connection failed";
+          root.testSuccess = false;
         }
       }
     };
 
     xhr.onerror = function () {
-      testingConnection = false;
-      testResult = pluginApi?.tr("settings.connection-failed") || "Connection failed";
-      testSuccess = false;
+      root.testingConnection = false;
+      root.testResult = pluginApi?.tr("settings.connection-failed") || "Connection failed";
+      root.testSuccess = false;
     };
 
-    const testUrl = valueHaUrl.trim().replace(/\/+$/, "") + "/api/";
+    const testUrl = root.valueHaUrl.trim().replace(/\/+$/, "") + "/api/";
     xhr.open("GET", testUrl);
-    xhr.setRequestHeader("Authorization", "Bearer " + valueHaToken.trim());
+    xhr.setRequestHeader("Authorization", "Bearer " + root.valueHaToken.trim());
     xhr.timeout = 10000;
     xhr.send();
   }
@@ -112,6 +105,7 @@ ScrollView {
     text: pluginApi?.tr("settings.description") || "Connect to your Home Assistant instance to control media players."
     wrapMode: Text.WordWrap
     color: Color.mOnSurface
+    Layout.fillWidth: true
   }
 
   NText {
@@ -119,41 +113,46 @@ ScrollView {
     wrapMode: Text.WordWrap
     color: Color.mOnSurfaceVariant
     pointSize: Style.fontSizeS
+    Layout.fillWidth: true
   }
 
   NTextInput {
     label: pluginApi?.tr("settings.url") || "Home Assistant URL"
     placeholderText: pluginApi?.tr("settings.url-placeholder") || "http://homeassistant.local:8123"
-    text: contentColumn.valueHaUrl
+    text: root.valueHaUrl
+    Layout.fillWidth: true
     onTextChanged: {
-      contentColumn.valueHaUrl = text;
+      root.valueHaUrl = text;
     }
   }
 
   NTextInput {
     label: pluginApi?.tr("settings.token") || "Access Token"
     placeholderText: "eyJ0eXAiOiJKV1..."
-    text: contentColumn.valueHaToken
+    text: root.valueHaToken
+    Layout.fillWidth: true
     inputItem.echoMode: TextInput.Password
     onTextChanged: {
-      contentColumn.valueHaToken = text;
+      root.valueHaToken = text;
     }
   }
 
   RowLayout {
     spacing: Style.marginM
+    Layout.fillWidth: true
 
     NButton {
-      text: testingConnection ? (pluginApi?.tr("status.connecting") || "Connecting...") : (pluginApi?.tr("settings.test-connection") || "Test Connection")
-      enabled: !testingConnection && valueHaUrl !== "" && valueHaToken !== ""
-      onClicked: testConnection()
+      text: root.testingConnection ? (pluginApi?.tr("status.connecting") || "Connecting...") : (pluginApi?.tr("settings.test-connection") || "Test Connection")
+      enabled: !root.testingConnection && root.valueHaUrl !== "" && root.valueHaToken !== ""
+      onClicked: root.testConnection()
     }
 
     NText {
-      visible: testResult !== ""
-      text: testResult
-      color: testSuccess ? Color.mPrimary : Color.mError
+      visible: root.testResult !== ""
+      text: root.testResult
+      color: root.testSuccess ? Color.mPrimary : Color.mError
       pointSize: Style.fontSizeS
+      Layout.fillWidth: true
     }
   }
 
@@ -164,6 +163,7 @@ ScrollView {
   NText {
     text: pluginApi?.tr("settings.default-player") || "Default Media Player"
     color: Color.mOnSurface
+    Layout.fillWidth: true
   }
 
   NText {
@@ -171,14 +171,15 @@ ScrollView {
     wrapMode: Text.WordWrap
     color: Color.mOnSurfaceVariant
     pointSize: Style.fontSizeS
+    Layout.fillWidth: true
   }
 
   NComboBox {
     Layout.fillWidth: true
-    enabled: pluginMain?.mediaPlayers?.length > 0
+    enabled: root.pluginMain?.mediaPlayers?.length > 0
 
     model: {
-      const players = pluginMain?.mediaPlayers || [];
+      const players = root.pluginMain?.mediaPlayers || [];
       if (players.length === 0) {
         return [
               {
@@ -194,15 +195,15 @@ ScrollView {
     }
 
     currentKey: {
-      const players = pluginMain?.mediaPlayers || [];
+      const players = root.pluginMain?.mediaPlayers || [];
       if (players.length === 0)
         return "";
-      const player = players.find(p => p.entity_id === contentColumn.valueDefaultMediaPlayer);
+      const player = players.find(p => p.entity_id === root.valueDefaultMediaPlayer);
       return player ? player.entity_id : "";
     }
 
     onSelected: key => {
-                  contentColumn.valueDefaultMediaPlayer = key;
+                  root.valueDefaultMediaPlayer = key;
                 }
   }
 
@@ -215,6 +216,7 @@ ScrollView {
     color: Color.mOnSurface
     pointSize: Style.fontSizeM
     font.weight: Style.fontWeightMedium
+    Layout.fillWidth: true
   }
 
   NText {
@@ -222,27 +224,31 @@ ScrollView {
     wrapMode: Text.WordWrap
     color: Color.mOnSurfaceVariant
     pointSize: Style.fontSizeS
+    Layout.fillWidth: true
   }
 
   NTextInput {
     label: pluginApi?.tr("settings.bar-widget.max-width.label") || "Maximum width"
     description: pluginApi?.tr("settings.bar-widget.max-width.description") || "Sets the maximum horizontal size of the widget. The widget will shrink to fit shorter content."
     placeholderText: pluginApi?.manifest?.metadata?.defaultSettings?.barWidgetMaxWidth?.toString() || "200"
-    text: contentColumn.valueBarWidgetMaxWidth
+    text: root.valueBarWidgetMaxWidth
+    Layout.fillWidth: true
     inputItem.inputMethodHints: Qt.ImhDigitsOnly
-    onTextChanged: contentColumn.valueBarWidgetMaxWidth = text
+    onTextChanged: root.valueBarWidgetMaxWidth = text
   }
 
   NToggle {
     label: pluginApi?.tr("settings.bar-widget.use-fixed-width.label") || "Use fixed width"
     description: pluginApi?.tr("settings.bar-widget.use-fixed-width.description") || "When enabled, the widget will always use the maximum width instead of dynamically adjusting to content."
-    checked: contentColumn.valueBarWidgetUseFixedWidth
-    onToggled: checked => contentColumn.valueBarWidgetUseFixedWidth = checked
+    checked: root.valueBarWidgetUseFixedWidth
+    Layout.fillWidth: true
+    onToggled: checked => root.valueBarWidgetUseFixedWidth = checked
   }
 
   NComboBox {
     label: pluginApi?.tr("settings.bar-widget.scrolling-mode.label") || "Scrolling mode"
     description: pluginApi?.tr("settings.bar-widget.scrolling-mode.description") || "Control when text scrolling is enabled for long titles."
+    Layout.fillWidth: true
     model: [
       {
         "key": "always",
@@ -257,9 +263,27 @@ ScrollView {
         "name": pluginApi?.tr("options.scrolling-modes.never") || "Never scroll"
       }
     ]
-    currentKey: contentColumn.valueBarWidgetScrollingMode
-    onSelected: key => contentColumn.valueBarWidgetScrollingMode = key
+    currentKey: root.valueBarWidgetScrollingMode
+    onSelected: key => root.valueBarWidgetScrollingMode = key
   }
 
+  NDivider {
+    Layout.fillWidth: true
+  }
+
+  NText {
+    text: pluginApi?.tr("settings.panel.title") || "Panel settings"
+    color: Color.mOnSurface
+    pointSize: Style.fontSizeM
+    font.weight: Style.fontWeightMedium
+    Layout.fillWidth: true
+  }
+
+  NToggle {
+    label: pluginApi?.tr("settings.show-volume-percentage.label") || "Show volume percentage"
+    description: pluginApi?.tr("settings.show-volume-percentage.description") || "Display the volume percentage next to the volume slider."
+    checked: root.valueShowVolumePercentage
+    Layout.fillWidth: true
+    onToggled: checked => root.valueShowVolumePercentage = checked
   }
 }
