@@ -162,13 +162,13 @@ Item {
 
           Popup {
             id: devicePopup
-            y: deviceButton.height - Style.marginS
+            y: deviceButton.height + Style.marginS
             width: deviceButton.width
             implicitHeight: Math.min(Style.capsuleHeight * 5, deviceListView.contentHeight + devicePopup.topPadding + devicePopup.bottomPadding)
             padding: Style.marginS
 
             background: NBox {
-              color: Color.mSurfaceContainer
+              color: Color.mSurfaceVariant
               radius: Style.radiusM
             }
 
@@ -325,8 +325,6 @@ Item {
             to: mediaDuration
             value: calculatedPosition
             enabled: isConnected && canSeek
-            heightRatio: 0.4
-            cutoutColor: Color.mSurfaceVariant
             onPressedChanged: if (!pressed && Math.abs(value - calculatedPosition) > 1)
                                 pluginMain?.seek(value)
           }
@@ -449,8 +447,6 @@ Item {
             to: 1
             value: localVolumeLevel
             enabled: isConnected && !isVolumeMuted
-            heightRatio: 0.4
-            cutoutColor: Color.mSurfaceVariant
             onMoved: localVolumeLevel = value
             onPressedChanged: if (!pressed)
                                 pluginMain?.setVolume(localVolumeLevel)
