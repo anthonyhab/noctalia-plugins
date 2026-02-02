@@ -164,7 +164,7 @@ Item {
             id: devicePopup
             y: deviceButton.height - Style.marginS
             width: deviceButton.width
-            implicitHeight: Math.min(Math.max(48 * Style.uiScaleRatio, Style.capsuleHeight) * 5, deviceListView.contentHeight + devicePopup.topPadding + devicePopup.bottomPadding)
+            implicitHeight: Math.min(Style.capsuleHeight * 5, deviceListView.contentHeight + devicePopup.topPadding + devicePopup.bottomPadding)
             padding: Style.marginS
 
             background: NBox {
@@ -179,32 +179,22 @@ Item {
 
               delegate: Rectangle {
                 width: deviceListView.width
-                height: Math.max(48 * Style.uiScaleRatio, Style.capsuleHeight)
+                height: Style.capsuleHeight
                 radius: Style.radiusS
 
                 readonly property bool isSelected: modelData.entity_id === pluginMain?.selectedMediaPlayer
 
-                color: isSelected ? Color.mSecondaryContainer : (deviceDelegateMA.containsMouse ? Color.mHover : "transparent")
+                color: deviceDelegateMA.containsMouse ? Color.mHover : "transparent"
 
                 NText {
                   anchors.fill: parent
                   anchors.leftMargin: Style.marginM
-                  anchors.rightMargin: Style.marginL + Style.marginM
+                  anchors.rightMargin: Style.marginM
                   text: modelData.friendly_name || modelData.entity_id
                   verticalAlignment: Text.AlignVCenter
-                  color: parent.isSelected ? Color.mOnSecondaryContainer : (deviceDelegateMA.containsMouse ? Color.mOnHover : Color.mOnSurface)
+                  color: deviceDelegateMA.containsMouse ? Color.mOnHover : (parent.isSelected ? Color.mPrimary : Color.mOnSurface)
                   font.weight: parent.isSelected ? Style.fontWeightBold : Style.fontWeightMedium
                   elide: Text.ElideRight
-                }
-
-                NIcon {
-                  anchors.right: parent.right
-                  anchors.rightMargin: Style.marginM
-                  anchors.verticalCenter: parent.verticalCenter
-                  icon: "check"
-                  visible: parent.isSelected
-                  color: Color.mOnSecondaryContainer
-                  pointSize: Style.fontSizeM
                 }
 
                 MouseArea {
