@@ -28,12 +28,13 @@ Item {
   property bool cacheHydrated: false
   property bool settingsReady: false
   // Keys we persist to cache for offline/fast startup UI
-  readonly property var cachedAttributeKeys: ["media_title", "media_artist", "media_album_name", "entity_picture", "media_duration", "media_position", "media_position_updated_at", "volume_level", "is_volume_muted", "shuffle", "repeat", "friendly_name"]
+  readonly property var cachedAttributeKeys: ["media_title", "media_artist", "media_album_name", "entity_picture", "media_duration", "media_position", "media_position_updated_at", "volume_level", "is_volume_muted", "shuffle", "repeat", "friendly_name", "preMuteVolumeLevel"]
 
   // Keys we allow to "stick" across refreshes when missing.
   // Keep this list conservative to avoid stale media metadata when a new item doesn't provide all fields.
   readonly property var mergeStickyAttributeKeys: ["volume_level", "is_volume_muted", "shuffle", "repeat", "friendly_name"]
   property var volumeOverrides: ({})
+  property real preMuteVolumeLevel: -1
 
   // Computed properties for current media player
   readonly property var selectedPlayerState: {
@@ -46,7 +47,7 @@ Item {
   readonly property bool canPause: !!(supportedFeatures & 1)
   readonly property bool canSeek: !!(supportedFeatures & 2)
   readonly property bool canVolumeSet: !!(supportedFeatures & 4)
-  readonly property bool canVolumeMute: !!(supportedFeatures & 8)
+  readonly property bool canVolumeMute: !!(supportedFeatures & 8) || hasValidAttribute(selectedPlayerState?.attributes, "is_volume_muted")
   readonly property bool canPrevious: !!(supportedFeatures & 16)
   readonly property bool canNext: !!(supportedFeatures & 32)
   readonly property bool canTurnOn: !!(supportedFeatures & 128)
@@ -302,8 +303,53 @@ Item {
         ToastService.showError(friendlyName, pluginApi?.tr("errors.service-failed") || "Service call failed");
       } else {
         Logger.d("HomeAssistant", "Service call successful:", domain, service);
+        // REST service calls return updated entity states - merge them immediately
+        if (response && Array.isArray(response)) {
+          mergeServiceResponseStates(response);
+        }
       }
     });
+  }
+
+  // Merge states returned from service calls (instant UI updates)
+  function mergeServiceResponseStates(entities) {
+    if (!entities || !Array.isArray(entities) || entities.length === 0)
+      return;
+
+    const newState = Object.assign({}, currentState);
+    let updatedCount = 0;
+
+    for (const entity of entities) {
+      if (!entity.entity_id)
+        continue;
+      // Only process media_player entities
+      if (!entity.entity_id.startsWith("media_player."))
+        continue;
+
+      const mergedEntity = Object.assign({}, entity);
+      mergedEntity.attributes = mergePlayerAttributes(currentState, entity.entity_id, entity.attributes);
+      maybeStoreVolumeOverride(entity.entity_id, mergedEntity.attributes);
+      newState[entity.entity_id] = mergedEntity;
+      updatedCount++;
+
+      // Update mediaPlayers list if needed
+      const existingIndex = mediaPlayers.findIndex(p => p.entity_id === entity.entity_id);
+      if (existingIndex >= 0) {
+        mediaPlayers[existingIndex] = {
+          entity_id: entity.entity_id,
+          friendly_name: entity.attributes?.friendly_name || entity.entity_id,
+          state: entity.state
+        };
+      }
+    }
+
+    if (updatedCount > 0) {
+      currentState = newState;
+      // Trigger reactivity by reassigning mediaPlayers
+      mediaPlayers = [...mediaPlayers];
+      saveCachedState();
+      Logger.d("HomeAssistant", "Merged", updatedCount, "entities from service response");
+    }
   }
 
   // Media player control functions
@@ -396,10 +442,15 @@ Item {
   function toggleMute() {
     if (!selectedMediaPlayer)
       return;
-    callService("media_player", "volume_mute", selectedMediaPlayer, {
-                  is_volume_mute: !isVolumeMuted
-                });
-    updateSelectedPlayerAttribute("is_volume_muted", !isVolumeMuted);
+    if (volumeLevel > 0) {
+      preMuteVolumeLevel = volumeLevel;
+      setVolume(0);
+    } else if (preMuteVolumeLevel > 0) {
+      setVolume(preMuteVolumeLevel);
+      preMuteVolumeLevel = -1;
+    } else {
+      setVolume(0.5);
+    }
   }
 
   function seek(position) {
@@ -480,6 +531,8 @@ Item {
     }
     if (pluginApi.pluginSettings.volumeOverrides)
       volumeOverrides = pluginApi.pluginSettings.volumeOverrides;
+    if (pluginApi.pluginSettings.preMuteVolumeLevel !== undefined)
+      preMuteVolumeLevel = pluginApi.pluginSettings.preMuteVolumeLevel;
     cacheHydrated = true;
   }
 
@@ -496,6 +549,7 @@ Item {
       timestamp: Date.now()
     };
     pluginApi.pluginSettings.volumeOverrides = volumeOverrides || {};
+    pluginApi.pluginSettings.preMuteVolumeLevel = preMuteVolumeLevel;
     pluginApi.saveSettings();
   }
 
