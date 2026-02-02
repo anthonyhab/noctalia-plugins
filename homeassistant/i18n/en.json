@@ -28,6 +28,10 @@
     "refresh": "Refresh"
   },
   "settings": {
+    "tabs": {
+      "appearance": "Appearance",
+      "connection": "Connection"
+    },
     "description": "Connect to your Home Assistant instance to control media players.",
     "url": "Home Assistant URL",
     "url-placeholder": "http://homeassistant.local:8123",
@@ -54,6 +58,13 @@
         "label": "Scrolling mode",
         "description": "Control when text scrolling is enabled for long titles."
       }
+    },
+    "panel": {
+      "title": "Panel settings"
+    },
+    "show-volume-percentage": {
+      "label": "Show volume percentage",
+      "description": "Display the volume percentage next to the volume slider."
     }
   },
   "options": {
