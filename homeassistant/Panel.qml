@@ -40,6 +40,7 @@ Item {
   readonly property bool canRepeat: pluginMain?.canRepeat || false
   readonly property bool shuffleEnabled: pluginMain?.shuffleEnabled || false
   readonly property string repeatMode: pluginMain?.repeatMode || "off"
+  readonly property bool showVolumePercentage: pluginApi?.pluginSettings?.showVolumePercentage ?? false
   property real localVolumeLevel: volumeLevel
   onVolumeLevelChanged: {
     if (!volumeSlider.pressed)
@@ -453,13 +454,12 @@ Item {
           }
 
           NText {
-            visible: canVolumeSet
+            visible: canVolumeSet && showVolumePercentage
             text: Math.round(localVolumeLevel * 100) + "%"
             pointSize: Style.fontSizeXS
             color: Color.mOnSurfaceVariant
             family: Settings.data.ui.fontFixed
-            Layout.preferredWidth: Math.round(Style.marginL * 3)
-            Layout.rightMargin: Style.marginXS
+            Layout.preferredWidth: Math.round(Style.marginL * 2.5)
             horizontalAlignment: Text.AlignRight
           }
         }
