@@ -15,17 +15,25 @@ Item {
 
   visible: false
 
+  // Core properties
   property bool available: false
   property bool applying: false
   property bool pendingApplyAfterCurrent: false
   property string themeName: ""
   property var availableThemes: []
   property bool suppressSettingsSignal: false
+  property var pendingAlacrittyColors: null
+  property bool ignoreNextPluginSettingsChanged: false
+
+  // Operation manager state (replaces old pending operations)
+  property bool operationInProgress: false
+  property string operationThemeName: ""
+  property int operationId: 0
+
+  // Reload/apply coordination to avoid race conditions
   property bool pendingReloadApply: false
   property bool pendingReloadApplyAvailabilityReady: false
   property bool pendingReloadApplyThemeReady: false
-  property var pendingAlacrittyColors: null
-  property bool ignoreNextPluginSettingsChanged: false
 
   property bool observedActive: false
   property string observedConfigDir: ""
@@ -34,17 +42,21 @@ Item {
   readonly property bool debugLogging: pluginApi?.pluginSettings?.debugLogging === true
 
   readonly property string schemeDisplayName: pluginApi?.manifest?.metadata?.schemeName || "Omarchy"
+  readonly property string schemeBaseDir: {
+    const baseDir = ColorSchemeService.downloadedSchemesDirectory || (Settings.configDir + "colorschemes")
+    return baseDir.endsWith("/") ? baseDir.slice(0, -1) : baseDir
+  }
   readonly property string schemeKey: {
     const name = schemeDisplayName || "Omarchy"
     return name.replace(/[\\/]/g, "-").trim()
   }
   readonly property string schemeFolder: {
-    const baseDir = ColorSchemeService.downloadedSchemesDirectory || (Settings.configDir + "colorschemes");
-    const normalizedBase = baseDir.endsWith("/") ? baseDir.slice(0, -1) : baseDir;
-    return normalizedBase + "/" + schemeKey;
+    return schemeBaseDir + "/" + schemeKey
   }
   readonly property string schemeOutputPath: schemeFolder + "/" + schemeKey + ".json"
   readonly property string schemeOutputDir: schemeFolder
+  readonly property string legacySchemeKey: (schemeKey || "").toLowerCase()
+  property bool legacyCleanupChecked: false
 
   property bool savedPreferencesLoaded: false
   property bool hasSavedColorPreferences: false
@@ -91,11 +103,49 @@ Item {
     return "~/.local/share/omarchy";
   }
 
+  // Async operation helpers
+  AsyncThemeSetter {
+    id: asyncThemeSetter
+    themeSetCommand: root.themeSetCommand
+    useFastScript: false
+    timeoutMs: 3000
+  }
+
+  InstantSchemeApplier {
+    id: instantSchemeApplier
+    schemeDisplayName: root.schemeDisplayName
+    pluginApi: root.pluginApi
+  }
+
   function normalizeThemeKey(name) {
     if (!name || typeof name !== "string")
       return ""
     return name.replace(/<[^>]+>/g, "").trim().toLowerCase().replace(/\s+/g, "-")
   }
+
+  // Format directory name to display name (matches Omarchy's walker style)
+  // e.g., "catppuccin-latte" → "Catppuccin Latte"
+  // e.g., "gruvbox" → "Gruvbox"
+  function formatThemeName(dirName) {
+    if (!dirName || typeof dirName !== "string")
+      return ""
+
+    // Replace hyphens with spaces
+    var spaced = dirName.replace(/-/g, " ")
+
+    // Capitalize first letter of each word
+    var words = spaced.split(" ")
+    for (var i = 0; i < words.length; i++) {
+      if (words[i].length > 0) {
+        words[i] = words[i].charAt(0).toUpperCase() + words[i].slice(1)
+      }
+    }
+
+    return words.join(" ")
+  }
+
+  // Computed property for display name
+  readonly property string themeDisplayName: formatThemeName(themeName)
 
   function logDebug() {
     if (!debugLogging)
@@ -103,12 +153,57 @@ Item {
     Logger.d.apply(Logger, ["Omarchy"].concat(Array.prototype.slice.call(arguments)))
   }
 
+  function isDaytime() {
+    // Only valid when location-based scheduling is enabled
+    const schedulingMode = Settings.data.colorSchemes.schedulingMode
+    if (schedulingMode !== "location") {
+      return null  // Unknown
+    }
+    return !Settings.data.colorSchemes.darkMode
+  }
+
+  function getFilteredThemes() {
+    const themes = root.availableThemes || []
+    const filteringEnabled = pluginApi?.pluginSettings?.timeBasedThemeFiltering === true
+    if (!filteringEnabled)
+      return themes
+
+    // Check if location-based scheduling is enabled
+    const schedulingMode = Settings.data.colorSchemes.schedulingMode
+    if (schedulingMode !== "location") {
+      Logger.w("Omarchy", "Time-based filtering enabled but location-based scheduling not active in Noctalia")
+      return themes  // Return all themes when we can't determine time
+    }
+
+    const isDay = isDaytime()
+    if (isDay === null) {
+      return themes  // Fallback if time unknown
+    }
+
+    const filtered = themes.filter(theme => {
+      const mode = theme.mode || "dark"
+      return isDay ? mode === "light" : mode === "dark"
+    })
+
+    if (filtered.length === 0) {
+      Logger.w("Omarchy", "No themes match current time of day, falling back to all themes")
+      return themes
+    }
+    return filtered
+  }
+
   function setNoctaliaDarkMode(isDarkMode) {
+    // Only update dark mode when scheduling is disabled
+    // Respect user's scheduling preferences in Noctalia
+    const schedulingMode = Settings.data.colorSchemes.schedulingMode || "off"
+    if (schedulingMode !== "off") {
+      Logger.d("Omarchy", "Skipping dark mode update - scheduling is active:", schedulingMode)
+      return false
+    }
+
     if (Settings.data.colorSchemes.darkMode === isDarkMode)
       return false
 
-    // Prevent ColorSchemeService's onDarkModeChanged handler from re-applying the
-    // previous predefined scheme while we are mid-apply (it triggers template generation).
     const wasWallpaper = !!Settings.data.colorSchemes.useWallpaperColors
     Settings.data.colorSchemes.useWallpaperColors = true
     Settings.data.colorSchemes.darkMode = isDarkMode
@@ -256,10 +351,11 @@ Item {
     pendingReloadApply = true
     pendingReloadApplyAvailabilityReady = false
     pendingReloadApplyThemeReady = false
+
     checkAvailability()
+    refreshThemeName()
     if (includeThemeScan)
       scanThemes()
-    refreshThemeName()
   }
 
   function maybeRunPendingReloadApply() {
@@ -267,9 +363,18 @@ Item {
       return
     if (!pendingReloadApplyAvailabilityReady || !pendingReloadApplyThemeReady)
       return
+
     pendingReloadApply = false
     if (pluginApi?.pluginSettings?.active)
       applyCurrentTheme()
+  }
+
+  function reloadPluginState() {
+    if (pluginApi?.pluginSettings?.active) {
+      scheduleReloadApply(true)
+    } else {
+      refresh()
+    }
   }
 
   function maybeAutoApply() {
@@ -294,20 +399,18 @@ Item {
   }
 
   function checkAvailability() {
-    // Check for both colors.toml and theme.name file
     runShell(availabilityProcess, "bash", "[ -f \"$1\" ] && [ -f \"$2\" ]", [omarchyConfigPath, omarchyThemeNamePath])
   }
 
   function scanThemes() {
     logDebug("Scanning themes using omarchy-theme-list")
-
-    // Use omarchy-theme-list and derive light/dark mode from theme files
+    // Output format: display_name|dir_name|mode
     const cmd = "themes_dir=\"$1\"; stock_dir=\"$2\"; " +
                 "omarchy-theme-list | while IFS= read -r name; do " +
                 "[ -z \"$name\" ] && continue; " +
                 "theme_dir=$(echo \"$name\" | sed -E 's/<[^>]+>//g' | tr '[:upper:]' '[:lower:]' | tr ' ' '-'); " +
                 "if [ -f \"$themes_dir/$theme_dir/light.mode\" ] || [ -f \"$stock_dir/$theme_dir/light.mode\" ]; then mode=light; else mode=dark; fi; " +
-                "printf '%s|%s\\n' \"$name\" \"$mode\"; " +
+                "printf '%s|%s|%s\\n' \"$name\" \"$theme_dir\" \"$mode\"; " +
                 "done";
     logDebug("Theme scan command:", cmd)
     runShell(themesProcess, "bash", cmd, [omarchyThemesDir, omarchyPath + "/themes"])
@@ -348,7 +451,6 @@ Item {
     }
 
     rememberColorPreferences()
-
     applying = true;
 
     const cacheCompatible = SchemeCache.isCompatible(ThemePipeline.PIPELINE_VERSION);
@@ -374,12 +476,68 @@ Item {
     return true;
   }
 
+  // NEW: Async setTheme with optimistic UI updates
   function setTheme(nextThemeName) {
     if (!nextThemeName)
       return false;
 
-    themeSetProcess.command = [themeSetCommand, nextThemeName];
-    themeSetProcess.running = true;
+    // Debounce: cancel previous operation if in progress
+    if (operationInProgress) {
+      Logger.d("Omarchy", "Cancelling previous operation");
+      asyncThemeSetter.cancelOperation();
+    }
+
+    const previousThemeName = themeName
+    const opId = ++operationId;
+    operationInProgress = true;
+    operationThemeName = nextThemeName;
+
+    Logger.i("Omarchy", "Starting async theme change:", nextThemeName, "opId:", opId);
+
+    // Phase 1: Optimistic UI update (instant)
+    themeName = nextThemeName;
+
+    // Phase 2: Apply scheme from cache (instant)
+    const schemeResult = instantSchemeApplier.applyScheme(nextThemeName);
+    if (!schemeResult.success) {
+      Logger.w("Omarchy", "Cache miss, colors will apply after theme-set completes");
+    }
+
+    // Phase 3: Start async theme-set
+    const promise = asyncThemeSetter.setTheme(nextThemeName, opId);
+
+    promise.then(function(result) {
+      if (result.operationId !== operationId) {
+        Logger.d("Omarchy", "Stale operation ignored");
+        return;
+      }
+
+      operationInProgress = false;
+      operationThemeName = ""
+
+      if (result.success) {
+        Logger.i("Omarchy", "Theme change completed:", nextThemeName);
+        // Refresh theme name to confirm
+        refreshThemeName();
+
+        // If cache miss occurred, generate scheme from files now
+        if (!schemeResult.success) {
+          Logger.i("Omarchy", "Cache miss detected, generating scheme from files");
+          Qt.callLater(function() {
+            applyCurrentTheme();
+          });
+        }
+      } else {
+        Logger.e("Omarchy", "Theme change failed:", result.error);
+        themeName = previousThemeName
+        refreshThemeName()
+        Qt.callLater(function() {
+          applyCurrentTheme()
+        })
+        ToastService.showError("Omarchy", pluginApi?.tr("errors.failed-theme-set") || "Failed to switch theme");
+      }
+    });
+
     return true;
   }
 
@@ -388,7 +546,6 @@ Item {
     logDebug("First 500 chars:", content.slice(0, 500))
 
     function extractColorFromLine(line) {
-      // Match both formats: color = "#ffffff" and color = "0xffffff"
       const colorMatch = line.match(/=\s*["'](?:#|0x)?([a-fA-F0-9]{6,8})["']/);
       if (colorMatch) {
         const hex = colorMatch[1].toLowerCase();
@@ -408,7 +565,6 @@ Item {
 
       const color = extractColorFromLine(line);
       if (color) {
-        // Extract the key name (everything before the =)
         const keyMatch = line.match(/^([a-zA-Z0-9_]+)\s*=/);
         if (keyMatch) {
           const key = keyMatch[1];
@@ -420,41 +576,27 @@ Item {
 
     Logger.i("Omarchy", "Parsed colors:", Object.keys(colors).join(","));
 
-    if (!colors.background) {
-      Logger.e("Omarchy", "PARSE FAILED: No background color found");
-      logDebug("First 500 chars of content:", content.slice(0, 500))
-    }
-    if (!colors.foreground) {
-      Logger.e("Omarchy", "PARSE FAILED: No foreground color found");
-      logDebug("First 500 chars of content:", content.slice(0, 500))
-    }
-
-    if (!colors.background || !colors.foreground)
+    if (!colors.background || !colors.foreground) {
+      Logger.e("Omarchy", "PARSE FAILED: Missing required colors");
       return null;
+    }
     return colors;
   }
 
   function parseHyprlandConf(content) {
-    // Extract $activeBorderColor from hyprland.conf
-    // Formats: rgb(RRGGBB), rgba(RRGGBBAA), rgba(...) rgba(...) 45deg (gradient)
     const lines = content.split("\n");
     for (var i = 0; i < lines.length; i++) {
       const line = lines[i].trim();
       if (line.startsWith("$activeBorderColor")) {
-        // Extract the color value after the =
         const match = line.match(/=\s*(.+)/);
         if (!match) continue;
 
         const value = match[1].trim();
-        // For gradients like "rgba(010401ee) rgba(518a51ee) 45deg", pick the second (brighter) color
-        // For simple colors like "rgb(c6d0f5)", use that
         const colorMatches = value.match(/rgba?\(([a-fA-F0-9]{6,8})\)/g);
         if (colorMatches && colorMatches.length > 0) {
-          // Use the last color in the list (usually brighter in gradients)
           const lastColor = colorMatches[colorMatches.length - 1];
           const hexMatch = lastColor.match(/rgba?\(([a-fA-F0-9]{6,8})\)/);
           if (hexMatch) {
-            // Take first 6 chars for RGB, ignore alpha if present
             const hex = hexMatch[1].slice(0, 6);
             logDebug("Found Hyprland border color:", "#" + hex)
             return "#" + hex.toLowerCase();
@@ -480,12 +622,10 @@ Item {
       return;
     }
 
-    // Include both dark and light keys (native schemes have both)
-    // Use the generated scheme for the active mode, copy it for the other mode as fallback
     const wrappedScheme = {
       "dark": scheme,
       "light": scheme
-    };
+    }
 
     const jsonContent = JSON.stringify(wrappedScheme, null, 2);
     logDebug("Writing scheme JSON, length:", jsonContent.length)
@@ -494,16 +634,31 @@ Item {
     runShell(schemeWriteProcess, "sh", writeCmd, [schemeOutputDir, schemeOutputPath])
   }
 
+  function cleanupLegacySchemeFolder() {
+    if (legacyCleanupChecked)
+      return
+    legacyCleanupChecked = true
+
+    if (!schemeBaseDir || !schemeKey)
+      return
+    if (!legacySchemeKey || legacySchemeKey === schemeKey)
+      return
+
+    const cleanupCmd = "if [ -d \"$1/$2\" ] && [ -f \"$1/$3/$3.json\" ]; then rm -rf \"$1/$2\" && printf 'removed'; fi"
+    runShell(legacySchemeCleanupProcess, "sh", cleanupCmd, [schemeBaseDir, legacySchemeKey, schemeKey])
+  }
+
+  // Process definitions
   Process {
     id: availabilityProcess
     running: false
     onExited: function (code) {
       available = (code === 0);
-      maybeAutoApply()
       if (root.pendingReloadApply) {
         root.pendingReloadApplyAvailabilityReady = true
         root.maybeRunPendingReloadApply()
       }
+      maybeAutoApply()
     }
   }
 
@@ -582,29 +737,32 @@ Item {
       }
 
       const themeLines = output.trim().split("\n").filter(line => line && line.trim());
-      const themeNames = [];
-
-      // Create theme entries with just names (colors parsed by omarchy-theme-set)
       const themes = [];
       for (var i = 0; i < themeLines.length; i++) {
         const line = themeLines[i];
         const parts = line.split("|");
-        const themeName = parts[0]?.trim();
-        if (!themeName)
+        // New format: display_name|dir_name|mode
+        const displayName = parts[0]?.trim();
+        const dirName = parts[1]?.trim();
+        const detectedMode = parts[2]?.trim();
+
+        if (!displayName || !dirName)
           continue;
-        const detectedMode = parts[1]?.trim();
-        const normalizedName = normalizeThemeKey(themeName)
+
+        const normalizedName = normalizeThemeKey(dirName)
         const cachedScheme = SchemeCache.getScheme(normalizedName);
         const mode = cachedScheme?.mode || detectedMode || "dark";
-        themeNames.push(themeName);
+
         themes.push({
-          "name": themeName,
-          "colors": [],  // No preview colors needed
+          "name": displayName,      // Display name for UI (e.g., "Catppuccin Latte")
+          "dirName": dirName,       // Directory name for operations (e.g., "catppuccin-latte")
+          "colors": [],
           "mode": mode
         });
+
       }
 
-      Logger.i("Omarchy", "Found", themeNames.length, "themes")
+      Logger.i("Omarchy", "Found", themes.length, "themes")
       availableThemes = themes;
     }
   }
@@ -618,22 +776,6 @@ Item {
       if (root.pendingReloadApply) {
         root.pendingReloadApplyThemeReady = true
         root.maybeRunPendingReloadApply()
-      }
-    }
-  }
-
-  Process {
-    id: themeSetProcess
-    running: false
-    onExited: function (code) {
-      if (code !== 0) {
-        ToastService.showError("Omarchy", pluginApi?.tr("errors.failed-theme-set") || "Failed to switch theme");
-        return;
-      }
-      if (pluginApi?.pluginSettings?.active) {
-        scheduleReloadApply()
-      } else {
-        refreshThemeName()
       }
     }
   }
@@ -686,7 +828,6 @@ Item {
         return;
       }
 
-      // Parse Hyprland border color (optional - don't fail if missing)
       if (code === 0) {
         const content = stdout.text || "";
         const borderColor = parseHyprlandConf(content);
@@ -702,7 +843,6 @@ Item {
       const schemeResult = ThemePipeline.generateScheme(parsed, ColorsConvert);
       logDebug("Detected mode:", schemeResult.mode)
 
-      // Auto-sync dark mode setting
       const isDarkMode = schemeResult.mode === "dark";
       if (Settings.data.colorSchemes.darkMode !== isDarkMode) {
         Logger.i("Omarchy", "Auto-switching Noctalia dark mode to:", isDarkMode);
@@ -730,8 +870,9 @@ Item {
 
       Logger.i("Omarchy", "Scheme file written successfully to:", schemeOutputPath);
       ColorSchemeService.applyScheme(schemeOutputPath)
+      // Store scheme identity (key) not full path for better Noctalia integration
       if (Settings.data.colorSchemes.useWallpaperColors) {
-        Settings.data.colorSchemes.predefinedScheme = schemeOutputPath
+        Settings.data.colorSchemes.predefinedScheme = schemeKey
         Settings.data.colorSchemes.useWallpaperColors = false
       }
 
@@ -742,8 +883,25 @@ Item {
     }
   }
 
+  Process {
+    id: legacySchemeCleanupProcess
+    running: false
+    stdout: StdioCollector {}
+    onExited: function(code) {
+      if (code !== 0)
+        return
+
+      if ((stdout.text || "").indexOf("removed") !== -1) {
+        Logger.i("Omarchy", "Removed legacy omarchy colorscheme directory to prevent duplicates")
+        if (ColorSchemeService.loadColorSchemes)
+          ColorSchemeService.loadColorSchemes()
+      }
+    }
+  }
+
   function cycleTheme() {
-    const themes = root.availableThemes || [];
+    const filteringMode = pluginApi?.pluginSettings?.themeFilteringMode || "random-only"
+    const themes = filteringMode === "random-and-cycle" ? getFilteredThemes() : (root.availableThemes || [])
     if (themes.length === 0)
       return;
 
@@ -751,8 +909,11 @@ Item {
     const currentKey = normalizeThemeKey(root.themeName)
     for (let i = 0; i < themes.length; i++) {
       const entry = themes[i];
-      const name = typeof entry === "string" ? entry : entry.name;
-      if (normalizeThemeKey(name) === currentKey) {
+      // Use dirName for comparison if available, fallback to name
+      const entryKey = typeof entry === "string"
+        ? normalizeThemeKey(entry)
+        : normalizeThemeKey(entry.dirName || entry.name);
+      if (entryKey === currentKey) {
         currentIndex = i;
         break;
       }
@@ -760,29 +921,34 @@ Item {
 
     const nextIndex = (currentIndex + 1) % themes.length;
     const nextTheme = themes[nextIndex];
-    const nextName = typeof nextTheme === "string" ? nextTheme : nextTheme.name;
+    // Use dirName for operations, not display name
+    const nextName = typeof nextTheme === "string" ? nextTheme : (nextTheme.dirName || nextTheme.name);
+    Logger.d("Omarchy", "cycleTheme: current:", root.themeName, "-> next:", nextName);
     root.setTheme(nextName);
   }
 
   function randomTheme() {
-    const themes = root.availableThemes || [];
+    const themes = getFilteredThemes();
     if (themes.length === 0)
       return;
 
-    // Filter out the currently active theme
     const currentKey = normalizeThemeKey(root.themeName)
     const otherThemes = themes.filter(theme => {
-      const name = typeof theme === "string" ? theme : theme.name;
-      return normalizeThemeKey(name) !== currentKey
+      // Use dirName for comparison if available, fallback to name
+      const themeKey = typeof theme === "string"
+        ? normalizeThemeKey(theme)
+        : normalizeThemeKey(theme.dirName || theme.name);
+      return themeKey !== currentKey
     });
 
-    // If no other themes available, can't pick a different one
     if (otherThemes.length === 0)
       return;
 
     const randomIndex = Math.floor(Math.random() * otherThemes.length);
     const randomTheme = otherThemes[randomIndex];
-    const randomName = typeof randomTheme === "string" ? randomTheme : randomTheme.name;
+    // Use dirName for operations, not display name
+    const randomName = typeof randomTheme === "string" ? randomTheme : (randomTheme.dirName || randomTheme.name);
+    Logger.d("Omarchy", "randomTheme: selected theme dirName:", randomName);
     root.setTheme(randomName);
   }
 
@@ -790,7 +956,7 @@ Item {
     target: "omarchy"
 
     function reload() {
-      root.scheduleReloadApply()
+      root.reloadPluginState()
     }
 
     function toggle() {
@@ -818,7 +984,7 @@ Item {
     target: "plugin:omarchy"
 
     function reload() {
-      root.scheduleReloadApply()
+      root.reloadPluginState()
     }
 
     function toggle() {
@@ -845,6 +1011,7 @@ Item {
   Component.onCompleted: {
     loadSavedColorPreferences()
     refresh();
+    cleanupLegacySchemeFolder()
     captureObservedSettings()
     maybeAutoApply()
   }
@@ -876,7 +1043,7 @@ Item {
       if (activeChanged) {
         if (nextActive) {
           rememberColorPreferences()
-          root.scheduleReloadApply()
+          root.scheduleReloadApply(true)
         } else {
           restoreColorPreferences()
         }

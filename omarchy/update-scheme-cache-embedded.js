@@ -33,7 +33,8 @@ function updatePipelineVersion(version) {
 }
 
 function updateSchemeCache(version, cache) {
-  const cacheStr = JSON.stringify(cache, null, 2);
+  const sortedCache = Object.fromEntries(Object.entries(cache).sort((a, b) => a[0].localeCompare(b[0])));
+  const cacheStr = JSON.stringify(sortedCache, null, 2);
   const content = readFileSafe(targetFile);
   const next = content
     .replace(/const SCHEME_CACHE_VERSION = \"[^\"]*\";/, `const SCHEME_CACHE_VERSION = "${version}";`)

@@ -36,7 +36,7 @@ Item {
       return pluginTitle;
     if (!isAvailable)
       return unavailableLabel;
-    const name = pluginMain?.themeName || "";
+    const name = pluginMain?.themeDisplayName || "";
     return name !== "" ? name : pluginTitle;
   }
 
@@ -49,12 +49,16 @@ Item {
       return "alert-circle";
     return "palette";
   }
+  readonly property bool isLoading: pluginMain?.operationInProgress || false
+
   readonly property string tooltipText: {
+    if (isLoading)
+      return "Applying theme...";
     if (!isActive)
       return pluginApi?.tr("tooltips.inactive") || "Omarchy (inactive)\nClick to open settings";
     if (!isAvailable)
       return pluginApi?.tr("tooltips.not-available") || "Omarchy not available\nInstall omarchy and configure themes";
-    const currentTheme = pluginMain?.themeName || "";
+    const currentTheme = pluginMain?.themeDisplayName || "";
     return pluginApi?.tr("tooltips.active", { "theme": currentTheme }) || ("Theme: " + currentTheme);
   }
 
@@ -110,13 +114,14 @@ Item {
 
     screen: root.screen
     oppositeDirection: BarService.getPillDirection(root)
-    icon: iconName
+    icon: isLoading ? "refresh" : iconName
     text: pillText
     tooltipText: root.tooltipText
     forceOpen: !isBarVertical && isActive && isAvailable && pillText !== ""
     forceClose: !isActive || (!isAvailable && pillText === "")
-    customBackgroundColor: pillBackgroundColor
+    customBackgroundColor: isLoading ? Color.mPrimary : pillBackgroundColor
     customTextIconColor: pillTextIconColor
+
     onClicked: {
       TooltipService.hide();
       pluginApi?.togglePanel(root.screen, pill);
@@ -131,7 +136,9 @@ Item {
     }
     onMiddleClicked: {
       TooltipService.hide();
-      selectRandomTheme();
+      if (!isLoading) {
+        selectRandomTheme();
+      }
     }
   }
 

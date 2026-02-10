@@ -2,6 +2,14 @@
 
 Fast color scheme conversion for QuickShell/Noctalia with CIELAB-optimized colors.
 
+## Availability
+
+Install and update through the Noctalia plugin directory:
+
+1. Open `Settings -> Plugins -> Sources`
+2. Click `Add custom repository`
+3. Add `https://github.com/anthonyhab/noctalia-plugins/`
+
 ## Architecture
 
 ### Runtime (QuickShell)
@@ -51,11 +59,12 @@ When you want to improve the color conversion:
 
 3. **Regenerate cache:**
    ```bash
-   node generate-scheme-cache.js
+   node generate-scheme-cache.js --scope builtins
    node update-scheme-cache-embedded.js
+   node check-cache-consistency.js
    ```
    First command generates JSON, second embeds it in the QML file
-   (Repo ships an empty cache; run these before release.)
+   and the third verifies version/key consistency.
 
 4. **Test in QuickShell:**
    - The updated CIELAB-optimized colors are immediately available
@@ -65,8 +74,11 @@ When you want to improve the color conversion:
 
 Just add your theme to `~/.config/omarchy/themes/my-theme/` with a `colors.toml` file!
 
-The script automatically:
-- Scans both user themes (`~/.config/omarchy/themes/*`) and default themes (`~/.local/share/omarchy/themes/*`)
+The script can automatically:
+- Scan built-in themes only (default release mode):
+  `node generate-scheme-cache.js --scope builtins`
+- Scan built-in + user themes:
+  `node generate-scheme-cache.js --scope all`
 - Parses `colors.toml` for colors (simple TOML format: `key = "#hexvalue"`)
 - Converts to CIELAB-optimized noctalia format
 
@@ -80,8 +92,9 @@ The script automatically:
 
 Then regenerate:
 ```bash
-node generate-scheme-cache.js    # Scans all themes, builds palettes
+node generate-scheme-cache.js --scope all
 node update-scheme-cache-embedded.js
+node check-cache-consistency.js
 ```
 
 **Note: New omarchy versions include default themes bundled with omarchy, no need to install them separately!**
@@ -94,6 +107,7 @@ node update-scheme-cache-embedded.js
 - **ColorsConvert.js** - Runtime HSL utilities
 - **generate-scheme-cache.js** - CLI tool to generate scheme cache
 - **update-scheme-cache-embedded.js** - CLI tool to embed cache + version
+- **check-cache-consistency.js** - Validates embedded cache keys/version against source files
 - **scheme-cache.json** - Generated cache (auto-updated, don't edit)
 - **color_analysis_report.js** - CLI tool for analyzing themes
 
