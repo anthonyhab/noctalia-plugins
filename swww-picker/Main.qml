@@ -21,6 +21,7 @@ Item {
   property string resolvedWallpapersDir: ""
   property bool resolvedDirReady: false
   property string lastWallpapersDirSetting: ""
+  property bool rescanPending: false
 
   // Default settings from manifest
   readonly property var defaultSettings: pluginApi?.manifest?.metadata?.defaultSettings || ({})
@@ -95,6 +96,11 @@ Item {
   function scanWallpapers() {
     if (!wallpapersDir) {
       wallpaperList = [];
+      return;
+    }
+
+    if (scanProcess.running) {
+      rescanPending = true;
       return;
     }
 
@@ -214,11 +220,17 @@ Item {
   // Refresh: re-check availability and rescan wallpapers
   function refresh() {
     checkAvailability();
-    scanWallpapers();
+    if (resolvedDirReady) {
+      scanWallpapers();
+    } else {
+      checkResolvedWallpapersDir();
+    }
   }
 
   function checkResolvedWallpapersDir() {
     if (!wallpapersDir)
+      return;
+    if (resolveDirProcess.running)
       return;
     const dirEsc = wallpapersDir.replace(/'/g, "'\\''");
     resolveDirProcess.command = ["bash", "-c", "readlink -f '" + dirEsc + "' 2>/dev/null || true"];
@@ -288,6 +300,10 @@ Item {
       if (code !== 0) {
         Logger.e("SwwwPicker", "Failed to scan wallpapers directory");
         wallpaperList = [];
+        if (rescanPending) {
+          rescanPending = false;
+          Qt.callLater(scanWallpapers);
+        }
         return;
       }
 
@@ -295,6 +311,10 @@ Item {
       if (!output) {
         Logger.w("SwwwPicker", "No wallpapers found in " + wallpapersDir);
         wallpaperList = [];
+        if (rescanPending) {
+          rescanPending = false;
+          Qt.callLater(scanWallpapers);
+        }
         return;
       }
 
@@ -309,6 +329,11 @@ Item {
       } else if (wallpaperList.length > 0) {
         currentIndex = 0;
         currentWallpaper = wallpaperList[0];
+      }
+
+      if (rescanPending) {
+        rescanPending = false;
+        Qt.callLater(scanWallpapers);
       }
     }
   }
@@ -327,6 +352,7 @@ Item {
       if (!resolvedDirReady) {
         resolvedDirReady = true;
         resolvedWallpapersDir = resolved;
+        scanWallpapers();
         return;
       }
       if (resolvedWallpapersDir !== resolved) {
@@ -383,8 +409,8 @@ Item {
       const newDir = wallpapersDir;
       if (lastWallpapersDirSetting !== newDir) {
         lastWallpapersDirSetting = newDir;
-        Qt.callLater(scanWallpapers);
         resolvedDirReady = false;
+        resolvedWallpapersDir = "";
         checkResolvedWallpapersDir();
       }
     }
