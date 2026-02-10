@@ -2,6 +2,14 @@
 
 Use Noctalia as your Polkit authentication agent. When an app requests elevated privileges, a Noctalia panel opens for password entry.
 
+## Availability
+
+Install and update through the Noctalia plugin directory:
+
+1. Open `Settings -> Plugins -> Sources`
+2. Click `Add custom repository`
+3. Add `https://github.com/anthonyhab/noctalia-plugins/`
+
 ## Setup
 
 ### 1. Install dependencies
