@@ -25,7 +25,9 @@
       "themeSetCommand": "",
       "omarchyConfigDir": "",
       "showThemeName": true,
-      "showSearchInput": true
+      "showSearchInput": true,
+      "timeBasedThemeFiltering": false,
+      "themeFilteringMode": "random-only"
     }
   }
 }

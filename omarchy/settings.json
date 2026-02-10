@@ -1,8 +1,0 @@
-{
-  "active": true,
-  "themeSetCommand": "~/.local/bin/theme-set",
-  "omarchyConfigDir": "",
-  "showThemeName": true,
-  "showSearchInput": true,
-  "debugLogging": true
-}

@@ -5,7 +5,10 @@
     "not-available": "Omarchy not found",
     "active": "Active",
     "inactive": "Inactive",
-    "applying": "Applying…"
+    "applying": "Applying...",
+    "no-location": "Location-based scheduling is not enabled in Noctalia settings",
+    "daytime": "Currently: Daytime",
+    "nighttime": "Currently: Nighttime"
   },
   "actions": {
     "refresh": "Refresh",
@@ -21,7 +24,7 @@
     "theme-set-command": "Theme-set command",
     "theme": {
       "label": "Theme",
-      "placeholder": "Select…",
+      "placeholder": "Select...",
       "available": "Available themes"
     },
     "show-theme-name": {
@@ -35,7 +38,18 @@
     "debug-logging": {
       "label": "Enable debug logging",
       "desc": "Logs extra diagnostics to help troubleshoot theme parsing and scheme application."
+    },
+    "time-based-filtering": {
+      "label": "Enable time-based theme filtering",
+      "desc": "Random theme selection will only pick light themes during daytime and dark themes at night."
+    },
+    "filtering-mode": {
+      "label": "Apply filtering to"
     }
+  },
+  "filtering-mode": {
+    "random-only": "Random theme only",
+    "random-and-cycle": "Random and cycle"
   },
   "tooltips": {
     "close": "Close",
@@ -59,14 +73,22 @@
     "auto-applying": "Auto-applying Omarchy theme"
   },
   "panel": {
-    "settings-hint": "Configure Omarchy paths via Settings → Plugins → Omarchy.",
+    "settings-hint": "Configure Omarchy paths via Settings -> Plugins -> Omarchy.",
     "search-placeholder": "Search themes..."
   },
   "settings": {
     "description": "Set how Noctalia locates Omarchy and manage the plugin state.",
     "paths-hint": "Point the fields below at your Omarchy install; leave blank to use the defaults.",
+    "tabs": {
+      "general": "General",
+      "configuration": "Configuration"
+    },
     "controls": {
       "title": "Plugin controls"
+    },
+    "time-filtering": {
+      "title": "Time-based Theme Filtering",
+      "desc": "Automatically filter themes based on time of day using your location settings."
     }
   }
 }

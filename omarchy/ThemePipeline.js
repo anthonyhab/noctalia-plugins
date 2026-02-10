@@ -1,5 +1,5 @@
 // Fast runtime pipeline for generating Noctalia palettes from Omarchy colors.
-const PIPELINE_VERSION = "a0e19b763cce"; // Updated to include mBarBorder
+const PIPELINE_VERSION = "05a5e1b01ec6"; // Updated to include mBarBorder
 
 function ensureContrast(foreground, background, minRatio, step, convert) {
   let result = foreground;

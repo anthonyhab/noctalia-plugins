@@ -7,7 +7,7 @@
 //   node generate-scheme-cache.js
 //   node update-scheme-cache-embedded.js
 
-const SCHEME_CACHE_VERSION = "a0e19b763cce";
+const SCHEME_CACHE_VERSION = "05a5e1b01ec6";
 const SCHEME_CACHE = {
   "aetheria": {
     "mode": "dark",
@@ -46,6 +46,46 @@ const SCHEME_CACHE = {
       "mOutline": "#261851",
       "mOutlineVariant": "#231940",
       "mShadow": "#090611"
+    }
+  },
+  "miasma": {
+    "mode": "dark",
+    "palette": {
+      "mPrimary": "#78824b",
+      "mOnPrimary": "#ffffff",
+      "mPrimaryContainer": "#303324",
+      "mOnPrimaryContainer": "#f0f0f5",
+      "mSecondary": "#bb7744",
+      "mOnSecondary": "#1d1d1d",
+      "mSecondaryContainer": "#573c28",
+      "mOnSecondaryContainer": "#f0f0f5",
+      "mTertiary": "#5f875f",
+      "mOnTertiary": "#ffffff",
+      "mTertiaryContainer": "#323932",
+      "mOnTertiaryContainer": "#f0f0f5",
+      "mError": "#685742",
+      "mOnError": "#f0f0f5",
+      "mErrorContainer": "#201d19",
+      "mOnErrorContainer": "#f0f0f5",
+      "mHover": "#5f875f",
+      "mOnHover": "#ffffff",
+      "mSurface": "#222222",
+      "mOnSurface": "#c2c2b0",
+      "mBackground": "#222222",
+      "mOnBackground": "#c2c2b0",
+      "mSurfaceVariant": "#323030",
+      "mOnSurfaceVariant": "#9a9a9a",
+      "mSurfaceContainerLowest": "#2b2b2b",
+      "mSurfaceContainerLow": "#343333",
+      "mSurfaceContainer": "#3e3c3c",
+      "mSurfaceContainerHigh": "#474444",
+      "mSurfaceContainerHighest": "#514d4d",
+      "mSurfaceBright": "#4c4848",
+      "mSurfaceDim": "#1a1a1a",
+      "mOutline": "#444242",
+      "mOutlineVariant": "#3c3c3c",
+      "mShadow": "#1a1a1a",
+      "mBarBorder": "#78824b"
     }
   },
   "catppuccin": {
@@ -727,4 +767,8 @@ function isCompatible(pipelineVersion) {
 
 function getAvailableThemes() {
   return Object.keys(SCHEME_CACHE);
+}
+
+function getAllSchemes() {
+  return SCHEME_CACHE;
 }
