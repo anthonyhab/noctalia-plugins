@@ -409,16 +409,6 @@ Item {
     }
   }
 
-  onAgentAvailableChanged: {
-    // No-op - availability is now handled by connection/subscription
-  }
-
-  function enqueueSocketCommand(message, onResponse) {
-    // Deprecated - replaced by sendCommand
-    sendCommand(message);
-    onResponse?.(true, { type: "ok" });
-  }
-
   Socket {
     id: agentSocket
     path: root.socketPath

@@ -5,14 +5,17 @@
   "minNoctaliaVersion": "3.6.0",
   "author": "habibe",
   "license": "MIT",
-  "repository": "https://github.com/habibe/noctalia-polkit",
+  "repository": "https://github.com/anthonyhab/noctalia-plugins",
   "description": "Use Noctalia panels as your Polkit authentication agent.",
+  "tags": ["Panel", "System", "Privacy"],
   "entryPoints": {
     "main": "Main.qml",
     "panel": "Panel.qml",
     "settings": "Settings.qml"
   },
-  "dependencies": { "plugins": [] },
+  "dependencies": {
+    "plugins": []
+  },
   "metadata": {
     "defaultSettings": {
       "settingsPanelMode": "centered",
