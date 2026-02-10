@@ -1,7 +1,7 @@
 {
   "id": "polkit-auth",
   "name": "Polkit Authentication",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "minNoctaliaVersion": "3.6.0",
   "author": "habibe",
   "license": "MIT",
