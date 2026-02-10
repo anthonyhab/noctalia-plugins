@@ -1,25 +1,33 @@
-This is a development copy of a Home Assistant integration plugin for Noctalia.
+# Home Assistant Plugin
 
-**Install**
+Control Home Assistant media players from Noctalia Shell.
 
-- Copy this folder to `~/.config/noctalia/plugins/homeassistant/`
-- Ensure `~/.config/noctalia/plugins.json` enables the plugin (or enable it in Settings → Plugins)
+## Features
 
-**Setup**
+- Bar widget controls for media playback
+- Panel UI with playback, seek, and volume controls
+- Shuffle and repeat actions
+- Optional default media player selection
 
-1. In Home Assistant, go to Profile → Security → Long-Lived Access Tokens
-2. Create a new token and copy it
-3. In Noctalia Settings → Plugins → Home Assistant, enter:
-   - Your Home Assistant URL (e.g., http://homeassistant.local:8123)
-   - The access token you created
-4. Select your default media player (optional)
+## Availability
 
-**Features**
+Install and update through the Noctalia plugin directory:
 
-- Control media players from the bar widget
-- Full media control panel with playback controls, volume, and seek
-- Real-time status updates via polling
-- Support for multiple media players
-- Shuffle and repeat controls
+1. Open `Settings -> Plugins -> Sources`
+2. Click `Add custom repository`
+3. Add `https://github.com/anthonyhab/noctalia-plugins/`
 
-This plugin uses HTTP REST API calls to communicate with Home Assistant.
+## Setup
+
+1. In Home Assistant, create a long-lived access token:
+   - Profile -> Security -> Long-Lived Access Tokens
+2. Open **Noctalia Settings -> Plugins -> Home Assistant**.
+3. Configure:
+   - Home Assistant URL (for example `http://homeassistant.local:8123`)
+   - Access token
+   - Default media player (optional)
+
+## Notes
+
+- This plugin uses Home Assistant REST API calls.
+- Keep your token private and rotate it if compromised.

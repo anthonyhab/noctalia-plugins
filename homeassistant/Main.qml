@@ -19,7 +19,12 @@ Item {
 
   // HTTP request tracking
   property int requestId: 0
-  property var pendingRequests: ({})
+  property bool stateFetchInFlight: false
+  property int consecutiveStateFetchFailures: 0
+  readonly property int pollIntervalPlayingMs: 5000
+  readonly property int pollIntervalIdleMs: 15000
+  readonly property int pollIntervalMaxBackoffMs: 30000
+  property int currentPollIntervalMs: pollIntervalIdleMs
 
   // Entity state
   property var mediaPlayers: []
@@ -86,11 +91,21 @@ Item {
   // Polling timer for state updates
   Timer {
     id: pollTimer
-    interval: 5000  // Poll every 5 seconds
+    interval: currentPollIntervalMs
     repeat: true
     running: connected
     onTriggered: fetchStates()
   }
+
+  Timer {
+    id: cacheSaveTimer
+    interval: 750
+    repeat: false
+    onTriggered: flushCachedState()
+  }
+
+  property bool cacheDirty: false
+  property string lastSavedCacheSnapshot: ""
 
   // Connection test timer
   Timer {
@@ -123,6 +138,8 @@ Item {
         if (xhr.status === 200) {
           connected = true;
           connectionError = "";
+          consecutiveStateFetchFailures = 0;
+          updatePollInterval();
           Logger.d("HomeAssistant", "Connection test successful");
           fetchStates();
         } else if (xhr.status === 401) {
@@ -198,21 +215,47 @@ Item {
     return requestId;
   }
 
+  function updatePollInterval() {
+    let nextInterval = isPlaying ? pollIntervalPlayingMs : pollIntervalIdleMs;
+    if (consecutiveStateFetchFailures > 0) {
+      const backoff = Math.min(pollIntervalPlayingMs * Math.pow(2, Math.min(consecutiveStateFetchFailures, 3)), pollIntervalMaxBackoffMs);
+      nextInterval = Math.max(nextInterval, backoff);
+    }
+    if (currentPollIntervalMs !== nextInterval) {
+      currentPollIntervalMs = nextInterval;
+    }
+  }
+
+  function markStateFetchResult(success) {
+    if (success) {
+      consecutiveStateFetchFailures = 0;
+    } else {
+      consecutiveStateFetchFailures++;
+    }
+    updatePollInterval();
+  }
+
   function fetchStates() {
+    if (!connected)
+      return;
+    if (stateFetchInFlight) {
+      Logger.d("HomeAssistant", "Skipping state fetch, previous request still in flight");
+      return;
+    }
+
+    stateFetchInFlight = true;
     Logger.d("HomeAssistant", "Fetching states...");
     sendHttpRequest("GET", "/api/states", null, function (status, response) {
+      stateFetchInFlight = false;
       if (status === 200 && response) {
         Logger.d("HomeAssistant", "States fetched successfully, processing", response.length, "entities");
         processStates(response);
+        markStateFetchResult(true);
       } else {
         Logger.w("HomeAssistant", "Failed to fetch states:", status);
+        markStateFetchResult(false);
       }
     });
-  }
-
-  // HTTP requests handle responses in callbacks, so this function is no longer needed
-  function handleResult(msg) {
-    // Legacy function - no longer used with HTTP API
   }
 
   function processStates(states) {
@@ -248,7 +291,7 @@ Item {
     }
 
     Logger.d("HomeAssistant", "Found", players.length, "media players");
-    saveCachedState();
+    scheduleCachedStateSave();
   }
 
   function handleStateChange(data) {
@@ -288,7 +331,7 @@ Item {
                                         return p;
                                       });
     }
-    saveCachedState();
+    scheduleCachedStateSave();
   }
 
   function callService(domain, service, entityId, serviceData) {
@@ -347,7 +390,7 @@ Item {
       currentState = newState;
       // Trigger reactivity by reassigning mediaPlayers
       mediaPlayers = [...mediaPlayers];
-      saveCachedState();
+      scheduleCachedStateSave();
       Logger.d("HomeAssistant", "Merged", updatedCount, "entities from service response");
     }
   }
@@ -412,7 +455,7 @@ Item {
     }
     newState[selectedMediaPlayer] = newPlayerState;
     currentState = newState;
-    saveCachedState();
+    scheduleCachedStateSave();
   }
 
   function setVolume(level) {
@@ -488,12 +531,14 @@ Item {
 
   function selectMediaPlayer(entityId) {
     selectedMediaPlayer = entityId;
-    saveCachedState();
+    scheduleCachedStateSave();
   }
 
   function disconnect() {
+    flushCachedState();
     connected = false;
     connecting = false;
+    stateFetchInFlight = false;
     pollTimer.stop();
   }
 
@@ -533,24 +578,49 @@ Item {
       volumeOverrides = pluginApi.pluginSettings.volumeOverrides;
     if (pluginApi.pluginSettings.preMuteVolumeLevel !== undefined)
       preMuteVolumeLevel = pluginApi.pluginSettings.preMuteVolumeLevel;
+    lastSavedCacheSnapshot = JSON.stringify(buildCachePayload());
+    cacheDirty = false;
     cacheHydrated = true;
   }
 
-  function saveCachedState() {
+  function buildCachePayload() {
+    return {
+      entities: buildCachedEntities(),
+      mediaPlayers: mediaPlayers,
+      selectedMediaPlayer: selectedMediaPlayer
+    };
+  }
+
+  function scheduleCachedStateSave() {
+    cacheDirty = true;
     if (!settingsReady || !pluginApi)
+      return;
+    cacheSaveTimer.restart();
+  }
+
+  function flushCachedState() {
+    if (!settingsReady || !pluginApi)
+      return;
+    if (!cacheDirty)
       return;
     if (!pluginApi.pluginSettings) {
       pluginApi.pluginSettings = {};
     }
-    pluginApi.pluginSettings.stateCache = {
-      entities: buildCachedEntities(),
-      mediaPlayers: mediaPlayers,
-      selectedMediaPlayer: selectedMediaPlayer,
+    const payload = buildCachePayload();
+    const snapshot = JSON.stringify(payload);
+    if (snapshot === lastSavedCacheSnapshot) {
+      cacheDirty = false;
+      return;
+    }
+
+    pluginApi.pluginSettings.stateCache = Object.assign({}, payload, {
       timestamp: Date.now()
-    };
+    });
     pluginApi.pluginSettings.volumeOverrides = volumeOverrides || {};
     pluginApi.pluginSettings.preMuteVolumeLevel = preMuteVolumeLevel;
     pluginApi.saveSettings();
+    lastSavedCacheSnapshot = snapshot;
+    cacheDirty = false;
   }
 
   // Auto-connect when URL/token are configured
@@ -579,10 +649,16 @@ Item {
 
   Component.onCompleted: {
     loadCachedStateIfAvailable();
+    updatePollInterval();
     if (haUrl && haToken) {
       testConnection();
     }
   }
+
+  Component.onDestruction: flushCachedState()
+
+  onIsPlayingChanged: updatePollInterval()
+  onConnectedChanged: updatePollInterval()
 
   function hasValidAttribute(attributes, key) {
     if (!attributes)

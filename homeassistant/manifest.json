@@ -5,8 +5,9 @@
   "minNoctaliaVersion": "3.6.0",
   "author": "habibe",
   "license": "MIT",
-  "repository": "https://github.com/habibe/noctalia-shell",
+  "repository": "https://github.com/anthonyhab/noctalia-plugins",
   "description": "Control Home Assistant media players from your bar.",
+  "tags": ["Bar", "Panel", "Productivity"],
   "entryPoints": {
     "main": "Main.qml",
     "panel": "Panel.qml",
