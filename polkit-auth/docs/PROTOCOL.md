@@ -2,50 +2,78 @@
 
 ## Overview
 
-The Noctalia Auth Protocol v2 is a session-based communication protocol between the authentication agent (`noctalia-auth`) and the UI client (`polkit-auth`).
+The Noctalia Auth Protocol v2 is a session-based IPC protocol between the daemon (`noctalia-auth`) and the UI plugin (`polkit-auth`).
 
-All messages are line-delimited JSON objects sent over a Unix domain socket at `${XDG_RUNTIME_DIR}/noctalia-auth.sock`.
-
----
+- Transport: line-delimited JSON over Unix socket
+- Socket path: `${XDG_RUNTIME_DIR}/noctalia-auth.sock`
+- Session ownership: daemon is the source of truth for lifecycle and state transitions
 
 ## Session Lifecycle
 
-### 1. Creation (`session.created`)
-Sent by the agent when a new authentication request is received (Polkit, Keyring, or Pinentry).
+### 1) `session.created`
+
+Emitted once when a logical auth flow starts.
 
 ```json
 {
   "type": "session.created",
   "id": "unique-session-id",
-  "source": "polkit" | "keyring" | "pinentry",
+  "source": "polkit",
   "context": {
     "message": "Authentication required",
     "requestor": {
       "name": "Application Name",
       "icon": "icon-name",
       "pid": 1234
-    },
-    ... source-specific fields
+    }
   }
 }
 ```
 
-### 2. Prompting (`session.updated`)
-Sent by the agent when user input (e.g., password) is required.
+### 2) `session.updated`
+
+Emitted when the same session needs input again or has retry feedback.
 
 ```json
 {
   "type": "session.updated",
   "id": "unique-session-id",
   "state": "prompting",
-  "prompt": "Password: ",
+  "prompt": "Password:",
   "echo": false,
-  "error": "Optional error message for retries"
+  "error": "Optional retry error",
+  "curRetry": 1,
+  "maxRetries": 3
 }
 ```
 
-### 3. Response (`session.respond`)
-Sent by the client to submit the user's response.
+Notes:
+- Retries must be modeled as `session.updated` on the same `id`
+- `curRetry` and `maxRetries` are primarily used by pinentry flows
+
+### 3) `session.closed`
+
+Emitted exactly once for terminal outcomes.
+
+```json
+{
+  "type": "session.closed",
+  "id": "unique-session-id",
+  "result": "success",
+  "error": "Optional terminal error"
+}
+```
+
+`result` values:
+- `success`
+- `cancelled`
+- `error`
+
+## Client Commands
+
+### `session.respond`
+
+Submit a user response for a prompting session.
 
 ```json
 {
@@ -55,48 +83,167 @@ Sent by the client to submit the user's response.
 }
 ```
 
-### 4. Completion (`session.closed`)
-Sent by the agent when the session is finished.
+Acknowledgement:
+- Success: `{"type":"ok"}`
+- Failure: `{"type":"error","message":"..."}`
+
+Common failure causes:
+- unknown session id
+- session not accepting input (invalid state)
+- source mismatch
+- not active UI provider
+
+### `session.cancel`
+
+Cancel a session.
 
 ```json
 {
-  "type": "session.closed",
-  "id": "unique-session-id",
-  "result": "success" | "cancelled" | "error"
+  "type": "session.cancel",
+  "id": "unique-session-id"
 }
 ```
 
----
+Acknowledgement:
+- Success: `{"type":"ok"}`
+- Failure: `{"type":"error","message":"..."}`
 
 ## Utility Messages
 
-### Ping
-Client checks if the agent is alive and retrieves version/capabilities.
+### `ping`
 
-**Request:** `{"type": "ping"}`
-**Response:** `{"type": "pong", "version": "2.0", "capabilities": ["polkit", "keyring", "pinentry"]}`
+Request:
 
-### Next (Long Polling)
-Client polls for the next pending event in the agent's queue.
+```json
+{"type":"ping"}
+```
 
-**Request:** `{"type": "next"}`
-**Response:** One of the `session.*` events, or `{"type": "empty"}` if no events are pending.
+Response:
 
----
+```json
+{
+  "type":"pong",
+  "version":"2.0",
+  "capabilities":["polkit","keyring","pinentry"],
+  "bootstrap": {
+    "mode":"session",
+    "pinentry_path":"/usr/libexec/pinentry-noctalia",
+    "timestamp": 1739198208
+  },
+  "provider": {
+    "id":"provider-id",
+    "name":"polkit-auth",
+    "kind":"quickshell",
+    "priority":100
+  }
+}
+```
+
+`bootstrap` is optional and reports startup self-heal/conflict policy state.
+`provider` is optional and reports the currently active UI provider.
+
+### UI provider registration
+
+UI frontends should register so the daemon can enforce active-provider ownership.
+
+Register request:
+
+```json
+{
+  "type":"ui.register",
+  "name":"polkit-auth",
+  "kind":"quickshell",
+  "priority":100
+}
+```
+
+Register response:
+
+```json
+{
+  "type":"ui.registered",
+  "id":"provider-id",
+  "active":true,
+  "priority":100
+}
+```
+
+`active` is computed after provider election and is authoritative for the registering client.
+
+Heartbeat request:
+
+```json
+{
+  "type":"ui.heartbeat",
+  "id":"provider-id"
+}
+```
+
+Unregister request:
+
+```json
+{
+  "type":"ui.unregister"
+}
+```
+
+Acknowledgement:
+- Success: `{"type":"ok"}`
+- Failure: `{"type":"error","message":"Provider not registered"}`
+
+Daemon active-provider event:
+
+```json
+{
+  "type":"ui.active",
+  "active":true,
+  "id":"provider-id",
+  "name":"polkit-auth",
+  "kind":"quickshell",
+  "priority":100
+}
+```
+
+Notes:
+- `ui.active` is a broadcast snapshot for all subscribers/providers.
+- When `active=true`, `id` is the elected provider.
+- When `active=false`, no provider is currently elected; clients should remain connected and wait for the next `ui.registered` / `ui.active` update.
+
+### `next`
+
+Long-poll one queued event.
+
+Request:
+
+```json
+{"type":"next"}
+```
+
+Response:
+- one `session.*` event (request blocks until an event is available)
 
 ## Source Contexts
 
 ### Polkit
-- `message`: Action description
-- `actionId`: The Polkit action ID
-- `user`: Target user for authentication
+- `message`
+- `actionId`
+- `user`
+- `details` (optional)
 
 ### Keyring
-- `keyringName`: The name of the keyring being unlocked
+- `message`
+- `keyringName`
 
 ### Pinentry
-- `description`: GPG prompt description
-- `keyinfo`: Internal GPG key identifier
-- `curRetry`: Current attempt number
-- `maxRetries`: Maximum allowed attempts
-- `confirmOnly`: If true, only a Yes/No confirmation is needed
+- `description`
+- `keyinfo`
+- `curRetry`
+- `maxRetries`
+- `confirmOnly`
+- `repeat`
+
+## Pinentry Notes
+
+- Pinentry retries should not force close+recreate loops
+- Wrong password should emit `session.updated` with `error` and stay in the same session
+- A terminal result (`success`, `cancelled`, or terminal `error`) must emit `session.closed` once

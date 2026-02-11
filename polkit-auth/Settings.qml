@@ -78,9 +78,29 @@ ColumnLayout {
   }
 
   NText {
-    text: pluginApi?.tr("settings.description") ?? "Connect to the Noctalia polkit agent over IPC."
+    text: pluginApi?.tr("settings.description") ?? "Connect to the Noctalia auth daemon over IPC."
     wrapMode: Text.WordWrap
     color: Color.mOnSurface
+  }
+
+  NText {
+    text: "Daemon conflict policy: " + (pluginMain?.agentConflictMode || "session")
+    wrapMode: Text.WordWrap
+    color: Color.mOnSurfaceVariant
+  }
+
+  NText {
+    text: {
+      if (!(pluginMain?.providerRegistered ?? false)) {
+        return "UI provider status: disconnected"
+      }
+      if (!(pluginMain?.providerActivityKnown ?? false)) {
+        return "UI provider status: negotiating"
+      }
+      return "UI provider status: " + ((pluginMain?.providerActive ?? true) ? "active" : "standby")
+    }
+    wrapMode: Text.WordWrap
+    color: Color.mOnSurfaceVariant
   }
 
   NComboBox {
