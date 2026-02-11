@@ -1,11 +1,11 @@
-# Noctalia Auth Protocol v2
+# BB Auth Protocol v2
 
 ## Overview
 
-The Noctalia Auth Protocol v2 is a session-based IPC protocol between the daemon (`noctalia-auth`) and the UI plugin (`polkit-auth`).
+The BB Auth Protocol v2 is a session-based IPC protocol between the daemon (`bb-auth`) and the UI plugin (`bb-auth`).
 
 - Transport: line-delimited JSON over Unix socket
-- Socket path: `${XDG_RUNTIME_DIR}/noctalia-auth.sock`
+- Socket path: `${XDG_RUNTIME_DIR}/bb-auth.sock`
 - Session ownership: daemon is the source of truth for lifecycle and state transitions
 
 ## Session Lifecycle
@@ -127,12 +127,12 @@ Response:
   "capabilities":["polkit","keyring","pinentry"],
   "bootstrap": {
     "mode":"session",
-    "pinentry_path":"/usr/libexec/pinentry-noctalia",
+    "pinentry_path":"/usr/libexec/pinentry-bb",
     "timestamp": 1739198208
   },
   "provider": {
     "id":"provider-id",
-    "name":"polkit-auth",
+    "name":"bb-auth",
     "kind":"quickshell",
     "priority":100
   }
@@ -151,7 +151,7 @@ Register request:
 ```json
 {
   "type":"ui.register",
-  "name":"polkit-auth",
+  "name":"bb-auth",
   "kind":"quickshell",
   "priority":100
 }
@@ -198,7 +198,7 @@ Daemon active-provider event:
   "type":"ui.active",
   "active":true,
   "id":"provider-id",
-  "name":"polkit-auth",
+  "name":"bb-auth",
   "kind":"quickshell",
   "priority":100
 }

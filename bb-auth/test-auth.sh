@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-SOCKET="${XDG_RUNTIME_DIR}/noctalia-auth.sock"
+SOCKET="${XDG_RUNTIME_DIR}/bb-auth.sock"
 
 send() {
     local payload="$1"
@@ -10,7 +10,7 @@ send() {
 
 if [ ! -S "$SOCKET" ]; then
     echo "Socket not found: $SOCKET"
-    echo "Ensure noctalia-auth.service is running"
+    echo "Ensure bb-auth.service is running"
     exit 1
 fi
 

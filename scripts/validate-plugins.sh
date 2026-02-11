@@ -16,7 +16,7 @@ done
 plugins=(
   homeassistant
   omarchy
-  polkit-auth
+  bb-auth
   swww-picker
 )
 

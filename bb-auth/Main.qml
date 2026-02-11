@@ -36,7 +36,7 @@ Item {
   readonly property string socketPath: {
     const runtimeDir = Quickshell.env("XDG_RUNTIME_DIR");
     return runtimeDir && runtimeDir.length > 0
-      ? (runtimeDir + "/noctalia-auth.sock")
+      ? (runtimeDir + "/bb-auth.sock")
       : "";
   }
 
@@ -101,7 +101,7 @@ Item {
     if (!agentSocket.connected) return false
     return sendCommand({
       type: "ui.register",
-      name: "polkit-auth",
+      name: "bb-auth",
       kind: "quickshell",
       priority: 100,
       version: agentVersion

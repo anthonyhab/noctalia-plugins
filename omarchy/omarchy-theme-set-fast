@@ -1,0 +1,159 @@
+#!/bin/bash
+# Optimized parallel theme-set script for maximum speed
+# With proper timing and verbose logging
+
+# Ensure HOME is set (for subshells)
+export HOME="${HOME:-$HOME}"
+
+LOG_FILE="/tmp/omarchy-theme-set.log"
+
+log() {
+  echo "[$(date '+%Y-%m-%d %H:%M:%S.%3N')] $1" >> "$LOG_FILE"
+}
+
+if [[ -z $1 ]]; then
+  log "ERROR: No theme name provided"
+  echo "Usage: omarchy-theme-set-fast <theme-name>"
+  exit 1
+fi
+
+THEME_NAME_RAW="$1"
+THEME_NAME=$(echo "$THEME_NAME_RAW" | sed -E 's/<[^>]+>//g' | tr '[:upper:]' '[:lower:]' | tr ' ' '-')
+
+log "=========================================="
+log "Starting theme change: $THEME_NAME"
+log "=========================================="
+
+# Paths
+CURRENT_THEME_PATH="$HOME/.config/omarchy/current/theme"
+NEXT_THEME_PATH="$HOME/.config/omarchy/current/next-theme"
+USER_THEMES_PATH="$HOME/.config/omarchy/themes"
+OMARCHY_THEMES_PATH="${OMARCHY_PATH:-$HOME/.local/share/omarchy}/themes"
+
+# Find theme
+if [[ -d "$USER_THEMES_PATH/$THEME_NAME" ]]; then
+  THEME_PATH="$USER_THEMES_PATH/$THEME_NAME"
+  log "Found theme in user directory: $THEME_PATH"
+elif [[ -d "$OMARCHY_THEMES_PATH/$THEME_NAME" ]]; then
+  THEME_PATH="$OMARCHY_THEMES_PATH/$THEME_NAME"
+  log "Found theme in system directory: $THEME_PATH"
+else
+  log "ERROR: Theme '$THEME_NAME' does not exist"
+  echo "Theme '$THEME_NAME' does not exist"
+  exit 1
+fi
+
+# Cleanup and setup next theme directory (atomic swap preparation)
+log "Setting up next theme directory..."
+rm -rf "$NEXT_THEME_PATH" 2>/dev/null
+mkdir -p "$NEXT_THEME_PATH"
+
+# Step 1: Copy theme files (must complete before swap)
+log "Copying theme files..."
+if ! cp -r "$THEME_PATH/"* "$NEXT_THEME_PATH/" 2>/dev/null; then
+  log "WARNING: Some files failed to copy"
+fi
+log "Theme files copied"
+
+# Step 2: Generate dynamic configs (must complete before swap)
+log "Generating dynamic configs..."
+if omarchy-theme-set-templates 2>/dev/null; then
+  log "Dynamic configs generated successfully"
+else
+  log "WARNING: Dynamic config generation had issues"
+fi
+
+# Step 3: Atomic swap - move next theme to current
+log "Performing atomic swap..."
+rm -rf "$CURRENT_THEME_PATH" 2>/dev/null
+if mv "$NEXT_THEME_PATH" "$CURRENT_THEME_PATH"; then
+  log "Atomic swap completed successfully"
+else
+  log "ERROR: Atomic swap failed"
+  exit 1
+fi
+
+# Step 4: Store theme name for reference
+echo "$THEME_NAME" > "$HOME/.config/omarchy/current/theme.name"
+log "Theme name stored: $THEME_NAME"
+
+  # Step 5: Set wallpaper (CRITICAL - must happen after swap)
+  log "Setting wallpaper..."
+  # Try theme-bg-next first, then fall back to omarchy-theme-bg-next
+  if command -v theme-bg-next >/dev/null 2>&1 && theme-bg-next 2>/dev/null; then
+    log "Wallpaper set successfully (theme-bg-next)"
+  elif command -v omarchy-theme-bg-next >/dev/null 2>&1 && omarchy-theme-bg-next 2>/dev/null; then
+    log "Wallpaper set successfully (omarchy-theme-bg-next)"
+  else
+    log "ERROR: Failed to set wallpaper (both theme-bg-next and omarchy-theme-bg-next failed)"
+  fi
+
+# Step 6: Fire-and-forget restarts and hooks (non-critical)
+log "Starting background operations..."
+(
+  # Restart waybar if running
+  if pgrep -x waybar >/dev/null 2>&1; then
+    if omarchy-restart-waybar 2>/dev/null; then
+      log "Waybar restarted"
+    else
+      log "WARNING: Waybar restart failed"
+    fi
+  fi
+  
+  # Reload hyprland config
+  sleep 0.1
+  if hyprctl reload 2>/dev/null; then
+    log "Hyprland config reloaded"
+  else
+    log "WARNING: Hyprland reload failed"
+  fi
+  
+  # Signal btop to reload
+  if pkill -SIGUSR2 btop 2>/dev/null; then
+    log "Btop signaled"
+  fi
+  
+  # Restart terminal if needed
+  if omarchy-restart-terminal 2>/dev/null; then
+    log "Terminal restarted"
+  fi
+  
+  # Run hooks with parallel execution (using our optimized script)
+  log "Running hooks (parallel execution)..."
+  # Try to find execute-hooks.sh in common locations
+  hooks_script=""
+  for path in "$HOME/.local/bin/execute-hooks.sh" "$OMARCHY_PATH/bin/execute-hooks.sh" "/usr/local/bin/execute-hooks.sh"; do
+    if [ -x "$path" ]; then
+      hooks_script="$path"
+      break
+    fi
+  done
+  
+  log "Looking for hook executor at: ${hooks_script:-'(not found in standard paths)' }"
+  if [ -n "$hooks_script" ]; then
+    log "Found hook executor at: $hooks_script"
+    if bash "$hooks_script" "$THEME_NAME" "$LOG_FILE" 2>/dev/null; then
+      log "Hooks completed successfully"
+    else
+      log "WARNING: Some hooks failed (exit code: $?, check $LOG_FILE for details)"
+    fi
+  else
+    log "WARNING: execute-hooks.sh not found or not executable, falling back to omarchy-hook"
+    if omarchy-hook theme-set "$THEME_NAME" 2>/dev/null; then
+      log "Hooks completed (fallback)"
+    else
+      log "WARNING: Hooks failed (non-critical)"
+    fi
+  fi
+  
+  # Note: Noctalia notification is now handled within execute-hooks.sh via noctalia-notifier.sh
+  # This ensures proper ordering (after all file generators complete)
+  
+  log "All background operations completed"
+) &
+
+log "Theme change initiated successfully (PID: $!)"
+log "=========================================="
+
+# Exit immediately - let background ops finish
+exit 0

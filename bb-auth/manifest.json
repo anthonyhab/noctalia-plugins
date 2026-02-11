@@ -1,6 +1,6 @@
 {
-  "id": "polkit-auth",
-  "name": "Polkit Authentication",
+  "id": "bb-auth",
+  "name": "BB Auth",
   "version": "0.2.1",
   "minNoctaliaVersion": "3.6.0",
   "author": "habibe",
