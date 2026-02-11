@@ -31,7 +31,7 @@ Item {
     anchors.fill: parent
     pluginMain: root.pluginMain
     incomingSession: pluginMain?.currentSession ?? null
-    busy: (pluginMain?.sessionState ?? "idle") === "verifying"
+    busy: (pluginMain?.sessionState ?? "idle") === "verifying" || (pluginMain?.sessionState ?? "idle") === "submitting"
     agentAvailable: pluginMain?.agentAvailable ?? true
     statusText: pluginMain?.agentStatus ?? ""
     errorText: pluginMain?.lastError ?? ""

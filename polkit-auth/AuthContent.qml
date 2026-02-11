@@ -81,7 +81,7 @@ Item {
     property int outcomeEpoch: 0    // Increments to restart animations
 
     property bool warningDismissed: false
-    readonly property string requestWarning: (!warningDismissed && session && session.warning) ? session.warning : ""
+    readonly property string requestWarning: (!warningDismissed && session && session.error) ? session.error : ""
 
     // Submit state (tight feedback loop)
     property bool awaitingResult: false
@@ -106,16 +106,11 @@ Item {
 
 
     readonly property var requestor: session?.requestor ?? null
-    readonly property var subject: session?.subject ?? null
+    readonly property var subject: session?.details?.subject ?? null
     readonly property string requestorIconName: {
         if (requestor) {
-            if (requestor.iconName) return requestor.iconName
             if (requestor.icon) return requestor.icon
         }
-        if (session && session.hint && session.hint.iconName)
-            return session.hint.iconName
-        if (session && session.icon)
-            return session.icon
         return ""
     }
     readonly property string requestorIconPath: {
@@ -165,7 +160,7 @@ Item {
     readonly property color errorColor: Color.mError
     readonly property bool hasSession: hasActiveSession && !!(session && session.id)
     readonly property string displayUser: formatUser(session?.user ?? "")
-    readonly property bool fingerprintAvailable: !!(session && session.fingerprintAvailable)
+    readonly property bool fingerprintAvailable: false
 
     readonly property string commandPath: {
         if (!hasSession || !session?.message) return ""
@@ -179,12 +174,14 @@ Item {
 
     readonly property string detailsSummary: {
         if (!hasSession || !session) return ""
-        const source = (session.actionId || "").includes("polkit") ? "polkit" : "keyring"
+        const source = session.source || "unknown"
         const actionId = session.actionId || "N/A"
         const message = session.message || "N/A"
-        const cmdline = (subject && subject.cmdline) || "N/A"
+        const requestorName = (requestor && requestor.name) || "N/A"
+        const requestorPid = (requestor && requestor.pid) || "N/A"
+        const cmdline = commandPath || "N/A"
         const description = session.description || "N/A"
-        return "Source: " + source + "\nAction: " + actionId + "\nMessage: " + message + "\nCommand: " + cmdline + "\nDescription: " + description
+        return "Source: " + source + "\nAction: " + actionId + "\nMessage: " + message + "\nRequestor: " + requestorName + " (pid: " + requestorPid + ")\nCommand: " + cmdline + "\nDescription: " + description
     }
 
     function trOrDefault(key, fallback) {
@@ -372,7 +369,7 @@ Item {
                     pointSize: Style.fontSizeM * fontScale
                     color: Color.mOnSurface
                     text: {
-                        let appName = (requestor && requestor.displayName) || ""
+                        let appName = (requestor && requestor.name) || ""
                         if (!appName || appName.toLowerCase() === "unknown")
                             return "Allow an application to " + displayAction
                         return "Allow <font face='Monospace'><b>" + appName + "</b></font> to " + displayAction
@@ -480,7 +477,7 @@ Item {
                                     }
                                 }
                                 NDivider {
-                                    visible: displayUser.length > 0 && (subject !== null || commandPath !== "")
+                                    visible: displayUser.length > 0 && commandPath !== ""
                                     Layout.fillWidth: true
                                 }
                                 Item {
@@ -510,17 +507,17 @@ Item {
                                         NText {
                                             Layout.fillWidth: true
                                             horizontalAlignment: Text.AlignHCenter
-                                            text: (subject && subject.exe) || commandPath
+                                            text: commandPath
                                             font.family: "Monospace"
                                             color: Color.mOnSurfaceVariant
                                             pointSize: Style.fontSizeXS * 1.1 * fontScale
                                             wrapMode: Text.Wrap
                                         }
                                         NText {
-                                            visible: !!(subject && subject.cmdline && subject.cmdline !== subject.exe)
+                                            visible: false
                                             Layout.fillWidth: true
                                             horizontalAlignment: Text.AlignHCenter
-                                            text: (subject && subject.cmdline) || ""
+                                            text: ""
                                             font.family: "Monospace"
                                             color: Color.mOnSurfaceVariant
                                             pointSize: Style.fontSizeXS * 0.9 * fontScale
@@ -877,7 +874,7 @@ Item {
                 Layout.fillWidth: true
                 horizontalAlignment: Text.AlignHCenter
                 wrapMode: Text.WordWrap
-                text: "Check if noctalia-polkit-agent is running."
+                text: "Check if noctalia-auth.service is running."
                 color: Color.mOnSurfaceVariant
                 pointSize: Style.fontSizeS * fontScale
             }

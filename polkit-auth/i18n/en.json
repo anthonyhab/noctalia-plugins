@@ -11,8 +11,8 @@
     "idle": "No pending authentication requests.",
     "request": "Authentication required",
     "processing": "Working...",
-    "socket-unavailable": "Polkit agent socket not available",
-    "agent-unavailable": "Polkit agent not reachable",
+    "socket-unavailable": "Auth daemon socket not available",
+    "agent-unavailable": "Auth daemon not reachable",
     "auth-command": "Authentication is required to run this command as the super user.",
     "authenticated": "Authenticated",
     "submitted": "Submitted",
@@ -49,7 +49,7 @@
     "agent-failed": "Authentication error"
   },
   "settings": {
-    "description": "Connect to the Noctalia polkit agent over IPC.",
+    "description": "Connect to the Noctalia auth daemon over IPC.",
     "poll-interval": "Poll interval (ms)",
     "poll-interval-desc": "How frequently the plugin checks for new authentication requests.",
     "auto-open": "Auto-open panel",

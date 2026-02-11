@@ -17,11 +17,11 @@ function getContextModel(request, requestor, subject, appProfiles, Color) {
     if (!request || !request.id) return { color: Color.mPrimary, accentColor: Color.mPrimary, label: "System", glyph: "shield", kind: "system" };
 
     const actionId = (request.actionId || "").toLowerCase();
-    const appName = (requestor && requestor.displayName || "").toLowerCase();
+    const appName = (requestor && requestor.name || "").toLowerCase();
     const exe = (subject && subject.exe || "").toLowerCase();
     const msg = (request.message || "").toLowerCase();
     const desc = (request.description || "").toLowerCase();
-    const kind = (request.hint && request.hint.kind || "").toLowerCase();
+    const kind = (request.source || "").toLowerCase();
     const full = (actionId + " " + appName + " " + exe + " " + msg + " " + desc + " " + kind);
 
     if (full.includes("1password")) return appProfiles["1password"];
@@ -56,7 +56,9 @@ function getGpgInfo(request) {
     if (!request || !request.id || !request.description) return null;
 
     const desc = request.description;
-    const isGpg = (request.hint && request.hint.kind === "gpg") || desc.includes("OpenPGP");
+    const source = (request.source || "").toLowerCase();
+    const lowerDesc = desc.toLowerCase();
+    const isGpg = source === "pinentry" || lowerDesc.includes("openpgp") || lowerDesc.includes("gpg");
     if (!isGpg) return null;
 
     const identityMatch = desc.match(/"([^"]+)"/);
