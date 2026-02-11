@@ -24,8 +24,8 @@
       "lastUpdated": "2026-02-10T12:00:00Z"
     },
     {
-      "id": "polkit-auth",
-      "name": "Polkit Authentication",
+      "id": "bb-auth",
+      "name": "BB Auth",
       "version": "0.2.1",
       "author": "habibe",
       "description": "Use Noctalia panels as your Polkit authentication agent.",

@@ -15,7 +15,7 @@ Plugins are installed through the Noctalia plugin UI:
 - `omarchy/` - Omarchy integration plugin that syncs Omarchy theme colors into Noctalia so the shell follows Omarchy themes.
 - `homeassistant/` - Home Assistant plugin that surfaces devices and controls in Noctalia panels/widgets.
 - `swww-picker/` - Wallpaper picker and auto-cycler powered by `swww`.
-- `polkit-auth/` - Polkit authentication integration for Noctalia panels.
+- `bb-auth/` - BB Auth (Polkit authentication) integration for Noctalia panels.
 - `waybar-converter/` - Utility to help convert Waybar configs/themes into Noctalia compatible plugin.
   
 ## Demo videos

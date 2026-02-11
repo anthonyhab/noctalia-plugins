@@ -1,0 +1,139 @@
+#!/bin/bash
+# qs-dev - Smart Quickshell IPC wrapper for dev instances
+# Dynamically detects running qs instances without hardcoded paths
+
+set -e
+
+# Logging function
+log_debug() {
+  if [ "${QS_DEV_DEBUG:-}" = "1" ]; then
+    echo "[qs-dev] $1" >&2
+  fi
+}
+
+# Find all running Quickshell instances
+find_running_instances() {
+  log_debug "Scanning for running Quickshell instances..."
+  
+  local instances=""
+  local qs_pids=$(pgrep -x "qs" 2>/dev/null || pgrep -x "quickshell" 2>/dev/null || true)
+  
+  if [ -z "$qs_pids" ]; then
+    log_debug "No running qs/quickshell processes found"
+    return 0
+  fi
+  
+  for pid in $qs_pids; do
+    # Skip if we can't read process info
+    if [ ! -r "/proc/$pid/cwd" ] || [ ! -r "/proc/$pid/exe" ]; then
+      log_debug "Cannot read /proc/$pid, skipping"
+      continue
+    fi
+    
+    # Get the working directory (where shell.qml should be)
+    local cwd=$(readlink "/proc/$pid/cwd" 2>/dev/null || true)
+    if [ -z "$cwd" ]; then
+      log_debug "Cannot read cwd for PID $pid, skipping"
+      continue
+    fi
+    
+    # Verify this is a quickshell instance by checking for shell.qml
+    if [ ! -f "$cwd/shell.qml" ]; then
+      log_debug "No shell.qml in $cwd, skipping PID $pid"
+      continue
+    fi
+    
+    # Get the binary path
+    local exe=$(readlink -f "/proc/$pid/exe" 2>/dev/null || true)
+    if [ -z "$exe" ] || [ ! -x "$exe" ]; then
+      log_debug "Cannot find executable for PID $pid, skipping"
+      continue
+    fi
+    
+    log_debug "Found instance: PID=$pid, CWD=$cwd, EXE=$exe"
+    instances="${instances}${pid}|${cwd}|${exe}\n"
+  done
+  
+  printf "%b" "$instances"
+}
+
+# Select an instance from multiple options
+select_instance() {
+  local instances="$1"
+  local count=$(echo -e "$instances" | grep -c "^" || true)
+  
+  if [ "$count" -eq 0 ]; then
+    return 1
+  elif [ "$count" -eq 1 ]; then
+    echo -e "$instances" | head -1
+    return 0
+  else
+    echo "Multiple Quickshell instances found:" >&2
+    local i=1
+    while IFS='|' read -r pid cwd exe; do
+      [ -z "$pid" ] && continue
+      echo "  $i) $cwd (PID: $pid)" >&2
+      i=$((i + 1))
+    done <<< "$(echo -e "$instances")"
+    
+    echo -n "Select instance (1-$((i-1))): " >&2
+    read -r selection
+    
+    if [ "$selection" -ge 1 ] && [ "$selection" -lt "$i" ] 2>/dev/null; then
+      echo -e "$instances" | sed -n "${selection}p"
+      return 0
+    else
+      echo "Invalid selection" >&2
+      return 1
+    fi
+  fi
+}
+
+# Main execution
+main() {
+  # If first arg is not 'ipc', show usage
+  if [ $# -eq 0 ] || [ "$1" != "ipc" ]; then
+    echo "Usage: qs-dev ipc <command> [args...]"
+    echo ""
+    echo "Routes IPC commands to the correct Quickshell dev instance."
+    echo ""
+    echo "Auto-detects running instances by scanning running qs/quickshell processes"
+    echo "and checking their working directories for shell.qml."
+    echo ""
+    echo "Examples:"
+    echo "  qs-dev ipc call omarchy reload"
+    echo "  qs-dev ipc call noctalia showToast \"Title\" \"Message\""
+    echo ""
+    echo "Set QS_DEV_DEBUG=1 for verbose output"
+    exit 1
+  fi
+  
+  # Find all running instances
+  local instances
+  instances=$(find_running_instances)
+  
+  if [ -z "$instances" ]; then
+    echo "ERROR: No running Quickshell instances found" >&2
+    echo "Make sure a dev shell is running (qs -p .)" >&2
+    exit 1
+  fi
+  
+  # Select which instance to use
+  local selected
+  if ! selected=$(select_instance "$instances"); then
+    exit 1
+  fi
+  
+  # Parse the selected instance
+  local pid=$(echo "$selected" | cut -d'|' -f1)
+  local cwd=$(echo "$selected" | cut -d'|' -f2)
+  local exe=$(echo "$selected" | cut -d'|' -f3)
+  
+  log_debug "Using instance: PID=$pid, CWD=$cwd, EXE=$exe"
+  log_debug "Executing: ipc ${*:2}"
+  
+  # Execute the IPC command
+  exec "$exe" --path "$cwd" ipc "${@:2}"
+}
+
+main "$@"

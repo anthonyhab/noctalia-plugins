@@ -1,0 +1,32 @@
+#!/bin/bash
+# Async hook execution wrapper - queues hooks for background processing
+
+HOOK_NAME="$1"
+shift
+
+# Create hook queue directory if needed
+QUEUE_DIR="$HOME/.cache/omarchy/hook-queue"
+mkdir -p "$QUEUE_DIR"
+
+# Add hook to queue with timestamp
+TIMESTAMP=$(date +%s%N)
+QUEUE_FILE="$QUEUE_DIR/$TIMESTAMP-$HOOK_NAME"
+printf '%s\n' "$HOOK_NAME $*" > "$QUEUE_FILE"
+
+# Start async processor if not already running
+if ! pgrep -f "omarchy-hook-processor" >/dev/null 2>&1; then
+  # Try to find processor in common locations
+  processor=""
+  for path in "$HOME/.local/bin/omarchy-hook-processor" "$OMARCHY_PATH/bin/omarchy-hook-processor" "/usr/local/bin/omarchy-hook-processor"; do
+    if [ -x "$path" ]; then
+      processor="$path"
+      break
+    fi
+  done
+  
+  if [ -n "$processor" ]; then
+    "$processor" &
+  fi
+fi
+
+exit 0

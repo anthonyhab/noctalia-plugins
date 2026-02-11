@@ -1,0 +1,60 @@
+#!/bin/bash
+# Async hook processor - processes queued hooks in background
+
+QUEUE_DIR="$HOME/.cache/omarchy/hook-queue"
+LOCK_FILE="$QUEUE_DIR/.lock"
+
+# Prevent multiple instances
+if [[ -f "$LOCK_FILE" ]]; then
+  PID=$(cat "$LOCK_FILE" 2>/dev/null)
+  if ps -p "$PID" >/dev/null 2>&1; then
+    exit 0
+  fi
+fi
+
+echo $$ > "$LOCK_FILE"
+
+# Process all queued hooks
+process_queue() {
+  local processed=0
+  
+  # Sort by timestamp and process (handle filenames with spaces properly)
+  while IFS= read -r -d '' file; do
+    # Skip lock file
+    [[ "$file" == *".lock" ]] && continue
+    
+    # Read hook info
+    read -r HOOK_NAME ARGS < "$file"
+    
+    if [[ -n "$HOOK_NAME" ]]; then
+      # Execute hook with proper ordering
+      case "$HOOK_NAME" in
+        "theme-set")
+          # Theme-set hook - run immediately
+          omarchy-hook theme-set "$ARGS" 2>/dev/null
+          ;;
+        *)
+          # Other hooks - run with small delay to prevent resource contention
+          (sleep 0.5 && omarchy-hook "$HOOK_NAME" "$ARGS" 2>/dev/null) &
+          ;;
+      esac
+      
+      processed=$((processed + 1))
+    fi
+    
+    # Remove processed hook
+    rm -f "$file"
+  done < <(find "$QUEUE_DIR" -maxdepth 1 -type f ! -name "*.lock" -print0 2>/dev/null | sort -z)
+  
+  if [[ $processed -gt 0 ]]; then
+    echo "Processed $processed hooks"
+  fi
+}
+
+# Main processing loop
+process_queue
+
+# Clean up lock file
+rm -f "$LOCK_FILE"
+
+exit 0

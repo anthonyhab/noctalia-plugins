@@ -874,7 +874,7 @@ Item {
                 Layout.fillWidth: true
                 horizontalAlignment: Text.AlignHCenter
                 wrapMode: Text.WordWrap
-                text: "Check if noctalia-auth.service is running."
+                text: "Check if bb-auth.service is running."
                 color: Color.mOnSurfaceVariant
                 pointSize: Style.fontSizeS * fontScale
             }
