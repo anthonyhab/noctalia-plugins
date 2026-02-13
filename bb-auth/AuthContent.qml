@@ -19,7 +19,7 @@ Item {
     property var incomingSession: null
     property var session: null
 
-     onIncomingSessionChanged: {
+    onIncomingSessionChanged: {
         // New session, retry, or cleared session: Reset UI state, accept session
         successState = false
         session = incomingSession
@@ -41,7 +41,8 @@ Item {
 
     onVisibleChanged: {
         if (visible) {
-            if (hasSession) focusTimer.restart()
+            if (hasSession)
+                focusTimer.restart()
         } else {
             successState = false
             passwordInput.text = ""
@@ -49,7 +50,8 @@ Item {
         }
     }
 
-    readonly property string mainState: (pluginMain && pluginMain.sessionState) || "idle"
+    readonly property string mainState: (pluginMain
+                                         && pluginMain.sessionState) || "idle"
     readonly property bool hasActiveSession: mainState !== "idle"
     readonly property bool isVerifying: mainState === "verifying"
     readonly property bool isSuccess: mainState === "success"
@@ -91,28 +93,34 @@ Item {
     property bool stageButton: false
 
     // Outcome state machine
-    property int outcomeEpoch: 0    // Increments to restart animations
+    property int outcomeEpoch: 0 // Increments to restart animations
 
     property bool warningDismissed: false
-    readonly property string requestWarning: (!warningDismissed && session && session.error) ? session.error : ""
+    readonly property string requestWarning: (!warningDismissed && session
+                                              && session.error) ? session.error : ""
 
     // Submit state (tight feedback loop)
     property bool awaitingResult: false
     property bool submitPulseActive: false
-    readonly property bool busyVisual: isVerifying || (awaitingResult && !isSuccess && !isError)
-
-
+    readonly property bool busyVisual: isVerifying || (awaitingResult
+                                                       && !isSuccess
+                                                       && !isError)
 
     // --- 0. RICH CONTEXT DATA ---
     readonly property var appProfiles: AuthLogic.getAppProfiles(Color)
-    readonly property var contextModel: AuthLogic.getContextModel(session, requestor, subject, appProfiles, Color)
-
+    readonly property var contextModel: AuthLogic.getContextModel(session,
+                                                                  requestor,
+                                                                  subject,
+                                                                  appProfiles,
+                                                                  Color)
 
     readonly property var requestor: (session && session.requestor) || null
-    readonly property var subject: (session && session.details && session.details.subject) || null
+    readonly property var subject: (session && session.details
+                                    && session.details.subject) || null
     readonly property string requestorIconName: {
         if (requestor) {
-            if (requestor.icon) return requestor.icon
+            if (requestor.icon)
+                return requestor.icon
         }
         return ""
     }
@@ -125,21 +133,23 @@ Item {
     }
     readonly property bool hasRequestorIcon: requestorIconPath !== ""
 
-    readonly property var richContext: AuthLogic.getRichContext(session, Color, secondaryAccent)
-
+    readonly property var richContext: AuthLogic.getRichContext(session, Color,
+                                                                secondaryAccent)
 
     readonly property var gpgInfo: AuthLogic.getGpgInfo(session)
 
-
-    readonly property string displayAction: AuthLogic.getDisplayAction(session, richContext, secondaryAccent)
-    readonly property var contextCardModel: AuthLogic.getContextCardModel(contextModel, gpgInfo, session)
-
+    readonly property string displayAction: AuthLogic.getDisplayAction(
+                                                session, richContext,
+                                                secondaryAccent)
+    readonly property var contextCardModel: AuthLogic.getContextCardModel(
+                                                contextModel, gpgInfo, session)
 
     // Signal to request closing the container (window or panel)
-    signal closeRequested()
+    signal closeRequested
 
     // --- 1. THEME & METRICS ---
-    readonly property double fontScale: (typeof Settings !== "undefined" ? Settings.data.ui.fontDefaultScale : 1.0)
+    readonly property double fontScale: (typeof Settings
+                                         !== "undefined" ? Settings.data.ui.fontDefaultScale : 1.0)
     readonly property int baseSize: Style.baseWidgetSize
     readonly property int controlHeight: Math.round(baseSize * 1.1)
     readonly property int iconTile: baseSize
@@ -151,8 +161,12 @@ Item {
     readonly property int microGap: Style.marginS
     readonly property int cardPad: Style.marginM
 
-    readonly property color secondaryAccent: Color.mSecondary !== undefined ? Color.mSecondary : Color.mPrimary
-    readonly property color secondaryAccentContainer: Color.mSecondaryContainer !== undefined ? Color.mSecondaryContainer : Qt.alpha(secondaryAccent, 0.18)
+    readonly property color secondaryAccent: Color.mSecondary
+                                             !== undefined ? Color.mSecondary : Color.mPrimary
+    readonly property color secondaryAccentContainer: Color.mSecondaryContainer
+                                                      !== undefined ? Color.mSecondaryContainer : Qt.alpha(
+                                                                          secondaryAccent,
+                                                                          0.18)
     readonly property color colorFlowLine: Qt.alpha(secondaryAccent, 0.2)
     readonly property color colorFlowActive: secondaryAccent
     readonly property real cardRadius: Style.radiusM
@@ -167,20 +181,24 @@ Item {
     // --- 2. COMPUTED DATA ---
     readonly property color successColor: "#10B981" // Emerald 500
     readonly property color errorColor: Color.mError
-    readonly property bool hasSession: hasActiveSession && !!(session && session.id)
-    readonly property string displayUser: formatUser((session && session.user) || "")
+    readonly property bool hasSession: hasActiveSession && !!(session
+                                                              && session.id)
+    readonly property string displayUser: formatUser((session
+                                                      && session.user) || "")
     readonly property bool fingerprintAvailable: false
 
     readonly property string commandPath: {
-        if (!hasSession || !session && session.message) return ""
+        if (!hasSession || !session && session.message)
+            return ""
         const msg = session.message
         const match = msg.match(/'([^']+)'/)
-        if (match && match[1]) return match[1]
+        if (match && match[1])
+            return match[1]
         const matchPath = msg.match(/(\/[a-zA-Z0-9_\-\.\/]+)/)
-        if (matchPath && matchPath[1]) return matchPath[1]
+        if (matchPath && matchPath[1])
+            return matchPath[1]
         return ""
     }
-
 
     function trOrDefault(key, fallback) {
         if (pluginMain && pluginMain.pluginApi && pluginMain.pluginApi.tr) {
@@ -249,7 +267,8 @@ Item {
     Connections {
         target: pluginMain
         function onSessionCompleted(success) {
-            if (!root.visible) return
+            if (!root.visible)
+                return
             awaitingResult = false
             submitPulseActive = false
             submitPulseTimer.stop()
@@ -260,7 +279,8 @@ Item {
                 successState = true
             } else {
                 const reason = (pluginMain && pluginMain.closeReason) || ""
-                if (reason !== "cancelled" && reason !== "timeout" && reason !== "closed") {
+                if (reason !== "cancelled" && reason !== "timeout"
+                        && reason !== "closed") {
                     outcomeEpoch++
                     shakeAnim.restart()
                     passwordInput.text = ""
@@ -295,7 +315,6 @@ Item {
     }
 
     // --- 4. COMPONENTS ---
-
     NIconButton {
         anchors.top: parent.top
         anchors.right: parent.right
@@ -341,7 +360,9 @@ Item {
             anchors.left: parent.left
             anchors.right: parent.right
             spacing: 0
-            visible: (hasActiveSession || successState || ((pluginMain && pluginMain.isClosingUI) || false)) && !timedOutState && agentAvailable
+            visible: (hasActiveSession || successState
+                      || ((pluginMain && pluginMain.isClosingUI) || false))
+                     && !timedOutState && agentAvailable
 
             ColumnLayout {
                 id: headerStack
@@ -349,20 +370,23 @@ Item {
                 spacing: microGap
                 opacity: root.stageHeader ? 1.0 : 0.0
                 Behavior on opacity {
-                    NumberAnimation { duration: 300; easing.type: Easing.OutCubic }
-                }
-                    ConnectionFlow {
-                        Layout.alignment: Qt.AlignHCenter
-                        outcome: isSuccess ? "success" : (isError ? "fail" : "none")
-                        epoch: root.outcomeEpoch
-                        busy: root.busy
-                        contextModel: root.contextModel
-                        requestor: root.requestor
-                        hasRequestorIcon: root.hasRequestorIcon
-                        requestorIconPath: root.requestorIconPath
-                        isDark: root.isDark
-                        colorizeIcons: true
+                    NumberAnimation {
+                        duration: 300
+                        easing.type: Easing.OutCubic
                     }
+                }
+                ConnectionFlow {
+                    Layout.alignment: Qt.AlignHCenter
+                    outcome: isSuccess ? "success" : (isError ? "fail" : "none")
+                    epoch: root.outcomeEpoch
+                    busy: root.busy
+                    contextModel: root.contextModel
+                    requestor: root.requestor
+                    hasRequestorIcon: root.hasRequestorIcon
+                    requestorIconPath: root.requestorIconPath
+                    isDark: root.isDark
+                    colorizeIcons: true
+                }
 
                 NText {
                     Layout.fillWidth: true
@@ -375,7 +399,8 @@ Item {
                         let appName = (requestor && requestor.name) || ""
                         if (!appName || appName.toLowerCase() === "unknown")
                             return "Allow an application to " + displayAction
-                        return "Allow <font face='Monospace'><b>" + appName + "</b></font> to " + displayAction
+                        return "Allow <font face='Monospace'><b>" + appName
+                                + "</b></font> to " + displayAction
                     }
                 }
             }
@@ -387,7 +412,10 @@ Item {
                 fontScale: root.fontScale
                 opacity: root.stageCard ? 1.0 : 0.0
                 Behavior on opacity {
-                    NumberAnimation { duration: 300; easing.type: Easing.OutCubic }
+                    NumberAnimation {
+                        duration: 300
+                        easing.type: Easing.OutCubic
+                    }
                 }
             }
 
@@ -396,40 +424,70 @@ Item {
                 Layout.fillWidth: true
                 Layout.topMargin: sectionGap
                 implicitHeight: passwordInput.implicitHeight + (cardPad * 2)
-                radius: root.nestedRadius(root.inputRadius, inputWrapper.width, inputWrapper.height, 0)
+                radius: root.nestedRadius(root.inputRadius, inputWrapper.width,
+                                          inputWrapper.height, 0)
                 antialiasing: true
                 color: {
-                    if (successState) return Qt.alpha(successColor, 0.12)
-                    if (isError) return Qt.alpha(errorColor, 0.15)
+                    if (successState)
+                        return Qt.alpha(successColor, 0.12)
+                    if (isError)
+                        return Qt.alpha(errorColor, 0.15)
                     return Qt.alpha(Color.mSurfaceVariant, isDark ? 0.68 : 0.60)
                 }
                 border.color: {
-                    if (successState) return successColor
-                    if (isError) return errorColor
-                    return passwordInput.activeFocus
-                        ? Qt.alpha(contextModel ? contextModel.accentColor : Color.mSecondary, 0.6)
-                        : Color.mOutline
+                    if (successState)
+                        return successColor
+                    if (isError)
+                        return errorColor
+                    return passwordInput.activeFocus ? Qt.alpha(
+                                                           contextModel ? contextModel.accentColor : Color.mSecondary,
+                                                           0.6) : Color.mOutline
                 }
                 border.width: {
-                    if (successState || isError) return 2.5
+                    if (successState || isError)
+                        return 2.5
                     return 1
                 }
-                Behavior on border.color { ColorAnimation { duration: 200; easing.type: Easing.OutCubic } }
-                Behavior on border.width { enabled: !shakeAnim.running; NumberAnimation { duration: 200; easing.type: Easing.OutElastic; easing.amplitude: 0.6 } }
-                Behavior on color { ColorAnimation { duration: 300 } }
-
+                Behavior on border.color {
+                    ColorAnimation {
+                        duration: 200
+                        easing.type: Easing.OutCubic
+                    }
+                }
+                Behavior on border.width {
+                    enabled: !shakeAnim.running
+                    NumberAnimation {
+                        duration: 200
+                        easing.type: Easing.OutElastic
+                        easing.amplitude: 0.6
+                    }
+                }
+                Behavior on color {
+                    ColorAnimation {
+                        duration: 300
+                    }
+                }
 
                 // Success Message (Centered)
                 NText {
                     anchors.centerIn: parent
                     visible: successState
-                    text: (session && session.source === "keyring") ? trOrDefault("status.submitted", "Submitted") : trOrDefault("status.authenticated", "Authenticated")
+                    text: (session && session.source
+                           === "keyring") ? trOrDefault(
+                                                "status.submitted",
+                                                "Submitted") : trOrDefault(
+                                                "status.authenticated",
+                                                "Authenticated")
                     color: successColor
                     font.family: "Monospace"
                     font.weight: Style.fontWeightBold
                     pointSize: Style.fontSizeM * fontScale
                     opacity: visible ? 1.0 : 0.0
-                    Behavior on opacity { NumberAnimation { duration: 200 } }
+                    Behavior on opacity {
+                        NumberAnimation {
+                            duration: 200
+                        }
+                    }
                 }
 
                 TextField {
@@ -438,7 +496,10 @@ Item {
                     visible: !successState
                     opacity: busyVisual ? 0.35 : 1.0
                     Behavior on opacity {
-                        NumberAnimation { duration: 250; easing.type: Easing.OutCubic }
+                        NumberAnimation {
+                            duration: 250
+                            easing.type: Easing.OutCubic
+                        }
                     }
                     anchors.leftMargin: cardPad
                     anchors.topMargin: cardPad
@@ -447,7 +508,9 @@ Item {
                     font.pointSize: Style.fontSizeM * fontScale
                     font.family: Settings.data.ui.fontDefault
                     verticalAlignment: TextInput.AlignVCenter
-                    placeholderText: session && session.prompt || trOrDefault("placeholders.password", "Enter password")
+                    placeholderText: session && session.prompt || trOrDefault(
+                                         "placeholders.password",
+                                         "Enter password")
                     text: ""
                     echoMode: root.revealPassword ? TextInput.Normal : TextInput.Password
                     enabled: hasSession && !busyVisual
@@ -464,7 +527,8 @@ Item {
                     Keys.onPressed: function (event) {
                         if (event.key === Qt.Key_CapsLock)
                             root.capsLockOn = !root.capsLockOn
-                        if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
+                        if (event.key === Qt.Key_Return
+                                || event.key === Qt.Key_Enter) {
                             submitPasswordAttempt()
                             event.accepted = true
                         } else if (event.key === Qt.Key_Escape) {
@@ -476,6 +540,7 @@ Item {
                         }
                     }
                     onTextChanged: {
+
                         // Resetting local failure visuals if user types
                     }
                     onTextEdited: {
@@ -498,7 +563,9 @@ Item {
                     NIconButton {
                         icon: root.revealPassword ? "eye-off" : "eye"
                         baseSize: overlayButton
-                        colorBg: eyeHover.containsMouse ? Qt.alpha(Color.mOnSurfaceVariant, 0.1) : "transparent"
+                        colorBg: eyeHover.containsMouse ? Qt.alpha(
+                                                              Color.mOnSurfaceVariant,
+                                                              0.1) : "transparent"
                         onClicked: {
                             root.revealPassword = !root.revealPassword
                             passwordInput.forceActiveFocus()
@@ -513,22 +580,31 @@ Item {
                 }
             }
 
-
             NButton {
                 id: authButton
                 Layout.fillWidth: true
                 Layout.topMargin: Style.marginM
                 Layout.preferredHeight: controlHeight
                 fontSize: Style.fontSizeM * 1.2 * fontScale
-                text: busyVisual ? "" : (successState ? trOrDefault("status.verified", "Verified") : trOrDefault("actions.authenticate", "Authenticate"))
+                text: busyVisual ? "" : (successState ? trOrDefault(
+                                                            "status.verified",
+                                                            "Verified") : trOrDefault(
+                                                            "actions.authenticate",
+                                                            "Authenticate"))
                 backgroundColor: {
-                    if (successState) return successColor
-                    if (busyVisual) return Color.mSurfaceVariant
-                    if (hoverActive) return Qt.lighter(Color.mPrimary, root.isDark ? 1.15 : 1.08)
+                    if (successState)
+                        return successColor
+                    if (busyVisual)
+                        return Color.mSurfaceVariant
+                    if (hoverActive)
+                        return Qt.lighter(Color.mPrimary,
+                                          root.isDark ? 1.15 : 1.08)
                     return Color.mPrimary
                 }
-                enabled: hasSession && !busyVisual && !successState && passwordInput.text.length > 0
-                opacity: (authButton.enabled || successState) ? 1.0 : (busyVisual ? 0.85 : 0.55)
+                enabled: hasSession && !busyVisual && !successState
+                         && passwordInput.text.length > 0
+                opacity: (authButton.enabled
+                          || successState) ? 1.0 : (busyVisual ? 0.85 : 0.55)
                 activeFocusOnTab: true
                 focusPolicy: Qt.TabFocus
 
@@ -536,7 +612,10 @@ Item {
                 property real clickScale: 1.0
                 scale: clickScale
                 Behavior on clickScale {
-                    NumberAnimation { duration: 200; easing.type: Easing.OutBack }
+                    NumberAnimation {
+                        duration: 200
+                        easing.type: Easing.OutBack
+                    }
                 }
 
                 // Hover state - subtle background change
@@ -566,8 +645,10 @@ Item {
                 KeyNavigation.tab: passwordInput
                 KeyNavigation.backtab: passwordInput
 
-                Keys.onPressed: function(event) {
-                    if ((event.key === Qt.Key_Return || event.key === Qt.Key_Enter || event.key === Qt.Key_Space) && authButton.enabled) {
+                Keys.onPressed: function (event) {
+                    if ((event.key === Qt.Key_Return
+                         || event.key === Qt.Key_Enter
+                         || event.key === Qt.Key_Space) && authButton.enabled) {
                         submitPasswordAttempt()
                         event.accepted = true
                     }
@@ -602,7 +683,9 @@ Item {
                 Binding {
                     target: authButton.background || null
                     property: "radius"
-                    value: root.nestedRadius(root.inputRadius, authButton.width, authButton.height, 0)
+                    value: root.nestedRadius(root.inputRadius,
+                                             authButton.width,
+                                             authButton.height, 0)
                     when: authButton.background !== undefined
                 }
                 Binding {
@@ -613,7 +696,9 @@ Item {
                 }
                 onClicked: {
                     clickScale = 0.97
-                    Qt.callLater(function() { clickScale = 1.0 })
+                    Qt.callLater(function () {
+                        clickScale = 1.0
+                    })
                     submitPasswordAttempt()
                 }
             }
@@ -622,7 +707,8 @@ Item {
                 Layout.fillWidth: true
                 Layout.topMargin: Style.marginS
                 spacing: Style.marginS
-                visible: errorText.length > 0 || requestWarning.length > 0 || (hasSession && fingerprintAvailable && !busy)
+                visible: errorText.length > 0 || requestWarning.length > 0
+                         || (hasSession && fingerprintAvailable && !busy)
                 RowLayout {
                     Layout.alignment: Qt.AlignHCenter
                     visible: hasSession && fingerprintAvailable && !busy
@@ -633,7 +719,8 @@ Item {
                         color: Color.mPrimary
                     }
                     NText {
-                        text: trOrDefault("status.fingerprint-hint", "Touch fingerprint sensor")
+                        text: trOrDefault("status.fingerprint-hint",
+                                          "Touch fingerprint sensor")
                         color: Color.mOnSurfaceVariant
                         pointSize: Style.fontSizeS * fontScale
                     }
@@ -684,7 +771,9 @@ Item {
                 Layout.fillWidth: true
                 horizontalAlignment: Text.AlignHCenter
                 wrapMode: Text.WordWrap
-                text: trOrDefault("status.timed-out-detail", "This authentication request is no longer valid.")
+                text: trOrDefault(
+                          "status.timed-out-detail",
+                          "This authentication request is no longer valid.")
                 color: Color.mOnSurfaceVariant
                 pointSize: Style.fontSizeS * fontScale
             }
@@ -696,7 +785,9 @@ Item {
             anchors.centerIn: parent
             width: parent.width
             spacing: Style.marginM
-            visible: !hasActiveSession && !successState && !timedOutState && agentAvailable && !((pluginMain && pluginMain.isClosingUI) || false)
+            visible: !hasActiveSession && !successState && !timedOutState
+                     && agentAvailable
+                     && !((pluginMain && pluginMain.isClosingUI) || false)
             opacity: visible ? 1.0 : 0.0
             Behavior on opacity {
                 NumberAnimation {
@@ -754,7 +845,8 @@ Item {
                 Layout.fillWidth: true
                 horizontalAlignment: Text.AlignHCenter
                 wrapMode: Text.WordWrap
-                text: statusText || trOrDefault("status.agent-unavailable", "Polkit Agent Unavailable")
+                text: statusText || trOrDefault("status.agent-unavailable",
+                                                "Polkit Agent Unavailable")
                 color: Color.mError
                 font.weight: Style.fontWeightBold
                 pointSize: Style.fontSizeL * fontScale
@@ -875,6 +967,7 @@ Item {
 
     Component.onCompleted: {
         animateInTimer.start()
-        if (hasSession) focusTimer.restart()
+        if (hasSession)
+            focusTimer.restart()
     }
 }

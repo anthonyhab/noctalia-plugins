@@ -33,11 +33,11 @@ Item {
     implicitHeight: 48 * Style.uiScaleRatio
     onEpochChanged: {
         if (outcome === "fail")
-            failureAnim.restart();
+            failureAnim.restart()
 
         if (outcome === "success") {
-            successPing.restart();
-            successEchoPing.restart();
+            successPing.restart()
+            successEchoPing.restart()
         }
     }
 
@@ -97,7 +97,6 @@ Item {
                     to: 0
                     duration: 400
                 }
-
             }
 
             SequentialAnimation {
@@ -115,9 +114,7 @@ Item {
                     property: "scale"
                     value: 1
                 }
-
             }
-
         }
 
         PauseAnimation {
@@ -129,7 +126,6 @@ Item {
             property: "animationPhase"
             value: 0
         }
-
     }
 
     // Failure Glitch Animation
@@ -175,7 +171,6 @@ Item {
             property: "animationPhase"
             value: 0
         }
-
     }
 
     ParallelAnimation {
@@ -221,7 +216,9 @@ Item {
     SequentialAnimation {
         id: successEchoPing
 
-        PauseAnimation { duration: 200 }
+        PauseAnimation {
+            duration: 200
+        }
 
         ParallelAnimation {
             SequentialAnimation {
@@ -274,32 +271,31 @@ Item {
             border.width: 1.5 * Style.uiScaleRatio
 
             // Removed obnoxious accent glow
-
             Item {
                 anchors.fill: parent
                 anchors.margins: 6 * Style.uiScaleRatio
-                
+
                 FallbackIcon {
                     anchors.fill: parent
                     visible: !hasRequestorIcon
                     isDark: flowRoot.isDark
                     letter: {
                         if (requestor && requestor.fallbackLetter)
-                            return requestor.fallbackLetter;
+                            return requestor.fallbackLetter
 
                         if (safeLabel)
-                            return safeLabel.charAt(0);
+                            return safeLabel.charAt(0)
 
-                        return "?";
+                        return "?"
                     }
                     key: {
                         if (requestor && requestor.fallbackKey)
-                            return requestor.fallbackKey;
+                            return requestor.fallbackKey
 
                         if (safeLabel)
-                            return safeLabel.toLowerCase();
+                            return safeLabel.toLowerCase()
 
-                        return "unknown";
+                        return "unknown"
                     }
                     showLetter: true
                     radius: Style.radiusS
@@ -316,7 +312,9 @@ Item {
                     layer.effect: ShaderEffect {
                         property color targetColor: Settings.data.colorSchemes.darkMode ? Color.mOnSurface : Color.mSurfaceVariant
                         property real colorizeMode: 1.0
-                        fragmentShader: Qt.resolvedUrl(Quickshell.shellDir + "/Shaders/qsb/appicon_colorize.frag.qsb")
+                        fragmentShader: Qt.resolvedUrl(
+                                            Quickshell.shellDir
+                                            + "/Shaders/qsb/appicon_colorize.frag.qsb")
                     }
                 }
             }
@@ -337,21 +335,27 @@ Item {
                     color: flowRoot.activeColor
                     opacity: {
                         if (flowRoot.outcome === "success")
-                            return 0.85;
+                            return 0.85
 
                         if (flowRoot.outcome === "fail") {
                             // Rapid alternating flash
-                            let glitch = Math.sin(flowRoot.animationPhase * 50 + index) > 0;
-                            return glitch ? 0.9 : 0.05;
+                            let glitch = Math.sin(
+                                    flowRoot.animationPhase * 50 + index) > 0
+                            return glitch ? 0.9 : 0.05
                         }
                         // Comet-tail: active dot at full, trailing dots fade
-                        let activeIdx = Math.floor(flowRoot.animationPhase * flowRoot.dotCount);
-                        let dist = index - activeIdx;
-                        if (dist < 0) dist += flowRoot.dotCount;
-                        if (dist === 0) return 0.9;
-                        if (dist === 1) return 0.45;
-                        if (dist === 2) return 0.2;
-                        return 0.08;
+                        let activeIdx = Math.floor(
+                                flowRoot.animationPhase * flowRoot.dotCount)
+                        let dist = index - activeIdx
+                        if (dist < 0)
+                            dist += flowRoot.dotCount
+                        if (dist === 0)
+                            return 0.9
+                        if (dist === 1)
+                            return 0.45
+                        if (dist === 2)
+                            return 0.2
+                        return 0.08
                     }
 
                     Behavior on opacity {
@@ -361,9 +365,7 @@ Item {
                         }
                     }
                 }
-
             }
-
         }
 
         // System Shield Container (Right - Circle)
@@ -429,8 +431,7 @@ Item {
                                 duration: 100
                             }
 
-                            PropertyAction {
-                            }
+                            PropertyAction {}
 
                             NumberAnimation {
                                 target: parent
@@ -443,7 +444,5 @@ Item {
                 }
             }
         }
-
     }
-
 }
