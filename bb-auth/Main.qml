@@ -496,9 +496,11 @@ Item {
           if (!wasCancelled) {
             lastError = event.error || (pluginApi?.tr("errors.auth-failed") ?? "Authentication failed")
           }
-          sessionState = "idle"
+          
           if (wasCancelled && autoCloseOnCancel) {
             transitionToIdle("cancelled")
+          } else {
+            sessionState = "idle"
           }
         }
 
@@ -547,6 +549,11 @@ Item {
       return
     }
 
+    if (wasCancelled && autoCloseOnCancel) {
+      transitionToIdle("cancelled")
+      return
+    }
+
     // Session is closed and won't accept further input. If the agent immediately creates a new
     // session (common for retries), switch to it without closing the UI to avoid flicker.
     currentSession = null
@@ -558,10 +565,6 @@ Item {
     }
 
     sessionState = "idle"
-
-    if (wasCancelled && autoCloseOnCancel) {
-      transitionToIdle("cancelled")
-    }
   }
 
   function activateSession(session) {
