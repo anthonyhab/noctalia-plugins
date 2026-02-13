@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
+import Quickshell
 import qs.Commons
 import qs.Services.UI
 import qs.Widgets
@@ -16,8 +17,10 @@ Item {
     property bool hasRequestorIcon: false
     property string requestorIconPath: ""
     property bool isDark: false
+    property bool colorizeIcons: true
     readonly property int dotCount: 5
     property real animationPhase: 0
+    property real shieldBreath: 0
     readonly property color successColor: Color.mPrimary
     readonly property color errorColor: Color.mError
     // Ensure contextModel is safe to access
@@ -32,10 +35,34 @@ Item {
         if (outcome === "fail")
             failureAnim.restart();
 
-        if (outcome === "success")
-            // One final strong ping on success
+        if (outcome === "success") {
             successPing.restart();
+            successEchoPing.restart();
+        }
+    }
 
+    // Shield breathing animation — subtle y-axis float
+    SequentialAnimation {
+        running: outcome === "none" && Style.animationNormal > 0
+        loops: Animation.Infinite
+
+        NumberAnimation {
+            target: flowRoot
+            property: "shieldBreath"
+            from: 0
+            to: 1
+            duration: 3000
+            easing.type: Easing.InOutSine
+        }
+
+        NumberAnimation {
+            target: flowRoot
+            property: "shieldBreath"
+            from: 1
+            to: 0
+            duration: 3000
+            easing.type: Easing.InOutSine
+        }
     }
 
     SequentialAnimation {
@@ -49,7 +76,7 @@ Item {
             property: "animationPhase"
             from: 0
             to: 1
-            duration: busy ? 800 : 1500
+            duration: busy ? 800 : 1800
             easing.type: Easing.InOutSine
         }
 
@@ -94,7 +121,7 @@ Item {
         }
 
         PauseAnimation {
-            duration: busy ? 200 : 500
+            duration: busy ? 200 : 600
         }
 
         PropertyAction {
@@ -168,9 +195,8 @@ Item {
                 property: "opacity"
                 from: 0.8
                 to: 0
-                duration: 600
+                duration: 750
             }
-
         }
 
         SequentialAnimation {
@@ -178,8 +204,8 @@ Item {
                 target: pingRing
                 property: "scale"
                 from: 1
-                to: 2
-                duration: 750
+                to: 2.4
+                duration: 900
                 easing.type: Easing.OutCubic
             }
 
@@ -188,9 +214,48 @@ Item {
                 property: "scale"
                 value: 1
             }
-
         }
+    }
 
+    // Delayed echo ripple for double-pulse effect
+    SequentialAnimation {
+        id: successEchoPing
+
+        PauseAnimation { duration: 200 }
+
+        ParallelAnimation {
+            SequentialAnimation {
+                NumberAnimation {
+                    target: echoRing
+                    property: "opacity"
+                    from: 0
+                    to: 0.3
+                    duration: 100
+                }
+                NumberAnimation {
+                    target: echoRing
+                    property: "opacity"
+                    from: 0.3
+                    to: 0
+                    duration: 600
+                }
+            }
+            SequentialAnimation {
+                NumberAnimation {
+                    target: echoRing
+                    property: "scale"
+                    from: 1
+                    to: 2.0
+                    duration: 700
+                    easing.type: Easing.OutCubic
+                }
+                PropertyAction {
+                    target: echoRing
+                    property: "scale"
+                    value: 1
+                }
+            }
+        }
     }
 
     RowLayout {
@@ -200,8 +265,8 @@ Item {
         // App Icon Container (Left - Squircle)
         NBox {
             Layout.alignment: Qt.AlignVCenter
-            Layout.preferredWidth: 44 * Style.uiScaleRatio
-            Layout.preferredHeight: 44 * Style.uiScaleRatio
+            Layout.preferredWidth: 46 * Style.uiScaleRatio
+            Layout.preferredHeight: 46 * Style.uiScaleRatio
 
             radius: Style.radiusM
             color: Color.mSurfaceVariant
@@ -246,6 +311,13 @@ Item {
                     visible: hasRequestorIcon
                     imagePath: requestorIconPath
                     imageFillMode: Image.PreserveAspectFit
+
+                    layer.enabled: flowRoot.colorizeIcons && hasRequestorIcon
+                    layer.effect: ShaderEffect {
+                        property color targetColor: Settings.data.colorSchemes.darkMode ? Color.mOnSurface : Color.mSurfaceVariant
+                        property real colorizeMode: 1.0
+                        fragmentShader: Qt.resolvedUrl(Quickshell.shellDir + "/Shaders/qsb/appicon_colorize.frag.qsb")
+                    }
                 }
             }
         }
@@ -261,29 +333,33 @@ Item {
                 Rectangle {
                     width: 4 * Style.uiScaleRatio
                     height: width
-                    radius: 1
+                    radius: width / 2
                     color: flowRoot.activeColor
                     opacity: {
                         if (flowRoot.outcome === "success")
-                            return 0.8;
+                            return 0.85;
 
                         if (flowRoot.outcome === "fail") {
-                            // High-speed erratic glitch
+                            // Rapid alternating flash
                             let glitch = Math.sin(flowRoot.animationPhase * 50 + index) > 0;
-                            return glitch ? 0.9 : 0.1;
+                            return glitch ? 0.9 : 0.05;
                         }
-                        // Discrete light-up effect based on phase
+                        // Comet-tail: active dot at full, trailing dots fade
                         let activeIdx = Math.floor(flowRoot.animationPhase * flowRoot.dotCount);
-                        return index === activeIdx ? 0.8 : 0.1;
+                        let dist = index - activeIdx;
+                        if (dist < 0) dist += flowRoot.dotCount;
+                        if (dist === 0) return 0.9;
+                        if (dist === 1) return 0.45;
+                        if (dist === 2) return 0.2;
+                        return 0.08;
                     }
 
                     Behavior on opacity {
                         NumberAnimation {
-                            duration: flowRoot.outcome === "fail" ? 50 : 150
+                            duration: flowRoot.outcome === "fail" ? 40 : 120
+                            easing.type: Easing.OutQuad
                         }
-
                     }
-
                 }
 
             }
@@ -293,8 +369,13 @@ Item {
         // System Shield Container (Right - Circle)
         Item {
             Layout.alignment: Qt.AlignVCenter
-            Layout.preferredWidth: 40 * Style.uiScaleRatio
-            Layout.preferredHeight: 40 * Style.uiScaleRatio
+            Layout.preferredWidth: 38 * Style.uiScaleRatio
+            Layout.preferredHeight: 38 * Style.uiScaleRatio
+
+            // Breathing transform
+            transform: Translate {
+                y: flowRoot.outcome === "none" ? (flowRoot.shieldBreath * 1.5 - 0.75) : 0
+            }
 
             // Handshake Ping Ring
             Rectangle {
@@ -306,6 +387,21 @@ Item {
                 radius: width / 2
                 color: "transparent"
                 border.width: 1 * Style.uiScaleRatio
+                border.color: flowRoot.activeColor
+                opacity: 0
+                scale: 1
+            }
+
+            // Echo Ping Ring (second ripple)
+            Rectangle {
+                id: echoRing
+
+                anchors.centerIn: parent
+                width: parent.width
+                height: parent.height
+                radius: width / 2
+                color: "transparent"
+                border.width: 0.5 * Style.uiScaleRatio
                 border.color: flowRoot.activeColor
                 opacity: 0
                 scale: 1
@@ -342,15 +438,10 @@ Item {
                                 to: 1
                                 duration: 200
                             }
-
                         }
-
                     }
-
                 }
-
             }
-
         }
 
     }
