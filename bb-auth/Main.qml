@@ -37,9 +37,6 @@ Item {
     readonly property bool showSuccessAnimation: true
     readonly property string settingsPanelMode: getSetting("settingsPanelMode",
                                                            "centered")
-    readonly property bool showDetailsByDefault: getSetting(
-                                                     "showDetailsByDefault",
-                                                     false)
     readonly property bool closeInstantly: getSetting("closeInstantly", false)
     readonly property bool colorizeIcons: getSetting("colorizeIcons", true)
     readonly property int successAnimationDuration: closeInstantly ? 0 : 300
