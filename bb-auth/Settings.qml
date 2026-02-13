@@ -10,123 +10,257 @@ ColumnLayout {
   property var pluginApi: null
 
   spacing: Style.marginL
-  implicitWidth: Math.round(520 * Style.uiScaleRatio)
-  Layout.minimumWidth: implicitWidth
-  Layout.maximumWidth: implicitWidth
-  Layout.preferredWidth: implicitWidth
+  Layout.fillWidth: true
+  Layout.minimumWidth: Math.round(360 * Style.uiScaleRatio)
 
-  // Settings getter with fallback to manifest defaults and error handling
-  function getSetting(key, fallback) {
-    // Check if plugin API is available
-    if (!pluginApi) {
-      Logger.w("PolkitAuthSettings", "Plugin API not available for settings access - using manifest defaults");
-      const defaultVal = pluginApi?.manifest?.metadata?.defaultSettings?.[key];
-      return defaultVal !== undefined ? defaultVal : fallback;
-    }
-
-    // Check if plugin settings are available
-    if (!pluginApi.pluginSettings) {
-      Logger.w("PolkitAuthSettings", "Plugin settings not available - using manifest defaults");
-      const defaultVal = pluginApi?.manifest?.metadata?.defaultSettings?.[key];
-      return defaultVal !== undefined ? defaultVal : fallback;
-    }
-
-    // Original logic with additional safety checks
-    try {
-      const userVal = pluginApi?.pluginSettings?.[key];
-      if (userVal !== undefined && userVal !== null) return userVal;
-      const defaultVal = pluginApi?.manifest?.metadata?.defaultSettings?.[key];
-      if (defaultVal !== undefined && defaultVal !== null) return defaultVal;
-      return fallback;
-    } catch (e) {
-      Logger.e("PolkitAuthSettings", "Error accessing plugin settings:", e);
-      return fallback;
-    }
+  FontMetrics {
+    id: appFontMetrics
+    font: Qt.application.font
   }
 
-  property string valueSettingsPanelMode: getSetting("settingsPanelMode", "centered")
-  property bool valueShowDetailsByDefault: getSetting("showDetailsByDefault", false)
-  property bool valueCloseInstantly: getSetting("closeInstantly", false)
+  readonly property int basePreferredWidth: Math.round(520 * Style.uiScaleRatio)
+  readonly property int fontSafePreferredWidth: Math.round(appFontMetrics.averageCharacterWidth * 56 + Style.marginL * 2)
+  Layout.preferredWidth: Math.max(basePreferredWidth, fontSafePreferredWidth)
 
+  readonly property var defaultSettings: pluginApi?.manifest?.metadata?.defaultSettings || ({})
   readonly property var pluginMain: pluginApi?.mainInstance
 
-  function saveSettings() {
-    if (!pluginApi) {
-      Logger.e("PolkitAuthSettings", "Cannot save settings: plugin API not available");
-      ToastService.showError("Polkit Auth", "Settings cannot be saved - plugin not fully loaded");
-      return;
+  // --- i18n helper (catches !!key!! and ##key## markers) ---
+  function tr(key, fallback) {
+    if (!pluginApi || !pluginApi.tr)
+      return fallback;
+    var translated = pluginApi.tr(key);
+    if (!translated)
+      return fallback;
+    if (typeof translated === "string" && translated.length >= 4) {
+      var prefix = translated.slice(0, 2);
+      var suffix = translated.slice(translated.length - 2);
+      if ((prefix === "##" && suffix === "##") || (prefix === "!!" && suffix === "!!"))
+        return fallback;
     }
+    return translated;
+  }
 
-    if (!pluginApi.pluginSettings) {
-      Logger.e("PolkitAuthSettings", "Cannot save settings: plugin settings not available");
-      ToastService.showError("Polkit Auth", "Settings cannot be saved - plugin configuration issue");
+  // --- Settings helpers ---
+  function getSetting(key, fallback) {
+    if (pluginApi?.pluginSettings && pluginApi.pluginSettings[key] !== undefined)
+      return pluginApi.pluginSettings[key];
+    if (defaultSettings && defaultSettings[key] !== undefined)
+      return defaultSettings[key];
+    return fallback;
+  }
+
+  // Local state
+  property string valueSettingsPanelMode: "centered"
+  property bool valueShowDetailsByDefault: false
+  property bool valueCloseInstantly: false
+  property bool isLoading: false
+
+  function syncFromPlugin() {
+    if (!pluginApi)
       return;
-    }
+    isLoading = true;
+    valueSettingsPanelMode = getSetting("settingsPanelMode", "centered") || "centered";
+    valueShowDetailsByDefault = getSetting("showDetailsByDefault", false) === true;
+    valueCloseInstantly = getSetting("closeInstantly", false) === true;
+    isLoading = false;
+  }
 
-    try {
-      pluginApi.pluginSettings.settingsPanelMode = valueSettingsPanelMode;
-      pluginApi.pluginSettings.showDetailsByDefault = valueShowDetailsByDefault;
-      pluginApi.pluginSettings.closeInstantly = valueCloseInstantly;
+  onPluginApiChanged: syncFromPlugin()
+  Component.onCompleted: syncFromPlugin()
 
-      pluginApi.saveSettings();
-      pluginMain?.refresh();
-      Logger.d("PolkitAuthSettings", "Settings saved successfully");
-    } catch (e) {
-      Logger.e("PolkitAuthSettings", "Failed to save settings:", e);
-      ToastService.showError("Polkit Auth", "Failed to save settings: " + e.toString());
+  Connections {
+    target: pluginApi
+    function onPluginSettingsChanged() {
+      syncFromPlugin();
     }
   }
 
+  function saveSettings() {
+    if (!pluginApi)
+      return;
+
+    var settings = pluginApi.pluginSettings || {};
+    settings.settingsPanelMode = valueSettingsPanelMode;
+    settings.showDetailsByDefault = valueShowDetailsByDefault;
+    settings.closeInstantly = valueCloseInstantly;
+
+    pluginApi.pluginSettings = settings;
+    pluginApi.saveSettings();
+    pluginMain?.refresh();
+  }
+
+  // --- Header ---
   NText {
-    text: pluginApi?.tr("settings.description") ?? "Connect to the Noctalia auth daemon over IPC."
+    text: tr("settings.description", "Polkit and GPG authentication agent for Noctalia.")
     wrapMode: Text.WordWrap
     color: Color.mOnSurface
+    Layout.fillWidth: true
   }
 
-  NText {
-    text: "Daemon conflict policy: " + (pluginMain?.agentConflictMode || "session")
-    wrapMode: Text.WordWrap
-    color: Color.mOnSurfaceVariant
+  NDivider {
+    Layout.fillWidth: true
   }
 
-  NText {
-    text: {
-      if (!(pluginMain?.providerRegistered ?? false)) {
-        return "UI provider status: disconnected"
-      }
-      if (!(pluginMain?.providerActivityKnown ?? false)) {
-        return "UI provider status: negotiating"
-      }
-      return "UI provider status: " + ((pluginMain?.providerActive ?? true) ? "active" : "standby")
+  // --- Section 1: Dialog Behavior ---
+  ColumnLayout {
+    Layout.fillWidth: true
+    spacing: Style.marginS
+
+    NText {
+      text: "Dialog behavior"
+      pointSize: Style.fontSizeM
+      font.weight: Style.fontWeightMedium
+      color: Color.mOnSurface
     }
-    wrapMode: Text.WordWrap
-    color: Color.mOnSurfaceVariant
+
+    NText {
+      text: "Configure how the authentication dialog appears and behaves."
+      wrapMode: Text.WordWrap
+      color: Color.mOnSurfaceVariant
+      pointSize: Style.fontSizeS
+      Layout.fillWidth: true
+    }
   }
 
   NComboBox {
     Layout.fillWidth: true
-    label: pluginApi?.tr("settings.panel-mode") ?? "Panel mode"
-    description: pluginApi?.tr("settings.panel-mode-desc") ?? "Choose how the authentication dialog appears (may require reopening)."
+    label: tr("settings.panel-mode", "Panel mode")
+    description: tr("settings.panel-mode-desc", "Choose how the authentication dialog appears.")
     model: [
-      { key: "attached", name: pluginApi?.tr("settings.panel-mode-attached") ?? "Panel attached to bar" },
-      { key: "centered", name: pluginApi?.tr("settings.panel-mode-centered") ?? "Centered panel" },
-      { key: "window", name: pluginApi?.tr("settings.panel-mode-window") ?? "Separate window" }
+      { key: "attached", name: tr("settings.panel-mode-attached", "Panel attached to bar") },
+      { key: "centered", name: tr("settings.panel-mode-centered", "Centered panel") },
+      { key: "window", name: tr("settings.panel-mode-window", "Separate window") }
     ]
     currentKey: root.valueSettingsPanelMode
-    onSelected: key => root.valueSettingsPanelMode = key
+    onSelected: function(key) {
+      if (root.isLoading) return;
+      root.valueSettingsPanelMode = key;
+      root.saveSettings();
+    }
   }
 
   NToggle {
-    label: pluginApi?.tr("settings.show-details") ?? "Show details expander"
-    description: pluginApi?.tr("settings.show-details-desc") ?? "Allow the diagnostics details expander in the auth panel."
-    checked: root.valueShowDetailsByDefault
-    onToggled: checked => root.valueShowDetailsByDefault = checked
-  }
-
-  NToggle {
-    label: pluginApi?.tr("settings.close-instantly") ?? "Close instantly on success"
-    description: pluginApi?.tr("settings.close-instantly-desc") ?? "Skip the success state and close the panel immediately after verification."
+    label: tr("settings.close-instantly", "Close instantly on success")
+    description: tr("settings.close-instantly-desc", "Skip the success animation and close the panel immediately after verification.")
     checked: root.valueCloseInstantly
-    onToggled: checked => root.valueCloseInstantly = checked
+    Layout.fillWidth: true
+    onToggled: function(checked) {
+      if (root.isLoading) return;
+      root.valueCloseInstantly = checked;
+      root.saveSettings();
+    }
+  }
+
+  NToggle {
+    label: tr("settings.show-details", "Show details expander")
+    description: tr("settings.show-details-desc", "Show a diagnostics expander with action ID, requestor, and command details.")
+    checked: root.valueShowDetailsByDefault
+    Layout.fillWidth: true
+    onToggled: function(checked) {
+      if (root.isLoading) return;
+      root.valueShowDetailsByDefault = checked;
+      root.saveSettings();
+    }
+  }
+
+  NDivider {
+    Layout.fillWidth: true
+  }
+
+  // --- Section 2: Status ---
+  ColumnLayout {
+    Layout.fillWidth: true
+    spacing: Style.marginS
+
+    NText {
+      text: "Status"
+      pointSize: Style.fontSizeM
+      font.weight: Style.fontWeightMedium
+      color: Color.mOnSurface
+    }
+
+    // Provider status row
+    RowLayout {
+      Layout.fillWidth: true
+      spacing: Style.marginS
+
+      Rectangle {
+        width: Math.round(8 * Style.uiScaleRatio)
+        height: width
+        radius: width / 2
+        color: {
+          if (!(pluginMain?.providerRegistered ?? false))
+            return Color.mError;
+          if (!(pluginMain?.providerActivityKnown ?? false))
+            return Color.mTertiary;
+          return (pluginMain?.providerActive ?? true) ? Color.mPrimary : Color.mOutline;
+        }
+        Layout.alignment: Qt.AlignVCenter
+      }
+
+      NText {
+        text: {
+          if (!(pluginMain?.providerRegistered ?? false))
+            return "Disconnected from auth daemon";
+          if (!(pluginMain?.providerActivityKnown ?? false))
+            return "Negotiating with auth daemon";
+          return (pluginMain?.providerActive ?? true) ? "Active — ready to handle requests" : "Standby — another agent is active";
+        }
+        color: Color.mOnSurface
+        pointSize: Style.fontSizeS
+        Layout.fillWidth: true
+        wrapMode: Text.WordWrap
+      }
+    }
+
+    // Conflict policy
+    NText {
+      Layout.fillWidth: true
+      text: "Conflict policy: " + (pluginMain?.agentConflictMode || "session")
+      color: Color.mOnSurfaceVariant
+      pointSize: Style.fontSizeS
+      opacity: 0.7
+      wrapMode: Text.WordWrap
+    }
+  }
+
+  NDivider {
+    Layout.fillWidth: true
+  }
+
+  // --- Section 3: About ---
+  ColumnLayout {
+    Layout.fillWidth: true
+    spacing: Style.marginS
+
+    NText {
+      text: "About"
+      pointSize: Style.fontSizeM
+      font.weight: Style.fontWeightMedium
+      color: Color.mOnSurface
+    }
+
+    NText {
+      Layout.fillWidth: true
+      text: (pluginApi?.manifest?.name || "BB Auth") + " v" + (pluginApi?.manifest?.version || "0.0.0")
+      color: Color.mOnSurfaceVariant
+      pointSize: Style.fontSizeS
+      wrapMode: Text.WordWrap
+    }
+
+    NText {
+      Layout.fillWidth: true
+      text: pluginApi?.manifest?.description || ""
+      visible: text !== ""
+      color: Color.mOnSurfaceVariant
+      pointSize: Style.fontSizeS
+      wrapMode: Text.WordWrap
+      opacity: 0.7
+    }
+  }
+
+  Item {
+    Layout.fillHeight: true
   }
 }
