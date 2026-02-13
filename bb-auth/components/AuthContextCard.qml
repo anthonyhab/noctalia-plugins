@@ -34,6 +34,15 @@ NBox {
         }
     }
 
+    // Invisible item at top of card to anchor tooltip above
+    Item {
+        id: tooltipAnchor
+        anchors.top: parent.top
+        anchors.horizontalCenter: parent.horizontalCenter
+        width: 1
+        height: 1
+    }
+
     MouseArea {
         id: clickArea
         anchors.fill: parent
@@ -42,7 +51,7 @@ NBox {
         onClicked: {
             if (model && model.copyText) {
                 Quickshell.execDetached(["wl-copy", model.copyText])
-                TooltipService.show(root,
+                TooltipService.show(tooltipAnchor,
                                     model.copyTooltip || "Copied to clipboard")
                 Qt.callLater(function () {
                     TooltipService.hide()
@@ -51,7 +60,7 @@ NBox {
         }
         onEntered: {
             if (model && model.copyText) {
-                TooltipService.show(root,
+                TooltipService.show(tooltipAnchor,
                                     model.copyHint || "Click to copy details")
             }
         }
@@ -185,7 +194,9 @@ NBox {
                 textFormat: Text.RichText
                 pointSize: Style.fontSizeS
                 Layout.fillWidth: true
-                wrapMode: Text.Wrap
+                Layout.minimumWidth: 100
+                wrapMode: Text.WordWrap
+                horizontalAlignment: Text.AlignLeft
             }
         }
     }

@@ -47,6 +47,7 @@ Item {
         agentAvailable: (pluginMain && pluginMain.agentAvailable) || true
         statusText: (pluginMain && pluginMain.agentStatus) || ""
         errorText: (pluginMain && pluginMain.lastError) || ""
+        colorizeIcons: (pluginMain && pluginMain.colorizeIcons) !== false
         onCloseRequested: pluginMain && pluginMain.requestClose()
     }
 }

@@ -41,6 +41,7 @@ Item {
                                                      "showDetailsByDefault",
                                                      false)
     readonly property bool closeInstantly: getSetting("closeInstantly", false)
+    readonly property bool colorizeIcons: getSetting("colorizeIcons", true)
     readonly property int successAnimationDuration: closeInstantly ? 0 : 300
 
     readonly property string socketPath: {

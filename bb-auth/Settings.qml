@@ -62,6 +62,7 @@ ColumnLayout {
     property string valueSettingsPanelMode: "centered"
     property bool valueShowDetailsByDefault: false
     property bool valueCloseInstantly: false
+    property bool valueColorizeIcons: true
     property bool isLoading: false
 
     function syncFromPlugin() {
@@ -73,6 +74,7 @@ ColumnLayout {
         valueShowDetailsByDefault = getSetting("showDetailsByDefault",
                                                false) === true
         valueCloseInstantly = getSetting("closeInstantly", false) === true
+        valueColorizeIcons = getSetting("colorizeIcons", true) !== false
         isLoading = false
     }
 
@@ -94,6 +96,7 @@ ColumnLayout {
         settings.settingsPanelMode = valueSettingsPanelMode
         settings.showDetailsByDefault = valueShowDetailsByDefault
         settings.closeInstantly = valueCloseInstantly
+        settings.colorizeIcons = valueColorizeIcons
 
         pluginApi.pluginSettings = settings
         pluginApi.saveSettings()
@@ -183,6 +186,20 @@ ColumnLayout {
             if (root.isLoading)
                 return
             root.valueShowDetailsByDefault = checked
+            root.saveSettings()
+        }
+    }
+
+    NToggle {
+        label: tr("settings.colorize-icons", "Colorize icons")
+        description: tr("settings.colorize-icons-desc",
+                        "Apply theme colors to requestor icons in the auth dialog.")
+        checked: root.valueColorizeIcons
+        Layout.fillWidth: true
+        onToggled: function (checked) {
+            if (root.isLoading)
+                return
+            root.valueColorizeIcons = checked
             root.saveSettings()
         }
     }
