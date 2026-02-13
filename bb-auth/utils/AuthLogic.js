@@ -104,8 +104,13 @@ function getDisplayAction(request, richContext, secondaryAccent) {
     return "perform this action";
 }
 
-function getContextCardModel(contextModel, gpgInfo) {
+function getContextCardModel(contextModel, gpgInfo, request) {
     if (gpgInfo !== null) {
+        const meta = (gpgInfo.keyType && gpgInfo.keyId) ? (gpgInfo.keyType + " • " + gpgInfo.keyId) : "";
+        const copyText = "Name: " + (gpgInfo.name || "Unknown") +
+                         "\nEmail: " + (gpgInfo.email || "N/A") +
+                         "\nKey: " + (gpgInfo.keyType || "Unknown") + " • " + (gpgInfo.keyId || "N/A") +
+                         "\nCreated: " + (gpgInfo.created || "N/A");
         return {
             variant: "gpg",
             accentColor: contextModel ? contextModel.accentColor : "#FFFFFF",
@@ -113,18 +118,64 @@ function getContextCardModel(contextModel, gpgInfo) {
             tileIconPointSize: 20,
             name: gpgInfo.name || "Unknown",
             email: gpgInfo.email || "",
-            meta: (gpgInfo.keyType && gpgInfo.keyId) ? (gpgInfo.keyType + " • " + gpgInfo.keyId) : ""
+            meta: meta,
+            copyText: copyText,
+            copyHint: "Click to copy key details",
+            copyTooltip: "Key details copied!"
         };
     }
 
     if (contextModel && contextModel.kind === "vault") {
+        const appName = contextModel.label || "Vault";
         return {
             variant: "vault",
             accentColor: contextModel.accentColor,
             tileIcon: contextModel.glyph || "lock",
             tileIconPointSize: 18,
-            label: contextModel.label || "Vault",
-            richText: "Unlock <b><font color='" + contextModel.accentColor + "'>" + contextModel.label + "</font></b> vault"
+            label: appName,
+            richText: "Unlock <b><font color='" + contextModel.accentColor + "'>" + appName + "</font></b> vault",
+            copyText: "Application: " + appName + "\nType: Password vault",
+            copyHint: "Click to copy vault info",
+            copyTooltip: "Vault info copied!"
+        };
+    }
+
+    // Generic auth card for polkit, ssh-askpass, etc.
+    if (request) {
+        const source = request.source || "unknown";
+        const actionId = request.actionId || "N/A";
+        const message = request.message || "";
+        const description = request.description || "";
+        const copyText = "Source: " + source +
+                         "\nAction: " + actionId +
+                         "\nMessage: " + message +
+                         (description ? "\nDescription: " + description : "");
+
+        let label = "System";
+        let icon = "shield-check";
+        let accent = contextModel ? contextModel.accentColor : "#FFFFFF";
+
+        if (source === "polkit") {
+            label = "System Authentication";
+            icon = "shield-check";
+        } else if (source === "ssh-askpass") {
+            label = "SSH Key";
+            icon = "key";
+        } else if (source === "keyring") {
+            label = "Keyring";
+            icon = "lock";
+        }
+
+        return {
+            variant: "system",
+            accentColor: accent,
+            tileIcon: icon,
+            tileIconPointSize: 18,
+            label: label,
+            richText: "Authenticate <b><font color='" + accent + "'>" + label + "</font></b>",
+            copyText: copyText,
+            copyHint: "Click to copy details",
+            copyTooltip: "Details copied!"
         };
     }
 

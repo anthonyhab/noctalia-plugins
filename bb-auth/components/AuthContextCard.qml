@@ -1,6 +1,8 @@
 import QtQuick
 import QtQuick.Layouts
+import Quickshell
 import qs.Commons
+import qs.Services.UI
 import qs.Widgets
 
 NBox {
@@ -13,18 +15,33 @@ NBox {
     visible: model !== null
     radius: Style.radiusM
     color: Color.mSurfaceVariant
-    border.color: Color.mOutline
-    border.width: 1
+    border.color: clickArea.containsMouse ? Qt.lighter(model ? model.accentColor : Color.mOutline, 1.3) : Color.mOutline
+    border.width: clickArea.containsMouse ? 2 : 1
     implicitHeight: visible ? (contentLoader.implicitHeight + (Style.marginM * 2)) : 0
     Layout.preferredHeight: visible ? implicitHeight : 0
     Layout.fillWidth: true
 
-    MouseArea {
-        id: hoverArea
+    Behavior on border.color { ColorAnimation { duration: 150 } }
+    Behavior on border.width { NumberAnimation { duration: 150 } }
 
+    MouseArea {
+        id: clickArea
         anchors.fill: parent
         hoverEnabled: true
-        acceptedButtons: Qt.NoButton
+        cursorShape: Qt.PointingHandCursor
+        onClicked: {
+            if (model && model.copyText) {
+                Quickshell.execDetached(["wl-copy", model.copyText])
+                TooltipService.show(root, model.copyTooltip || "Copied to clipboard")
+                Qt.callLater(function() { TooltipService.hide() })
+            }
+        }
+        onEntered: {
+            if (model && model.copyText) {
+                TooltipService.show(root, model.copyHint || "Click to copy details")
+            }
+        }
+        onExited: TooltipService.hide()
     }
 
     // Hover Tint Overlay
@@ -33,7 +50,7 @@ NBox {
         anchors.margins: 1
         radius: parent.radius
         color: model ? model.accentColor : "transparent"
-        opacity: hoverArea.containsMouse ? (isDark ? 0.15 : 0.12) : 0
+        opacity: clickArea.containsMouse ? (isDark ? 0.15 : 0.12) : 0
 
         Behavior on opacity {
             NumberAnimation {
