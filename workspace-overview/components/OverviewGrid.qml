@@ -15,21 +15,21 @@ Item {
     readonly property HyprlandMonitor monitor: Hyprland.monitorFor(panelWindow.screen)
     readonly property var toplevels: ToplevelManager.toplevels
     readonly property int workspacesShown: pluginMain.gridRows * pluginMain.gridColumns
-    readonly property int workspaceGroup: Math.floor(((monitor.activeWorkspace?.id ?? 1) - 1) / workspacesShown)
-    property bool monitorIsFocused: (Hyprland.focusedMonitor?.name == monitor.name)
+    readonly property int workspaceGroup: Math.floor((((monitor.activeWorkspace && monitor.activeWorkspace.id) || 1) - 1) / workspacesShown)
+    property bool monitorIsFocused: (Hyprland.focusedMonitor && Hyprland.focusedMonitor.name) == monitor.name
     property var windows: pluginMain.windowList
     property var windowByAddress: pluginMain.windowByAddress
     property var windowAddresses: pluginMain.addresses
-    property var monitorData: pluginMain.monitors.find(function(m) { return m.id === root.monitor?.id })
+    property var monitorData: pluginMain.monitors.find(function(m) { return m.id === (root.monitor && root.monitor.id) })
     property real scale: pluginMain.gridScale
 
     // Workspace cell dimensions (accounting for rotated monitors)
-    property real workspaceImplicitWidth: (monitorData?.transform % 2 === 1)
-        ? ((monitor.height / monitor.scale - (monitorData?.reserved?.[0] ?? 0) - (monitorData?.reserved?.[2] ?? 0)) * root.scale)
-        : ((monitor.width / monitor.scale - (monitorData?.reserved?.[0] ?? 0) - (monitorData?.reserved?.[2] ?? 0)) * root.scale)
-    property real workspaceImplicitHeight: (monitorData?.transform % 2 === 1)
-        ? ((monitor.width / monitor.scale - (monitorData?.reserved?.[1] ?? 0) - (monitorData?.reserved?.[3] ?? 0)) * root.scale)
-        : ((monitor.height / monitor.scale - (monitorData?.reserved?.[1] ?? 0) - (monitorData?.reserved?.[3] ?? 0)) * root.scale)
+    property real workspaceImplicitWidth: (monitorData && monitorData.transform % 2 === 1)
+        ? ((monitor.height / monitor.scale - ((monitorData && monitorData.reserved && monitorData.reserved[0]) || 0) - ((monitorData && monitorData.reserved && monitorData.reserved[2]) || 0)) * root.scale)
+        : ((monitor.width / monitor.scale - ((monitorData && monitorData.reserved && monitorData.reserved[0]) || 0) - ((monitorData && monitorData.reserved && monitorData.reserved[2]) || 0)) * root.scale)
+    property real workspaceImplicitHeight: (monitorData && monitorData.transform % 2 === 1)
+        ? ((monitor.width / monitor.scale - ((monitorData && monitorData.reserved && monitorData.reserved[1]) || 0) - ((monitorData && monitorData.reserved && monitorData.reserved[3]) || 0)) * root.scale)
+        : ((monitor.height / monitor.scale - ((monitorData && monitorData.reserved && monitorData.reserved[1]) || 0) - ((monitorData && monitorData.reserved && monitorData.reserved[3]) || 0)) * root.scale)
 
     // Z-ordering
     property int workspaceZ: 0
@@ -50,7 +50,7 @@ Item {
         var lastWorkspace = (root.workspaceGroup + 1) * root.workspacesShown
 
         // Always show the row with the current workspace
-        var currentWorkspace = monitor.activeWorkspace?.id ?? 1
+        var currentWorkspace = (monitor.activeWorkspace && monitor.activeWorkspace.id) || 1
         if (currentWorkspace >= firstWorkspace && currentWorkspace <= lastWorkspace) {
             rows.add(Math.floor((currentWorkspace - firstWorkspace) / pluginMain.gridColumns))
         }
@@ -58,7 +58,7 @@ Item {
         // Add rows that have windows
         for (var addr in windowByAddress) {
             var win = windowByAddress[addr]
-            var wsId = win?.workspace?.id
+            var wsId = win && win.workspace && win.workspace.id
             if (wsId >= firstWorkspace && wsId <= lastWorkspace) {
                 var rowIndex = Math.floor((wsId - firstWorkspace) / pluginMain.gridColumns)
                 rows.add(rowIndex)
@@ -66,6 +66,18 @@ Item {
         }
 
         return rows
+    }
+
+    function getVisualYOffset(rowIndex) {
+        if (!pluginMain.hideEmptyRows) return rowIndex * (root.workspaceImplicitHeight + root.workspaceSpacing)
+
+        var visualIndex = 0
+        for (var i = 0; i < rowIndex; i++) {
+            if (root.rowsWithContent && root.rowsWithContent.has(i)) {
+                visualIndex++
+            }
+        }
+        return visualIndex * (root.workspaceImplicitHeight + root.workspaceSpacing)
     }
 
     implicitWidth: overviewBackground.implicitWidth + 20
@@ -141,8 +153,8 @@ Item {
                             Text {
                                 anchors.centerIn: parent
                                 text: workspace.workspaceValue
-                                font.family: Commons.Settings.data.ui.fontDefault
-                                font.pixelSize: 250 * root.scale * (monitor.scale ?? 1)
+                                font.family: Settings.data.ui.fontDefault
+                                font.pixelSize: 250 * root.scale * ((monitor && monitor.scale) || 1)
                                 font.weight: Style.fontWeightSemiBold
                                 color: Qt.rgba(
                                     Color.mOnSurfaceVariant.r,
@@ -200,8 +212,8 @@ Item {
                         return ToplevelManager.toplevels.values.filter(function(toplevel) {
                             var address = "0x" + toplevel.HyprlandToplevel.address
                             var win = root.windowByAddress[address]
-                            var inWorkspaceGroup = (root.workspaceGroup * root.workspacesShown < win?.workspace?.id &&
-                                                    win?.workspace?.id <= (root.workspaceGroup + 1) * root.workspacesShown)
+                            var inWorkspaceGroup = (root.workspaceGroup * root.workspacesShown < (win && win.workspace && win.workspace.id) &&
+                                                    (win && win.workspace && win.workspace.id) <= (root.workspaceGroup + 1) * root.workspacesShown)
                             return inWorkspaceGroup
                         }).sort(function(a, b) {
                             var addrA = "0x" + a.HyprlandToplevel.address
@@ -210,17 +222,17 @@ Item {
                             var winB = root.windowByAddress[addrB]
 
                             // Pinned windows always on top
-                            if (winA?.pinned !== winB?.pinned) {
-                                return winA?.pinned ? 1 : -1
+                            if ((winA && winA.pinned) !== (winB && winB.pinned)) {
+                                return (winA && winA.pinned) ? 1 : -1
                             }
 
                             // Floating windows above tiled
-                            if (winA?.floating !== winB?.floating) {
-                                return winA?.floating ? 1 : -1
+                            if ((winA && winA.floating) !== (winB && winB.floating)) {
+                                return (winA && winA.floating) ? 1 : -1
                             }
 
                             // Sort by focus history (lower = more recent = higher)
-                            return (winB?.focusHistoryID ?? 0) - (winA?.focusHistoryID ?? 0)
+                            return ((winB && winB.focusHistoryID) || 0) - ((winA && winA.focusHistoryID) || 0)
                         })
                     }
                 }
@@ -229,7 +241,7 @@ Item {
                     id: windowDelegate
                     required property var modelData
                     required property int index
-                    property int monitorId: windowData?.monitor ?? -1
+                    property int monitorId: ((windowData && windowData.monitor) || -1)
                     property var windowMonitor: pluginMain.monitors.find(function(m) { return m.id === monitorId })
                     property var address: "0x" + modelData.HyprlandToplevel.address
 
@@ -239,12 +251,12 @@ Item {
                     monitorData: windowMonitor
 
                     // Scale relative to source monitor
-                    property real sourceMonitorWidth: (windowMonitor?.transform % 2 === 1)
-                        ? (windowMonitor?.height ?? 1920) / (windowMonitor?.scale ?? 1) - (windowMonitor?.reserved?.[0] ?? 0) - (windowMonitor?.reserved?.[2] ?? 0)
-                        : (windowMonitor?.width ?? 1920) / (windowMonitor?.scale ?? 1) - (windowMonitor?.reserved?.[0] ?? 0) - (windowMonitor?.reserved?.[2] ?? 0)
-                    property real sourceMonitorHeight: (windowMonitor?.transform % 2 === 1)
-                        ? (windowMonitor?.width ?? 1080) / (windowMonitor?.scale ?? 1) - (windowMonitor?.reserved?.[1] ?? 0) - (windowMonitor?.reserved?.[3] ?? 0)
-                        : (windowMonitor?.height ?? 1080) / (windowMonitor?.scale ?? 1) - (windowMonitor?.reserved?.[1] ?? 0) - (windowMonitor?.reserved?.[3] ?? 0)
+                    property real sourceMonitorWidth: (windowMonitor && windowMonitor.transform % 2 === 1)
+                        ? ((windowMonitor && windowMonitor.height) || 1920) / ((windowMonitor && windowMonitor.scale) || 1) - ((windowMonitor && windowMonitor.reserved && windowMonitor.reserved[0]) || 0) - ((windowMonitor && windowMonitor.reserved && windowMonitor.reserved[2]) || 0)
+                        : ((windowMonitor && windowMonitor.width) || 1920) / ((windowMonitor && windowMonitor.scale) || 1) - ((windowMonitor && windowMonitor.reserved && windowMonitor.reserved[0]) || 0) - ((windowMonitor && windowMonitor.reserved && windowMonitor.reserved[2]) || 0)
+                    property real sourceMonitorHeight: (windowMonitor && windowMonitor.transform % 2 === 1)
+                        ? ((windowMonitor && windowMonitor.width) || 1080) / ((windowMonitor && windowMonitor.scale) || 1) - ((windowMonitor && windowMonitor.reserved && windowMonitor.reserved[1]) || 0) - ((windowMonitor && windowMonitor.reserved && windowMonitor.reserved[3]) || 0)
+                        : ((windowMonitor && windowMonitor.height) || 1080) / ((windowMonitor && windowMonitor.scale) || 1) - ((windowMonitor && windowMonitor.reserved && windowMonitor.reserved[1]) || 0) - ((windowMonitor && windowMonitor.reserved && windowMonitor.reserved[3]) || 0)
 
                     scale: Math.min(
                         root.workspaceImplicitWidth / sourceMonitorWidth,
@@ -258,10 +270,10 @@ Item {
 
                     property bool atInitPosition: (initX == x && initY == y)
 
-                    property int workspaceColIndex: ((windowData?.workspace?.id ?? 1) - 1) % pluginMain.gridColumns
-                    property int workspaceRowIndex: Math.floor(((windowData?.workspace?.id ?? 1) - 1) % root.workspacesShown / pluginMain.gridColumns)
+                    property int workspaceColIndex: (((windowData && windowData.workspace && windowData.workspace.id) || 1) - 1) % pluginMain.gridColumns
+                    property int workspaceRowIndex: Math.floor((((windowData && windowData.workspace && windowData.workspace.id) || 1) - 1) % root.workspacesShown / pluginMain.gridColumns)
                     xOffset: (root.workspaceImplicitWidth + root.workspaceSpacing) * workspaceColIndex
-                    yOffset: (root.workspaceImplicitHeight + root.workspaceSpacing) * workspaceRowIndex
+                    yOffset: root.getVisualYOffset(workspaceRowIndex)
 
                     Timer {
                         id: updateWindowPosition
@@ -269,8 +281,8 @@ Item {
                         repeat: false
                         running: false
                         onTriggered: {
-                            windowDelegate.x = Math.round(Math.max(((windowDelegate.windowData?.at[0] ?? 0) - (windowDelegate.windowMonitor?.x ?? 0) - (windowDelegate.monitorData?.reserved?.[0] ?? 0)) * windowDelegate.scale, 0) + windowDelegate.xOffset)
-                            windowDelegate.y = Math.round(Math.max(((windowDelegate.windowData?.at[1] ?? 0) - (windowDelegate.windowMonitor?.y ?? 0) - (windowDelegate.monitorData?.reserved?.[1] ?? 0)) * windowDelegate.scale, 0) + windowDelegate.yOffset)
+                            windowDelegate.x = Math.round(Math.max((((windowDelegate.windowData && windowDelegate.windowData.at[0]) || 0) - ((windowDelegate.windowMonitor && windowDelegate.windowMonitor.x) || 0) - ((windowDelegate.monitorData && windowDelegate.monitorData.reserved && windowDelegate.monitorData.reserved[0]) || 0)) * windowDelegate.scale, 0) + windowDelegate.xOffset)
+                            windowDelegate.y = Math.round(Math.max((((windowDelegate.windowData && windowDelegate.windowData.at[1]) || 0) - ((windowDelegate.windowMonitor && windowDelegate.windowMonitor.y) || 0) - ((windowDelegate.monitorData && windowDelegate.monitorData.reserved && windowDelegate.monitorData.reserved[1]) || 0)) * windowDelegate.scale, 0) + windowDelegate.yOffset)
                         }
                     }
 
@@ -288,7 +300,7 @@ Item {
                         drag.target: parent
 
                         onPressed: (mouse) => {
-                            root.draggingFromWorkspace = windowDelegate.windowData?.workspace?.id ?? -1
+                            root.draggingFromWorkspace = ((windowDelegate.windowData && windowDelegate.windowData.workspace && windowDelegate.windowData.workspace.id) || -1)
                             windowDelegate.pressed = true
                             windowDelegate.Drag.active = true
                             windowDelegate.Drag.source = windowDelegate
@@ -301,8 +313,8 @@ Item {
                             windowDelegate.pressed = false
                             windowDelegate.Drag.active = false
                             root.draggingFromWorkspace = -1
-                            if (targetWorkspace !== -1 && targetWorkspace !== windowDelegate.windowData?.workspace?.id) {
-                                Hyprland.dispatch("movetoworkspacesilent " + targetWorkspace + ", address:" + windowDelegate.windowData?.address)
+                            if (targetWorkspace !== -1 && targetWorkspace !== (windowDelegate.windowData && windowDelegate.windowData.workspace && windowDelegate.windowData.workspace.id)) {
+                                Hyprland.dispatch("movetoworkspacesilent " + targetWorkspace + ", address:" + (windowDelegate.windowData && windowDelegate.windowData.address))
                                 updateWindowPosition.restart()
                             } else {
                                 windowDelegate.x = windowDelegate.initX
@@ -338,9 +350,9 @@ Item {
                             NText {
                                 id: tooltipText
                                 anchors.centerIn: parent
-                                text: (windowDelegate.windowData?.title ?? (pluginMain.pluginApi?.tr("overview.tooltip.unknown") || "Unknown")) +
-                                      "\n[" + (windowDelegate.windowData?.class ?? (pluginMain.pluginApi?.tr("overview.tooltip.unknown-class") || "unknown")) + "]" +
-                                      (windowDelegate.windowData?.xwayland ? (" [" + (pluginMain.pluginApi?.tr("overview.tooltip.xwayland") || "XWayland") + "]") : "")
+                                text: ((windowDelegate.windowData && windowDelegate.windowData.title) || (pluginMain.pluginApi && pluginMain.pluginApi.tr("overview.tooltip.unknown") || "Unknown")) +
+                                      "\n[" + ((windowDelegate.windowData && windowDelegate.windowData.class) || (pluginMain.pluginApi && pluginMain.pluginApi.tr("overview.tooltip.unknown-class") || "unknown")) + "]" +
+                                      (windowDelegate.windowData && windowDelegate.windowData.xwayland ? (" [" + (pluginMain.pluginApi && pluginMain.pluginApi.tr("overview.tooltip.xwayland") || "XWayland") + "]") : "")
                                 color: Color.mSurface
                                 pointSize: 11
                             }
@@ -352,11 +364,11 @@ Item {
             // === ACTIVE WORKSPACE INDICATOR ===
             Rectangle {
                 id: focusedWorkspaceIndicator
-                property int activeWorkspaceInGroup: (monitor.activeWorkspace?.id ?? 1) - (root.workspaceGroup * root.workspacesShown)
+                property int activeWorkspaceInGroup: ((monitor.activeWorkspace && monitor.activeWorkspace.id) || 1) - (root.workspaceGroup * root.workspacesShown)
                 property int activeWorkspaceRowIndex: Math.floor((activeWorkspaceInGroup - 1) / pluginMain.gridColumns)
                 property int activeWorkspaceColIndex: (activeWorkspaceInGroup - 1) % pluginMain.gridColumns
                 x: (root.workspaceImplicitWidth + root.workspaceSpacing) * activeWorkspaceColIndex
-                y: (root.workspaceImplicitHeight + root.workspaceSpacing) * activeWorkspaceRowIndex
+                y: root.getVisualYOffset(activeWorkspaceRowIndex)
                 z: root.windowZ
                 width: root.workspaceImplicitWidth
                 height: root.workspaceImplicitHeight

@@ -14,8 +14,8 @@ ColumnLayout {
   Layout.minimumWidth: Math.round(520 * Style.uiScaleRatio)
   Layout.preferredWidth: Layout.minimumWidth
 
-  readonly property var defaultSettings: pluginApi?.manifest?.metadata?.defaultSettings || ({})
-  readonly property var pluginMain: pluginApi?.mainInstance
+  readonly property var defaultSettings: (pluginApi && pluginApi.manifest && pluginApi.manifest.metadata && pluginApi.manifest.metadata.defaultSettings) || ({})
+  readonly property var pluginMain: pluginApi && pluginApi.mainInstance
 
   // Local state
   property int gridRows: 2
@@ -25,7 +25,7 @@ ColumnLayout {
   property string overviewPosition: "top"
 
   function getSetting(key, fallback) {
-    if (pluginApi?.pluginSettings && pluginApi.pluginSettings[key] !== undefined) {
+    if (pluginApi && pluginApi.pluginSettings && pluginApi.pluginSettings[key] !== undefined) {
       return pluginApi.pluginSettings[key]
     }
     if (defaultSettings && defaultSettings[key] !== undefined) {
@@ -62,12 +62,12 @@ ColumnLayout {
     pluginApi.pluginSettings = settings
     pluginApi.saveSettings()
 
-    pluginMain?.refresh()
+    pluginMain && pluginMain.refresh()
   }
 
   // Description
   NText {
-    text: pluginApi?.tr("plugin.description") || "Visual workspace overview with live window previews for Hyprland"
+    text: pluginApi && pluginApi.tr("plugin.description") || "Visual workspace overview with live window previews for Hyprland"
     wrapMode: Text.WordWrap
     color: Color.mOnSurface
   }
@@ -77,54 +77,59 @@ ColumnLayout {
   }
 
   // === Workspace Grid ===
-  NText {
-    text: pluginApi?.tr("settings.grid.title") || "Workspace Grid"
-    pointSize: Style.fontSizeM
-    font.weight: Style.fontWeightMedium
-    color: Color.mOnSurface
+  NHeader {
+    label: pluginApi && pluginApi.tr("settings.grid.title") || "Workspace Grid"
   }
 
   RowLayout {
     Layout.fillWidth: true
     spacing: Style.marginM
 
-    NTextInput {
+    NSpinBox {
       Layout.fillWidth: true
-      label: pluginApi?.tr("settings.grid.rows.label") || "Rows"
-      description: pluginApi?.tr("settings.grid.rows.description") || "Number of workspace rows"
-      placeholderText: "2"
-      text: root.gridRows.toString()
-      inputItem.inputMethodHints: Qt.ImhDigitsOnly
-      onTextChanged: {
-        var val = parseInt(text)
-        if (val >= 1 && val <= 5) root.gridRows = val
+      label: pluginApi && pluginApi.tr("settings.grid.rows.label") || "Rows"
+      description: pluginApi && pluginApi.tr("settings.grid.rows.description") || "Number of workspace rows"
+      from: 1
+      to: 10
+      value: root.gridRows
+      onValueChanged: {
+        if (root.gridRows !== value) {
+          root.gridRows = value
+          root.saveSettings()
+        }
       }
     }
 
-    NTextInput {
+    NSpinBox {
       Layout.fillWidth: true
-      label: pluginApi?.tr("settings.grid.columns.label") || "Columns"
-      description: pluginApi?.tr("settings.grid.columns.description") || "Number of workspace columns"
-      placeholderText: "5"
-      text: root.gridColumns.toString()
-      inputItem.inputMethodHints: Qt.ImhDigitsOnly
-      onTextChanged: {
-        var val = parseInt(text)
-        if (val >= 1 && val <= 10) root.gridColumns = val
+      label: pluginApi && pluginApi.tr("settings.grid.columns.label") || "Columns"
+      description: pluginApi && pluginApi.tr("settings.grid.columns.description") || "Number of workspace columns"
+      from: 1
+      to: 20
+      value: root.gridColumns
+      onValueChanged: {
+        if (root.gridColumns !== value) {
+          root.gridColumns = value
+          root.saveSettings()
+        }
       }
     }
   }
 
-  NTextInput {
+  NValueSlider {
     Layout.fillWidth: true
-    label: pluginApi?.tr("settings.grid.scale.label") || "Scale"
-    description: pluginApi?.tr("settings.grid.scale.description") || "Overview scale factor (smaller = more compact)"
-    placeholderText: "0.16"
-    text: root.gridScale.toFixed(2)
-    inputItem.inputMethodHints: Qt.ImhFormattedNumbersOnly
-    onTextChanged: {
-      var val = parseFloat(text)
-      if (val >= 0.08 && val <= 0.30) root.gridScale = val
+    label: pluginApi && pluginApi.tr("settings.grid.scale.label") || "Scale"
+    description: pluginApi && pluginApi.tr("settings.grid.scale.description") || "Overview scale factor"
+    from: 0.05
+    to: 0.50
+    stepSize: 0.01
+    value: root.gridScale
+    text: value.toFixed(2)
+    onMoved: value => {
+      if (Math.abs(root.gridScale - value) > 0.001) {
+        root.gridScale = value
+        root.saveSettings()
+      }
     }
   }
 
@@ -142,18 +147,18 @@ ColumnLayout {
   }
 
   // === Behavior ===
-  NText {
-    text: pluginApi?.tr("settings.behavior.title") || "Behavior"
-    pointSize: Style.fontSizeM
-    font.weight: Style.fontWeightMedium
-    color: Color.mOnSurface
+  NHeader {
+    label: pluginApi && pluginApi.tr("settings.behavior.title") || "Behavior"
   }
 
   NToggle {
-    label: pluginApi?.tr("settings.behavior.hide-empty-rows.label") || "Hide empty rows"
-    description: pluginApi?.tr("settings.behavior.hide-empty-rows.description") || "Automatically hide workspace rows with no windows"
+    label: pluginApi && pluginApi.tr("settings.behavior.hide-empty-rows.label") || "Hide empty rows"
+    description: pluginApi && pluginApi.tr("settings.behavior.hide-empty-rows.description") || "Automatically hide workspace rows with no windows"
     checked: root.hideEmptyRows
-    onToggled: checked => root.hideEmptyRows = checked
+    onToggled: checked => {
+      root.hideEmptyRows = checked
+      root.saveSettings()
+    }
   }
 
   NDivider {
@@ -161,26 +166,26 @@ ColumnLayout {
   }
 
   // === Layout ===
-  NText {
-    text: pluginApi?.tr("settings.layout.title") || "Layout"
-    pointSize: Style.fontSizeM
-    font.weight: Style.fontWeightMedium
-    color: Color.mOnSurface
+  NHeader {
+    label: pluginApi && pluginApi.tr("settings.layout.title") || "Layout"
   }
 
 
 
   NComboBox {
     Layout.fillWidth: true
-    label: pluginApi?.tr("settings.layout.position.label") || "Position"
-    description: pluginApi?.tr("settings.layout.position.description") || "Where the overview appears on screen"
+    label: pluginApi && pluginApi.tr("settings.layout.position.label") || "Position"
+    description: pluginApi && pluginApi.tr("settings.layout.position.description") || "Where the overview appears on screen"
     model: [
-      { "key": "top", "name": pluginApi?.tr("settings.layout.position.top") || "Top" },
-      { "key": "center", "name": pluginApi?.tr("settings.layout.position.center") || "Center" },
-      { "key": "bottom", "name": pluginApi?.tr("settings.layout.position.bottom") || "Bottom" }
+      { "key": "top", "name": pluginApi && pluginApi.tr("settings.layout.position.top") || "Top" },
+      { "key": "center", "name": pluginApi && pluginApi.tr("settings.layout.position.center") || "Center" },
+      { "key": "bottom", "name": pluginApi && pluginApi.tr("settings.layout.position.bottom") || "Bottom" }
     ]
     currentKey: root.overviewPosition
-    onSelected: key => root.overviewPosition = key
+    onSelected: key => {
+      root.overviewPosition = key
+      root.saveSettings()
+    }
   }
 
   Item {
