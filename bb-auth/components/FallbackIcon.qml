@@ -9,7 +9,8 @@ Rectangle {
     property string key: "unknown"
     property bool showLetter: true
 
-    color: ColorUtils.getStableColor(root.key, ColorUtils.getVibrantPalette(root.isDark))
+    color: ColorUtils.getStableColor(root.key,
+                                     ColorUtils.getVibrantPalette(root.isDark))
 
     Text {
         anchors.centerIn: parent
@@ -19,5 +20,4 @@ Rectangle {
         color: root.isDark ? "black" : "white"
         visible: root.showLetter
     }
-
 }

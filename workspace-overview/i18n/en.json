@@ -1,0 +1,54 @@
+{
+    "plugin": {
+        "name": "Workspace Overview",
+        "description": "Visual workspace overview with live window previews for Hyprland"
+    },
+    "barWidget": {
+        "tooltip": "Workspace Overview"
+    },
+    "actions": {
+        "settings": "Settings"
+    },
+    "settings": {
+        "title": "Workspace Overview Settings",
+        "grid": {
+            "title": "Workspace Grid",
+            "rows": {
+                "label": "Rows",
+                "description": "Number of workspace rows"
+            },
+            "columns": {
+                "label": "Columns",
+                "description": "Number of workspace columns"
+            },
+            "scale": {
+                "label": "Scale",
+                "description": "Overview scale factor (smaller = more compact)"
+            }
+        },
+        "behavior": {
+            "title": "Behavior",
+            "hide-empty-rows": {
+                "label": "Hide empty rows",
+                "description": "Automatically hide workspace rows with no windows"
+            }
+        },
+        "layout": {
+            "title": "Layout",
+            "position": {
+                "label": "Position",
+                "description": "Where the overview appears on screen",
+                "top": "Top",
+                "center": "Center",
+                "bottom": "Bottom"
+            }
+        }
+    },
+    "overview": {
+        "tooltip": {
+            "xwayland": "XWayland",
+            "unknown": "Unknown",
+            "unknown-class": "unknown"
+        }
+    }
+}

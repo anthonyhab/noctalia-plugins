@@ -15,14 +15,24 @@ NBox {
     visible: model !== null
     radius: Style.radiusM
     color: Color.mSurfaceVariant
-    border.color: clickArea.containsMouse ? Qt.lighter(model ? model.accentColor : Color.mOutline, 1.3) : Color.mOutline
+    border.color: clickArea.containsMouse ? Qt.lighter(
+                                                model ? model.accentColor : Color.mOutline,
+                                                1.3) : Color.mOutline
     border.width: clickArea.containsMouse ? 2 : 1
     implicitHeight: visible ? (contentLoader.implicitHeight + (Style.marginM * 2)) : 0
     Layout.preferredHeight: visible ? implicitHeight : 0
     Layout.fillWidth: true
 
-    Behavior on border.color { ColorAnimation { duration: 150 } }
-    Behavior on border.width { NumberAnimation { duration: 150 } }
+    Behavior on border.color {
+        ColorAnimation {
+            duration: 150
+        }
+    }
+    Behavior on border.width {
+        NumberAnimation {
+            duration: 150
+        }
+    }
 
     MouseArea {
         id: clickArea
@@ -32,13 +42,17 @@ NBox {
         onClicked: {
             if (model && model.copyText) {
                 Quickshell.execDetached(["wl-copy", model.copyText])
-                TooltipService.show(root, model.copyTooltip || "Copied to clipboard")
-                Qt.callLater(function() { TooltipService.hide() })
+                TooltipService.show(root,
+                                    model.copyTooltip || "Copied to clipboard")
+                Qt.callLater(function () {
+                    TooltipService.hide()
+                })
             }
         }
         onEntered: {
             if (model && model.copyText) {
-                TooltipService.show(root, model.copyHint || "Click to copy details")
+                TooltipService.show(root,
+                                    model.copyHint || "Click to copy details")
             }
         }
         onExited: TooltipService.hide()
@@ -56,9 +70,7 @@ NBox {
             NumberAnimation {
                 duration: Style.animationFast
             }
-
         }
-
     }
 
     // Gradient glow
@@ -73,10 +85,10 @@ NBox {
                 position: 0
                 color: {
                     if (!model)
-                        return "transparent";
+                        return "transparent"
 
-                    let opacity = isDark ? 0.3 : 0.22;
-                    return Qt.alpha(model.accentColor, opacity);
+                    let opacity = isDark ? 0.3 : 0.22
+                    return Qt.alpha(model.accentColor, opacity)
                 }
             }
 
@@ -84,9 +96,7 @@ NBox {
                 position: 0.18
                 color: "transparent"
             }
-
         }
-
     }
 
     Loader {
@@ -96,9 +106,9 @@ NBox {
         anchors.margins: Style.marginM
         sourceComponent: {
             if (!model)
-                return null;
+                return null
 
-            return model.variant === "gpg" ? gpgComponent : vaultComponent;
+            return model.variant === "gpg" ? gpgComponent : vaultComponent
         }
     }
 
@@ -112,7 +122,8 @@ NBox {
                 Layout.alignment: Qt.AlignVCenter
                 icon: model.tileIcon
                 accentColor: model.accentColor
-                iconPointSize: Math.round(model.tileIconPointSize * Style.uiScaleRatio)
+                iconPointSize: Math.round(
+                                   model.tileIconPointSize * Style.uiScaleRatio)
                 isDark: root.isDark
             }
 
@@ -149,11 +160,8 @@ NBox {
                     Layout.fillWidth: true
                     wrapMode: Text.Wrap
                 }
-
             }
-
         }
-
     }
 
     Component {
@@ -166,7 +174,8 @@ NBox {
                 Layout.alignment: Qt.AlignVCenter
                 icon: model.tileIcon
                 accentColor: model.accentColor
-                iconPointSize: Math.round(model.tileIconPointSize * Style.uiScaleRatio)
+                iconPointSize: Math.round(
+                                   model.tileIconPointSize * Style.uiScaleRatio)
                 isDark: root.isDark
                 tileSize: Math.round(40 * Style.uiScaleRatio)
             }
@@ -178,9 +187,6 @@ NBox {
                 Layout.fillWidth: true
                 wrapMode: Text.Wrap
             }
-
         }
-
     }
-
 }

@@ -1,0 +1,32 @@
+{
+    "id": "workspace-overview",
+    "name": "Workspace Overview",
+    "version": "0.1.0",
+    "minNoctaliaVersion": "3.6.0",
+    "author": "habibe",
+    "license": "MIT",
+    "repository": "https://github.com/anthonyhab/noctalia-plugins",
+    "description": "Visual workspace overview with live window previews, drag-and-drop, and keyboard navigation for Hyprland.",
+    "tags": [
+        "Desktop",
+        "System",
+        "Productivity"
+    ],
+    "entryPoints": {
+        "main": "Main.qml",
+        "barWidget": "BarWidget.qml",
+        "settings": "Settings.qml"
+    },
+    "dependencies": {
+        "plugins": []
+    },
+    "metadata": {
+        "defaultSettings": {
+            "rows": 2,
+            "columns": 5,
+            "scale": 0.16,
+            "hideEmptyRows": true,
+            "position": "top"
+        }
+    }
+}
