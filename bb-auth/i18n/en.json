@@ -39,8 +39,6 @@
     "confirm": "Confirm",
     "cancel": "Cancel",
     "close": "Close",
-    "show-details": "Show details",
-    "hide-details": "Hide details",
     "copy-details": "Copy Details"
   },
   "errors": {
@@ -60,8 +58,6 @@
     "show-success-animation-desc": "Keep the dialog visible briefly after success.",
     "close-instantly": "Close instantly on success",
     "close-instantly-desc": "Skip the success state and close the panel immediately after verification.",
-    "show-details": "Show details expander",
-    "show-details-desc": "Show a diagnostics expander with action ID, requestor, and command details.",
     "colorize-icons": "Colorize icons",
     "colorize-icons-desc": "Apply theme colors to requestor icons in the auth dialog.",
     "auto-close-cancel": "Close on cancel",

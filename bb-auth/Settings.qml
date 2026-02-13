@@ -60,7 +60,6 @@ ColumnLayout {
 
     // Local state
     property string valueSettingsPanelMode: "centered"
-    property bool valueShowDetailsByDefault: false
     property bool valueCloseInstantly: false
     property bool valueColorizeIcons: true
     property bool isLoading: false
@@ -71,8 +70,6 @@ ColumnLayout {
         isLoading = true
         valueSettingsPanelMode = getSetting("settingsPanelMode",
                                             "centered") || "centered"
-        valueShowDetailsByDefault = getSetting("showDetailsByDefault",
-                                               false) === true
         valueCloseInstantly = getSetting("closeInstantly", false) === true
         valueColorizeIcons = getSetting("colorizeIcons", true) !== false
         isLoading = false
@@ -94,7 +91,6 @@ ColumnLayout {
 
         var settings = pluginApi.pluginSettings || {}
         settings.settingsPanelMode = valueSettingsPanelMode
-        settings.showDetailsByDefault = valueShowDetailsByDefault
         settings.closeInstantly = valueCloseInstantly
         settings.colorizeIcons = valueColorizeIcons
 
@@ -172,20 +168,6 @@ ColumnLayout {
             if (root.isLoading)
                 return
             root.valueCloseInstantly = checked
-            root.saveSettings()
-        }
-    }
-
-    NToggle {
-        label: tr("settings.show-details", "Show details expander")
-        description: tr("settings.show-details-desc",
-                        "Show a diagnostics expander with action ID, requestor, and command details.")
-        checked: root.valueShowDetailsByDefault
-        Layout.fillWidth: true
-        onToggled: function (checked) {
-            if (root.isLoading)
-                return
-            root.valueShowDetailsByDefault = checked
             root.saveSettings()
         }
     }
