@@ -21,10 +21,10 @@ Item {
   property int sectionWidgetsCount: 0
   property real scaling: 1.0
 
-  readonly property var pluginMain: pluginApi?.mainInstance
-  readonly property bool isOverviewOpen: pluginMain?.overviewOpen || false
+  readonly property var pluginMain: pluginApi && pluginApi.mainInstance
+  readonly property bool isOverviewOpen: pluginMain && pluginMain.overviewOpen || false
 
-  readonly property string tooltipText: pluginApi?.tr("barWidget.tooltip") || "Workspace Overview"
+  readonly property string tooltipText: pluginApi && pluginApi.tr("barWidget.tooltip") || "Workspace Overview"
 
   readonly property string iconName: isOverviewOpen ? "layout-dashboard" : "layout-grid"
 
@@ -42,7 +42,7 @@ Item {
 
     model: [
       {
-        "label": pluginApi?.tr("actions.settings") || "Settings",
+        "label": pluginApi && pluginApi.tr("actions.settings") || "Settings",
         "action": "settings",
         "icon": "settings"
       }
@@ -70,7 +70,7 @@ Item {
 
     onClicked: {
       TooltipService.hide()
-      pluginMain?.toggle()
+      pluginMain && pluginMain.toggle()
     }
 
     onRightClicked: {

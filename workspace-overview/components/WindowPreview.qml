@@ -16,28 +16,28 @@ Item {
     property bool restrictToWorkspace: true
     property bool overviewOpen: false
 
-    property real initX: Math.max(((windowData?.at[0] ?? 0) - (monitorData?.x ?? 0) - (monitorData?.reserved?.[0] ?? 0)) * root.scale, 0) + xOffset
-    property real initY: Math.max(((windowData?.at[1] ?? 0) - (monitorData?.y ?? 0) - (monitorData?.reserved?.[1] ?? 0)) * root.scale, 0) + yOffset
+    property real initX: Math.max((((windowData && windowData.at[0]) || 0) - ((monitorData && monitorData.x) || 0) - ((monitorData && monitorData.reserved && monitorData.reserved[0]) || 0)) * root.scale, 0) + xOffset
+    property real initY: Math.max((((windowData && windowData.at[1]) || 0) - ((monitorData && monitorData.y) || 0) - ((monitorData && monitorData.reserved && monitorData.reserved[1]) || 0)) * root.scale, 0) + yOffset
     property real xOffset: 0
     property real yOffset: 0
     property int widgetMonitorId: 0
 
-    property var targetWindowWidth: (windowData?.size[0] ?? 100) * scale
-    property var targetWindowHeight: (windowData?.size[1] ?? 100) * scale
+    property var targetWindowWidth: ((windowData && windowData.size[0]) || 100) * scale
+    property var targetWindowHeight: ((windowData && windowData.size[1]) || 100) * scale
     property bool hovered: false
     property bool pressed: false
 
     property real iconToWindowRatio: 0.25
     property real iconToWindowRatioCompact: 0.45
-    property var entry: DesktopEntries.heuristicLookup(windowData?.class)
-    property var iconPath: Quickshell.iconPath(entry?.icon ?? windowData?.class ?? "application-x-executable", "image-missing")
+    property var entry: DesktopEntries.heuristicLookup(windowData && windowData.class)
+    property var iconPath: Quickshell.iconPath((entry && entry.icon) || (windowData && windowData.class) || "application-x-executable", "image-missing")
     property bool compactMode: 48 > targetWindowHeight || 48 > targetWindowWidth
 
     x: initX
     y: initY
-    width: Math.min((windowData?.size[0] ?? 100) * root.scale, availableWorkspaceWidth)
-    height: Math.min((windowData?.size[1] ?? 100) * root.scale, availableWorkspaceHeight)
-    opacity: (windowData?.monitor ?? -1) == widgetMonitorId ? 1 : 0.4
+    width: Math.min(((windowData && windowData.size[0]) || 100) * root.scale, availableWorkspaceWidth)
+    height: Math.min(((windowData && windowData.size[1]) || 100) * root.scale, availableWorkspaceHeight)
+    opacity: ((windowData && windowData.monitor) || -1) == widgetMonitorId ? 1 : 0.4
 
     clip: true
 
@@ -97,7 +97,7 @@ Item {
                 property real iconSize: {
                     return Math.min(root.targetWindowWidth, root.targetWindowHeight) *
                         (root.compactMode ? root.iconToWindowRatioCompact : root.iconToWindowRatio) /
-                        (root.monitorData?.scale ?? 1)
+                        ((root.monitorData && root.monitorData.scale) || 1)
                 }
                 Layout.alignment: Qt.AlignHCenter
                 source: root.iconPath

@@ -18,7 +18,7 @@ Item {
         try {
             var val = pluginApi.pluginSettings[key]
             if (val === undefined || val === null) {
-                val = pluginApi.manifest?.metadata?.defaultSettings?.[key]
+                val = pluginApi.manifest && pluginApi.manifest.metadata && pluginApi.manifest.metadata.defaultSettings && pluginApi.manifest.metadata.defaultSettings[key]
             }
             return (val === undefined || val === null) ? fallback : val
         } catch (e) {
@@ -185,7 +185,7 @@ Item {
             id: overlayWindow
             required property var modelData
             readonly property HyprlandMonitor monitor: Hyprland.monitorFor(overlayWindow.screen)
-            property bool monitorIsFocused: (Hyprland.focusedMonitor?.id == monitor?.id)
+            property bool monitorIsFocused: (Hyprland.focusedMonitor && Hyprland.focusedMonitor.id) == (monitor && monitor.id)
             screen: modelData
             visible: root.overviewOpen
 
@@ -252,7 +252,7 @@ Item {
                     acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
                     onWheel: event => {
                         var workspacesPerGroup = root.gridRows * root.gridColumns
-                        var currentId = Hyprland.focusedMonitor?.activeWorkspace?.id ?? 1
+                        var currentId = (Hyprland.focusedMonitor && Hyprland.focusedMonitor.activeWorkspace && Hyprland.focusedMonitor.activeWorkspace.id) || 1
                         var currentGroup = Math.floor((currentId - 1) / workspacesPerGroup)
                         var minWorkspaceId = currentGroup * workspacesPerGroup + 1
                         var maxWorkspaceId = minWorkspaceId + workspacesPerGroup - 1
@@ -283,7 +283,7 @@ Item {
                     }
 
                     var workspacesPerGroup = root.gridRows * root.gridColumns
-                    var currentId = Hyprland.focusedMonitor?.activeWorkspace?.id ?? 1
+                    var currentId = (Hyprland.focusedMonitor && Hyprland.focusedMonitor.activeWorkspace && Hyprland.focusedMonitor.activeWorkspace.id) || 1
                     var currentGroup = Math.floor((currentId - 1) / workspacesPerGroup)
                     var minWorkspaceId = currentGroup * workspacesPerGroup + 1
                     var maxWorkspaceId = minWorkspaceId + workspacesPerGroup - 1
