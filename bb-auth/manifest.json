@@ -6,8 +6,12 @@
   "author": "habibe",
   "license": "MIT",
   "repository": "https://github.com/anthonyhab/noctalia-plugins",
-  "description": "Use Noctalia panels as your Polkit authentication agent.",
-  "tags": ["Panel", "System", "Privacy"],
+  "description": "Polkit and GPG authentication agent for Noctalia.",
+  "tags": [
+    "Panel",
+    "System",
+    "Privacy"
+  ],
   "entryPoints": {
     "main": "Main.qml",
     "panel": "Panel.qml",

@@ -49,7 +49,7 @@
     "agent-failed": "Authentication error"
   },
   "settings": {
-    "description": "Connect to the Noctalia auth daemon over IPC.",
+    "description": "Polkit and GPG authentication agent for Noctalia.",
     "poll-interval": "Poll interval (ms)",
     "poll-interval-desc": "How frequently the plugin checks for new authentication requests.",
     "auto-open": "Auto-open panel",
@@ -60,6 +60,8 @@
     "show-success-animation-desc": "Keep the dialog visible briefly after success.",
     "close-instantly": "Close instantly on success",
     "close-instantly-desc": "Skip the success state and close the panel immediately after verification.",
+    "show-details": "Show details expander",
+    "show-details-desc": "Show a diagnostics expander with action ID, requestor, and command details.",
     "auto-close-cancel": "Close on cancel",
     "auto-close-cancel-desc": "Close the panel when a request is cancelled.",
     "panel-mode": "Panel mode",
