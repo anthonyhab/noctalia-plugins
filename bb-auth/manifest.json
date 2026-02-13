@@ -24,7 +24,8 @@
     "defaultSettings": {
       "settingsPanelMode": "centered",
       "showDetailsByDefault": false,
-      "closeInstantly": false
+      "closeInstantly": false,
+      "colorizeIcons": true
     }
   }
 }

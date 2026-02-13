@@ -62,6 +62,8 @@
     "close-instantly-desc": "Skip the success state and close the panel immediately after verification.",
     "show-details": "Show details expander",
     "show-details-desc": "Show a diagnostics expander with action ID, requestor, and command details.",
+    "colorize-icons": "Colorize icons",
+    "colorize-icons-desc": "Apply theme colors to requestor icons in the auth dialog.",
     "auto-close-cancel": "Close on cancel",
     "auto-close-cancel-desc": "Close the panel when a request is cancelled.",
     "panel-mode": "Panel mode",

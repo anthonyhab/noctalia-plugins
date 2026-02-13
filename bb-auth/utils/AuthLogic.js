@@ -172,7 +172,7 @@ function getContextCardModel(contextModel, gpgInfo, request) {
             tileIcon: icon,
             tileIconPointSize: 18,
             label: label,
-            richText: "Authenticate <b><font color='" + accent + "'>" + label + "</font></b>",
+            richText: "<b><font color='" + accent + "'>" + label + "</font></b>",
             copyText: copyText,
             copyHint: "Click to copy details",
             copyTooltip: "Details copied!"

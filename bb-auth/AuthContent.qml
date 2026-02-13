@@ -85,6 +85,7 @@ Item {
     property bool capsLockOn: false
     property bool animateIn: false
     readonly property bool isDark: Settings.data.colorSchemes.darkMode
+    property bool colorizeIcons: true
 
     // Staggered entrance delays
     property bool stageHeader: false
@@ -385,7 +386,7 @@ Item {
                     hasRequestorIcon: root.hasRequestorIcon
                     requestorIconPath: root.requestorIconPath
                     isDark: root.isDark
-                    colorizeIcons: true
+                    colorizeIcons: root.colorizeIcons
                 }
 
                 NText {
