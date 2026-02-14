@@ -44,6 +44,8 @@ Add a toggle keybind to your Hyprland config (`~/.config/hypr/hyprland.conf`):
 
 ```
 bind = Super, TAB, exec, qs ipc call plugin:workspace-overview toggle
+# Optional: Mouse bind (middle click)
+bind = SUPER, mouse:274, exec, qs ipc call plugin:workspace-overview toggle
 ```
 
 ### 3. Reload

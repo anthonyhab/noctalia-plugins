@@ -340,22 +340,23 @@ Item {
                 // Calculate effective margin based on bar position + height
                 readonly property real barHeight: Style.getBarHeightForScreen(overlayWindow.screen.name)
                 readonly property string barPosition: Commons.Settings.getBarPositionForScreen(overlayWindow.screen.name)
-                
+
+                // Margin: attach directly to bar (no gap), otherwise small margin from screen edge
                 readonly property real effectiveMargin: {
-                    var m = Style.marginXL // Base margin
-                    
-                    if (root.overviewPosition === "top" && barPosition === "top") {
-                        m += barHeight + Style.marginM
-                    } else if (root.overviewPosition === "bottom" && barPosition === "bottom") {
-                        m += barHeight + Style.marginM
+                    if (root.overviewPosition === "top") {
+                        if (barPosition === "top") return barHeight // Attach directly to bar
+                        return Style.marginM // Small margin when no bar
                     }
-                    
-                    return m
+                    if (root.overviewPosition === "bottom") {
+                        if (barPosition === "bottom") return barHeight // Attach directly to bar
+                        return Style.marginM // Small margin when no bar
+                    }
+                    return Style.marginM // Default for center
                 }
 
                 // Dynamic anchoring based on position setting
                 anchors.horizontalCenter: parent.horizontalCenter
-                anchors.top: root.overviewPosition === "bottom" ? undefined : parent.top
+                anchors.top: root.overviewPosition === "top" ? parent.top : undefined
                 anchors.bottom: root.overviewPosition === "bottom" ? parent.bottom : undefined
                 anchors.verticalCenter: root.overviewPosition === "center" ? parent.verticalCenter : undefined
                 anchors.topMargin: root.overviewPosition === "top" ? effectiveMargin : 0
