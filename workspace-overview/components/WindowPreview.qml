@@ -13,17 +13,32 @@ Item {
     property var windowData
     property var monitorData
     property real windowScale: 1
+    property real positionScaleX: 1
+    property real positionScaleY: 1
     property var availableWorkspaceWidth: 100
     property var availableWorkspaceHeight: 100
     property bool restrictToWorkspace: true
     property bool overviewOpen: false
-    property real initX: Math.max((((windowData && windowData.at[0]) || 0) - ((monitorData && monitorData.x) || 0) - ((monitorData && monitorData.reserved && monitorData.reserved[0]) || 0)) * root.windowScale, 0) + xOffset
-    property real initY: Math.max((((windowData && windowData.at[1]) || 0) - ((monitorData && monitorData.y) || 0) - ((monitorData && monitorData.reserved && monitorData.reserved[1]) || 0)) * root.windowScale, 0) + yOffset
+    property int windowRounding: 0
+    property real centeringX: 0
+    property real centeringY: 0
     property real xOffset: 0
     property real yOffset: 0
+    // Calculate window position within the workspace cell
+    // Win pos is global. Monitor pos is global.
+    // We want pos relative to monitor (0,0), then scaled, then centered.
+    readonly property real rawPosX: ((windowData && windowData.at[0]) || 0) - ((monitorData && monitorData.x) || 0)
+    readonly property real rawPosY: ((windowData && windowData.at[1]) || 0) - ((monitorData && monitorData.y) || 0)
+    // Scale position
+    readonly property real scaledPosX: (rawPosX + centeringX) * positionScaleX
+    readonly property real scaledPosY: (rawPosY + centeringY) * positionScaleY
+    // For fullscreen/maximized: position at top-left of workspace cell (or respect shifts? usually FS fills monitor)
+    // If FS, we want it filling the whole cell (monitor).
+    property real initX: (isFullscreen || isMaximized) ? xOffset : Math.max(0, Math.min(scaledPosX, availableWorkspaceWidth - width)) + xOffset
+    property real initY: (isFullscreen || isMaximized) ? yOffset : Math.max(0, Math.min(scaledPosY, availableWorkspaceHeight - height)) + yOffset
     property int widgetMonitorId: 0
-    property var targetWindowWidth: ((windowData && windowData.size[0]) || 100) * windowScale
-    property var targetWindowHeight: ((windowData && windowData.size[1]) || 100) * windowScale
+    property var targetWindowWidth: width
+    property var targetWindowHeight: height
     property bool hovered: false
     property bool pressed: false
     property real iconToWindowRatio: 0.25
@@ -72,13 +87,20 @@ Item {
     // Default icon source (icon theme based). Steam logos are discovered asynchronously.
     property var iconPath: Quickshell.iconPath(resolvedIcon, "application-x-executable")
     property bool compactMode: 48 > targetWindowHeight || 48 > targetWindowWidth
+    // ScreencopyView wrapper that fills the parent and clips
+    // For fullscreen apps, we fill the entire workspace cell
+    // For regular windows, we preserve aspect ratio
+    readonly property bool isFullscreen: !!(windowData && windowData.fullscreen)
+    readonly property bool isMaximized: !!(windowData && windowData.maximized)
 
     x: initX
     y: initY
-    width: Math.min(((windowData && windowData.size[0]) || 100) * root.windowScale, availableWorkspaceWidth)
-    height: Math.min(((windowData && windowData.size[1]) || 100) * root.windowScale, availableWorkspaceHeight)
     opacity: ((windowData && windowData.monitor) || -1) == widgetMonitorId ? 1 : 0.4
     clip: true
+    // For fullscreen/maximized: fill the workspace cell exactly
+    // For regular windows: preserve aspect ratio
+    width: (isFullscreen || isMaximized) ? availableWorkspaceWidth : Math.min(((windowData && windowData.size[0]) || 100) * windowScale, availableWorkspaceWidth)
+    height: (isFullscreen || isMaximized) ? availableWorkspaceHeight : Math.min(((windowData && windowData.size[1]) || 100) * windowScale, availableWorkspaceHeight)
     // Trigger Steam icon search when we have a steamAppId and the window is visible
     onOverviewOpenChanged: {
         if (overviewOpen && root.steamAppId !== "" && !steamIconFinder.hasRun) {
@@ -97,7 +119,7 @@ Item {
         // Window overlay (hover/press states + border)
         Rectangle {
             anchors.fill: parent
-            radius: Math.max(2, Style.screenRadius * root.windowScale)
+            radius: root.windowRounding * root.windowScale
             color: root.pressed ? Qt.rgba(Color.mSurfaceVariant.r, Color.mSurfaceVariant.g, Color.mSurfaceVariant.b, 0.5) : root.hovered ? Qt.rgba(Color.mSurfaceVariant.r, Color.mSurfaceVariant.g, Color.mSurfaceVariant.b, 0.3) : "transparent"
             border.color: Qt.rgba(Color.mOutline.r, Color.mOutline.g, Color.mOutline.b, 0.3)
             border.width: Style.borderS

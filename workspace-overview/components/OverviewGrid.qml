@@ -1,3 +1,4 @@
+import "../helpers"
 import QtQuick
 import QtQuick.Effects
 import QtQuick.Layouts
@@ -21,66 +22,18 @@ Item {
     readonly property int workspacesShown: pluginMain.gridRows * pluginMain.gridColumns
     readonly property bool isViewingSpecialWorkspace: (monitor.activeWorkspace && monitor.activeWorkspace.id) < 0
     readonly property int workspaceGroup: isViewingSpecialWorkspace ? 0 : Math.floor((((monitor.activeWorkspace && monitor.activeWorkspace.id) || 1) - 1) / workspacesShown)
-    readonly property var specialWorkspaces: {
-        if (!pluginMain.showScratchpadWorkspaces)
-            return [];
+    readonly property var specialWorkspaces: pluginMain.specialWorkspaces || []
+    // Property to track active workspace for indicator updates
+    // Uses activeSpecialWorkspaceName to handle special workspaces that hyprctl doesn't report correctly
+    property var _activeWsForIndicator: {
+        // If we have an active special workspace name from navigation, use it
+        if (pluginMain.activeSpecialWorkspaceName && pluginMain.activeSpecialWorkspaceName !== "")
+            return {
+                "id": -1,
+                "name": "special:" + pluginMain.activeSpecialWorkspaceName
+            };
 
-        var byName = {
-        };
-        var workspaceList = pluginMain.workspaces || [];
-        for (var i = 0; i < workspaceList.length; i++) {
-            var ws = workspaceList[i];
-            if (!ws)
-                continue;
-
-            var rawName = ws.name || "";
-            var isSpecial = (ws.id < 0) || (rawName && rawName.toString().startsWith("special:")) || rawName === "special";
-            if (!isSpecial)
-                continue;
-
-            var normalizedName = normalizeSpecialName(rawName);
-            if (!byName[normalizedName])
-                byName[normalizedName] = {
-                    "id": ws.id,
-                    "rawName": rawName,
-                    "name": normalizedName,
-                    "windows": []
-                };
-
-        }
-        // Fallback: include any special workspace currently containing windows, even if not in `hyprctl workspaces`.
-        for (var addr in windowByAddress) {
-            var win = windowByAddress[addr];
-            if (win && win.workspace && win.workspace.id < 0) {
-                var rawWinName = win.workspace.name || "";
-                var normalizedWinName = normalizeSpecialName(rawWinName);
-                if (!byName[normalizedWinName])
-                    byName[normalizedWinName] = {
-                        "id": win.workspace.id,
-                        "rawName": rawWinName,
-                        "name": normalizedWinName,
-                        "windows": []
-                    };
-
-            }
-        }
-        // Attach windows to each special workspace.
-        for (var addr2 in windowByAddress) {
-            var win2 = windowByAddress[addr2];
-            if (win2 && win2.workspace && win2.workspace.id < 0) {
-                var rawWinName2 = win2.workspace.name || "";
-                var normalizedWinName2 = normalizeSpecialName(rawWinName2);
-                if (byName[normalizedWinName2])
-                    byName[normalizedWinName2].windows.push(win2);
-
-            }
-        }
-        var result = [];
-        for (var key in byName) result.push(byName[key])
-        result.sort(function(a, b) {
-            return a.name.localeCompare(b.name);
-        });
-        return result;
+        return pluginMain.activeWorkspace || (monitor && monitor.activeWorkspace);
     }
     readonly property int reservedSpecialSlots: {
         if (!pluginMain.showScratchpadWorkspaces)
@@ -137,13 +90,22 @@ Item {
     // Fit scale to ensure grid stays on screen (never upscale, only downscale if needed)
     readonly property real fitScale: Math.min(1, Math.min(availableWidth / Math.max(1, gridNaturalWidth), availableHeight / Math.max(1, gridNaturalHeight)))
     // Workspace cell dimensions (accounting for rotated monitors)
-    property real workspaceImplicitWidth: (monitorData && monitorData.transform % 2 === 1) ? ((monitor.height / monitor.scale - ((monitorData && monitorData.reserved && monitorData.reserved[0]) || 0) - ((monitorData && monitorData.reserved && monitorData.reserved[2]) || 0)) * root.cellScale) : ((monitor.width / monitor.scale - ((monitorData && monitorData.reserved && monitorData.reserved[0]) || 0) - ((monitorData && monitorData.reserved && monitorData.reserved[2]) || 0)) * root.cellScale)
-    property real workspaceImplicitHeight: (monitorData && monitorData.transform % 2 === 1) ? ((monitor.width / monitor.scale - ((monitorData && monitorData.reserved && monitorData.reserved[1]) || 0) - ((monitorData && monitorData.reserved && monitorData.reserved[3]) || 0)) * root.cellScale) : ((monitor.height / monitor.scale - ((monitorData && monitorData.reserved && monitorData.reserved[1]) || 0) - ((monitorData && monitorData.reserved && monitorData.reserved[3]) || 0)) * root.cellScale)
+    property real workspaceImplicitWidth: (monitorData && monitorData.transform % 2 === 1) ? (monitor.height / monitor.scale * root.cellScale) : (monitor.width / monitor.scale * root.cellScale)
+    property real workspaceImplicitHeight: (monitorData && monitorData.transform % 2 === 1) ? (monitor.width / monitor.scale * root.cellScale) : (monitor.height / monitor.scale * root.cellScale)
+    // Calculate centering offsets to "split the difference" of reserved space (bars)
+    // reserved: [left, top, right, bottom]
+    property real reservedLeft: (monitorData && monitorData.reserved && monitorData.reserved[0]) || 0
+    property real reservedTop: (monitorData && monitorData.reserved && monitorData.reserved[1]) || 0
+    property real reservedRight: (monitorData && monitorData.reserved && monitorData.reserved[2]) || 0
+    property real reservedBottom: (monitorData && monitorData.reserved && monitorData.reserved[3]) || 0
+    // Offset to apply to window positions to center the work area
+    property real centeringXOffset: (reservedRight - reservedLeft) / 2
+    property real centeringYOffset: (reservedBottom - reservedTop) / 2
     // Z-ordering
     property int workspaceZ: 0
     property int windowZ: 1
     property int windowDraggingZ: 99999
-    property real workspaceSpacing: 5
+    property real workspaceSpacing: hyprConfig.gapsWorkspaces + (pluginMain.gridSpacing || 0)
     // Drag state
     property int draggingFromWorkspace: -1
     property int draggingTargetWorkspace: -1
@@ -180,13 +142,9 @@ Item {
     // === SPECIAL WORKSPACES ===
     // We discover special workspaces from `hyprctl workspaces -j` (pluginMain.workspaces)
     // so they appear even when empty.
+    // === SPECIAL WORKSPACES ===
     function normalizeSpecialName(wsName) {
-        var name = (wsName || "").toString().trim();
-        if (name.startsWith("special:"))
-            name = name.slice("special:".length);
-
-        name = name.trim();
-        return name.length > 0 ? name : "special";
+        return pluginMain.normalizeSpecialName(wsName);
     }
 
     // Get label for a special workspace (first letter of first window's class/title, or first letter of name)
@@ -243,10 +201,11 @@ Item {
     }
 
     function getActiveWorkspaceValueForGrid() {
-        if (!monitor || !monitor.activeWorkspace)
+        // Use the _activeWs property from the indicator to ensure proper binding updates
+        var ws = root._activeWsForIndicator || pluginMain.activeWorkspace || (monitor && monitor.activeWorkspace);
+        if (!ws)
             return null;
 
-        var ws = monitor.activeWorkspace;
         if (ws.id < 0) {
             if (root.reservedSpecialSlots <= 0)
                 return null;
@@ -287,6 +246,10 @@ Item {
     implicitWidth: (overviewBackground.implicitWidth + 20) * fitScale
     implicitHeight: (overviewBackground.implicitHeight + 20) * fitScale
 
+    HyprlandConfig {
+        id: hyprConfig
+    }
+
     // Scaled container for fit-to-screen
     Item {
         id: scaledContainer
@@ -300,7 +263,7 @@ Item {
         Rectangle {
             id: overviewBackground
 
-            property real padding: 10
+            property real padding: Math.max(0, root.workspaceSpacing)
 
             anchors.fill: parent
             anchors.margins: 10
@@ -479,9 +442,15 @@ Item {
                             return m.id === monitorId;
                         })
                         property var address: "0x" + modelData.HyprlandToplevel.address
-                        // Scale relative to source monitor
-                        property real sourceMonitorWidth: (windowMonitor && windowMonitor.transform % 2 === 1) ? ((windowMonitor && windowMonitor.height) || 1920) / ((windowMonitor && windowMonitor.scale) || 1) - ((windowMonitor && windowMonitor.reserved && windowMonitor.reserved[0]) || 0) - ((windowMonitor && windowMonitor.reserved && windowMonitor.reserved[2]) || 0) : ((windowMonitor && windowMonitor.width) || 1920) / ((windowMonitor && windowMonitor.scale) || 1) - ((windowMonitor && windowMonitor.reserved && windowMonitor.reserved[0]) || 0) - ((windowMonitor && windowMonitor.reserved && windowMonitor.reserved[2]) || 0)
-                        property real sourceMonitorHeight: (windowMonitor && windowMonitor.transform % 2 === 1) ? ((windowMonitor && windowMonitor.width) || 1080) / ((windowMonitor && windowMonitor.scale) || 1) - ((windowMonitor && windowMonitor.reserved && windowMonitor.reserved[1]) || 0) - ((windowMonitor && windowMonitor.reserved && windowMonitor.reserved[3]) || 0) : ((windowMonitor && windowMonitor.height) || 1080) / ((windowMonitor && windowMonitor.scale) || 1) - ((windowMonitor && windowMonitor.reserved && windowMonitor.reserved[1]) || 0) - ((windowMonitor && windowMonitor.reserved && windowMonitor.reserved[3]) || 0)
+                        // Monitor dimensions (physical resolution / scale)
+                        property real rawMonitorWidth: ((windowMonitor && windowMonitor.width) || 1920) / ((windowMonitor && windowMonitor.scale) || 1)
+                        property real rawMonitorHeight: ((windowMonitor && windowMonitor.height) || 1080) / ((windowMonitor && windowMonitor.scale) || 1)
+                        // For transformed monitors, swap dimensions
+                        property real sourceMonitorWidth: (windowMonitor && windowMonitor.transform % 2 === 1) ? rawMonitorHeight : rawMonitorWidth
+                        property real sourceMonitorHeight: (windowMonitor && windowMonitor.transform % 2 === 1) ? rawMonitorWidth : rawMonitorHeight
+                        // Available area (minus reserved/bars) - for positioning windows correctly
+                        property real availableMonitorWidth: sourceMonitorWidth - ((windowMonitor && windowMonitor.reserved && windowMonitor.reserved[0]) || 0) - ((windowMonitor && windowMonitor.reserved && windowMonitor.reserved[2]) || 0)
+                        property real availableMonitorHeight: sourceMonitorHeight - ((windowMonitor && windowMonitor.reserved && windowMonitor.reserved[1]) || 0) - ((windowMonitor && windowMonitor.reserved && windowMonitor.reserved[3]) || 0)
                         property bool atInitPosition: (initX == x && initY == y)
                         property int rawWorkspaceId: (windowData && windowData.workspace && windowData.workspace.id) || 1
                         property int effectiveWorkspaceValue: root.getEffectiveWorkspaceValueForWindow(windowData) || root.groupFirstWorkspaceId
@@ -495,14 +464,19 @@ Item {
                         toplevel: modelData
                         monitorData: windowMonitor
                         windowScale: Math.min(root.workspaceImplicitWidth / sourceMonitorWidth, root.workspaceImplicitHeight / sourceMonitorHeight)
+                        positionScaleX: root.workspaceImplicitWidth / sourceMonitorWidth
+                        positionScaleY: root.workspaceImplicitHeight / sourceMonitorHeight
                         availableWorkspaceWidth: root.workspaceImplicitWidth
                         availableWorkspaceHeight: root.workspaceImplicitHeight
+                        centeringX: root.centeringXOffset
+                        centeringY: root.centeringYOffset
                         widgetMonitorId: root.monitor.id
                         overviewOpen: root.pluginMain.overviewOpen
                         // Position within the grid slot
                         xOffset: (root.workspaceImplicitWidth + root.workspaceSpacing) * workspaceColIndex
                         yOffset: root.getVisualYOffset(workspaceRowIndex)
                         z: atInitPosition ? (root.windowZ + index) : root.windowDraggingZ
+                        windowRounding: hyprConfig.rounding
                         Drag.hotSpot.x: targetWindowWidth / 2
                         Drag.hotSpot.y: targetWindowHeight / 2
 
@@ -513,8 +487,12 @@ Item {
                             repeat: false
                             running: false
                             onTriggered: {
-                                windowDelegate.x = Math.round(Math.max((((windowDelegate.windowData && windowDelegate.windowData.at[0]) || 0) - ((windowDelegate.windowMonitor && windowDelegate.windowMonitor.x) || 0) - ((windowDelegate.monitorData && windowDelegate.monitorData.reserved && windowDelegate.monitorData.reserved[0]) || 0)) * windowDelegate.windowScale, 0) + windowDelegate.xOffset);
-                                windowDelegate.y = Math.round(Math.max((((windowDelegate.windowData && windowDelegate.windowData.at[1]) || 0) - ((windowDelegate.windowMonitor && windowDelegate.windowMonitor.y) || 0) - ((windowDelegate.monitorData && windowDelegate.monitorData.reserved && windowDelegate.monitorData.reserved[1]) || 0)) * windowDelegate.windowScale, 0) + windowDelegate.yOffset);
+                                var rawX = ((windowDelegate.windowData && windowDelegate.windowData.at[0]) || 0) - ((windowDelegate.windowMonitor && windowDelegate.windowMonitor.x) || 0) - ((windowDelegate.monitorData && windowDelegate.monitorData.reserved && windowDelegate.monitorData.reserved[0]) || 0);
+                                var rawY = ((windowDelegate.windowData && windowDelegate.windowData.at[1]) || 0) - ((windowDelegate.windowMonitor && windowDelegate.windowMonitor.y) || 0) - ((windowDelegate.monitorData && windowDelegate.monitorData.reserved && windowDelegate.monitorData.reserved[1]) || 0);
+                                var scaledX = rawX * windowDelegate.positionScaleX;
+                                var scaledY = rawY * windowDelegate.positionScaleY;
+                                windowDelegate.x = Math.round(Math.max(0, Math.min(scaledX, windowDelegate.availableWorkspaceWidth - windowDelegate.width)) + windowDelegate.xOffset);
+                                windowDelegate.y = Math.round(Math.max(0, Math.min(scaledY, windowDelegate.availableWorkspaceHeight - windowDelegate.height)) + windowDelegate.yOffset);
                             }
                         }
 
