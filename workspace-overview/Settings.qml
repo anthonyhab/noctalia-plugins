@@ -39,8 +39,9 @@ ColumnLayout {
     // Predicted workspace cell size (simplified calculation)
     readonly property real predictedCellWidth: (screenWidth / screenScale) * gridScale
     readonly property real predictedCellHeight: (screenHeight / screenScale) * gridScale
-    readonly property real workspaceSpacing: 5
+    readonly property real workspaceSpacing: gridSpacing
     readonly property real padding: 40 // 20px each side
+
     // Predicted grid natural size
     readonly property real predictedGridWidth: gridColumns * predictedCellWidth + (gridColumns - 1) * workspaceSpacing + padding
     readonly property real predictedGridHeight: gridRows * predictedCellHeight + (gridRows - 1) * workspaceSpacing + padding
@@ -53,8 +54,11 @@ ColumnLayout {
     property int gridColumns: 5
     property real gridScale: 0.16
     property bool hideEmptyRows: true
+
     property bool showScratchpadWorkspaces: false
+    property int gridSpacing: 0
     property string overviewPosition: "top"
+
 
     function getSetting(key, fallback) {
         if (pluginApi && pluginApi.pluginSettings && pluginApi.pluginSettings[key] !== undefined)
@@ -75,8 +79,10 @@ ColumnLayout {
         gridScale = parseFloat(getSetting("scale", 0.16)) || 0.16;
         hideEmptyRows = !!getSetting("hideEmptyRows", true);
         showScratchpadWorkspaces = !!getSetting("showScratchpadWorkspaces", false);
+        gridSpacing = parseInt(getSetting("gridSpacing", 0)) || 0;
         overviewPosition = getSetting("position", "top") || "top";
     }
+
 
     function saveSettings() {
         if (!pluginApi)
@@ -89,8 +95,10 @@ ColumnLayout {
         settings.scale = gridScale;
         settings.hideEmptyRows = hideEmptyRows;
         settings.showScratchpadWorkspaces = showScratchpadWorkspaces;
+        settings.gridSpacing = gridSpacing;
         settings.position = overviewPosition;
         pluginApi.pluginSettings = settings;
+
         pluginApi.saveSettings();
         pluginMain && pluginMain.refresh();
     }
@@ -170,6 +178,24 @@ ColumnLayout {
             }
         }
     }
+
+    NValueSlider {
+        Layout.fillWidth: true
+        label: pluginApi && pluginApi.tr("settings.grid.spacing.label") || "Grid Spacing"
+        description: pluginApi && pluginApi.tr("settings.grid.spacing.description") || "Gap between workspace thumbnails"
+        from: 0
+        to: 50
+        stepSize: 1
+        value: root.gridSpacing
+        text: value + "px"
+        onMoved: (value) => {
+            if (root.gridSpacing !== value) {
+                root.gridSpacing = value;
+                root.saveSettings();
+            }
+        }
+    }
+
 
     NText {
         text: {
