@@ -24,13 +24,18 @@
             "scale": {
                 "label": "Scale",
                 "description": "Overview scale factor (smaller = more compact)"
-            }
+            },
+            "scale-warning": "Current settings exceed screen size. Overview is being scaled down to fit."
         },
         "behavior": {
             "title": "Behavior",
             "hide-empty-rows": {
                 "label": "Hide empty rows",
                 "description": "Automatically hide workspace rows with no windows"
+            },
+            "show-scratchpad": {
+                "label": "Show scratchpad windows",
+                "description": "Include special/scratchpad workspace windows in the overview"
             }
         },
         "layout": {

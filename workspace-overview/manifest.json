@@ -26,6 +26,7 @@
             "columns": 5,
             "scale": 0.16,
             "hideEmptyRows": true,
+            "showScratchpadWorkspaces": false,
             "position": "top"
         }
     }
