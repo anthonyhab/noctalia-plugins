@@ -71,3 +71,44 @@ Previously known as `polkit-auth` (plugin) and `noctalia-auth` (daemon).
 Renamed to BB Auth as part of the "habibe → bibe → BB" branding.
 The plugin ID has changed from `polkit-auth` to `bb-auth`.
 Reinstall through the Noctalia plugin UI if you were using the previous version.
+
+## Window Rules
+
+Add these to your compositor config for proper floating behavior.
+
+### Hyprland (0.53+)
+
+```conf
+windowrule {
+    match:class = ^(bb-auth)$
+    match:title = ^(Authentication Required)$
+
+    float = on
+    size = 420 340
+    center = on
+    dim_around = off
+}
+```
+
+For older Hyprland versions (pre-0.53):
+
+```conf
+windowrulev2 = float,class:^(bb-auth)$,title:^(Authentication Required)$
+windowrulev2 = size 420 340,class:^(bb-auth)$,title:^(Authentication Required)$
+windowrulev2 = center,class:^(bb-auth)$,title:^(Authentication Required)$
+windowrulev2 = nodim,class:^(bb-auth)$,title:^(Authentication Required)$
+```
+
+### Niri
+
+```kdl
+window-rule {
+    app-id "^bb-auth$"
+    title "^Authentication Required$"
+
+    open-floating true
+    default-floating-size {
+        fixed 420 340
+    }
+}
+```

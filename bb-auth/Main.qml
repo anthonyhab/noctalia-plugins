@@ -948,11 +948,11 @@ Item {
         color: Color.mSurface
 
         readonly property int windowWidth: Math.round(420 * Style.uiScaleRatio)
-        readonly property int windowHeight: Math.round(450 * Style.uiScaleRatio)
+        readonly property int minWindowHeight: Math.round(280 * Style.uiScaleRatio)
 
         implicitWidth: windowWidth
-        implicitHeight: windowHeight
-        minimumSize: Qt.size(windowWidth, windowHeight)
+        implicitHeight: floatingAuthContent.implicitHeight + Math.round(Style.marginXL * 2)
+        minimumSize: Qt.size(windowWidth, minWindowHeight)
 
         AuthContent {
             id: floatingAuthContent
