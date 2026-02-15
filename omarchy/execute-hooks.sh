@@ -96,28 +96,16 @@ run_pywalfox() {
     
     for ((i=0; i<max_wait; i++)); do
       if [ -S "$socket" ]; then
-        log "    [PYWALFOX] Socket found, updating..."
-        if command -v pywalfox-go >/dev/null 2>&1; then
-          if pywalfox-go update >> "$LOG_FILE" 2>&1; then
-            local end_time=$(date +%s%N)
-            local duration=$(( (end_time - start_time) / 1000000 ))
-            log "  [HOOK] ✓ Success: pywalfox (${duration}ms)"
-            return 0
-          else
-            log "    [PYWALFOX] Update failed, will retry..."
-            sleep 1
-          fi
-        else
-          log "    [PYWALFOX] pywalfox-go not found, skipping update"
-          return 0
-        fi
+        log "    [PYWALFOX] Socket found, daemon running (inotify will auto-update)"
+        log "  [HOOK] ✓ Success: pywalfox (daemon active, update via inotify)"
+        return 0
       else
         sleep 1
       fi
     done
     
     log "    [PYWALFOX] Socket not found after ${max_wait}s"
-    log "  [HOOK] ⚠ Partial: pywalfox (colors generated, update skipped)"
+    log "  [HOOK] ⚠ Partial: pywalfox (colors generated, daemon not running)"
     return 0  # Non-critical failure
   else
     log "  [HOOK] ✗ Failed: pywalfox-gen"
