@@ -29,6 +29,11 @@ Item {
     property bool showScratchpadWorkspaces: getSetting("showScratchpadWorkspaces", false)
     property int gridSpacing: getSetting("gridSpacing", 0)
     property string overviewPosition: getSetting("position", "top")
+    property int barMargin: getSetting("barMargin", 0)
+    property bool useSlideAnimation: getSetting("useSlideAnimation", true)
+    property int containerBorderWidth: getSetting("containerBorderWidth", -1)
+    property int selectionBorderWidth: getSetting("selectionBorderWidth", -1)
+    property string accentColorType: getSetting("accentColorType", "secondary")
     // === OVERVIEW STATE ===
     property bool overviewOpen: false
     // Track the last navigated index for smooth keyboard/mouse navigation
@@ -156,6 +161,11 @@ Item {
         showScratchpadWorkspaces = getSetting("showScratchpadWorkspaces", false);
         gridSpacing = getSetting("gridSpacing", 0);
         overviewPosition = getSetting("position", "top");
+        barMargin = getSetting("barMargin", 0);
+        useSlideAnimation = getSetting("useSlideAnimation", true);
+        containerBorderWidth = getSetting("containerBorderWidth", -1);
+        selectionBorderWidth = getSetting("selectionBorderWidth", -1);
+        accentColorType = getSetting("accentColorType", "secondary");
     }
 
     function updateWindowList() {
@@ -390,9 +400,8 @@ Item {
             WlrLayershell.namespace: "noctalia:workspace-overview"
             WlrLayershell.layer: WlrLayer.Overlay
             WlrLayershell.keyboardFocus: WlrKeyboardFocus.Exclusive
+            WlrLayershell.exclusiveZone: -1
             color: "transparent"
-            implicitWidth: contentColumn.implicitWidth
-            implicitHeight: contentColumn.implicitHeight
 
             anchors {
                 top: true
@@ -609,56 +618,68 @@ Item {
             }
 
             // === OVERVIEW CONTENT ===
-            Column {
-                // Small margin when no bar
-                // Small margin when no bar
+            Item {
+                id: contentContainer
 
-                id: contentColumn
+                anchors.fill: parent
 
                 // Calculate effective margin based on bar position + height
                 readonly property real barHeight: Style.getBarHeightForScreen(overlayWindow.screen.name)
                 readonly property string barPosition: Commons.Settings.getBarPositionForScreen(overlayWindow.screen.name)
-                // Margin: attach directly to bar (no gap), otherwise small margin from screen edge
-                readonly property real effectiveMargin: {
-                    if (root.overviewPosition === "top") {
-                        if (barPosition === "top")
-                            return barHeight;
 
-                        // Attach directly to bar
-                        return Style.marginM;
-                    }
-                    if (root.overviewPosition === "bottom") {
-                        if (barPosition === "bottom")
-                            return barHeight;
-
-                        // Attach directly to bar
-                        return Style.marginM;
-                    }
-                    return Style.marginM; // Default for center
+                // Margin: bar height + user-configurable additional margin
+                readonly property real baseMargin: {
+                    if (root.overviewPosition === "top" && barPosition === "top")
+                        return barHeight + root.barMargin;
+                    if (root.overviewPosition === "bottom" && barPosition === "bottom")
+                        return barHeight + root.barMargin;
+                    return Style.marginM + root.barMargin;
                 }
 
-                visible: root.overviewOpen
-                // Dynamic anchoring based on position setting
-                anchors.horizontalCenter: parent.horizontalCenter
-                anchors.top: root.overviewPosition === "top" ? parent.top : undefined
-                anchors.bottom: root.overviewPosition === "bottom" ? parent.bottom : undefined
-                anchors.verticalCenter: root.overviewPosition === "center" ? parent.verticalCenter : undefined
-                anchors.topMargin: root.overviewPosition === "top" ? effectiveMargin : 0
-                anchors.bottomMargin: root.overviewPosition === "bottom" ? effectiveMargin : 0
-
-                Loader {
-                    id: overviewLoader
-
-                    active: root.overviewOpen
-
-                    sourceComponent: OverviewGrid {
-                        pluginMain: root
-                        panelWindow: overlayWindow
-                        visible: true
-                    }
-
+                // Position the content based on setting
+                readonly property real contentY: {
+                    if (root.overviewPosition === "top")
+                        return baseMargin;
+                    if (root.overviewPosition === "bottom")
+                        return parent.height - contentColumn.height - baseMargin;
+                    return (parent.height - contentColumn.height) / 2; // center
                 }
 
+                Column {
+                    id: contentColumn
+
+                    visible: root.overviewOpen
+                    x: (parent.width - width) / 2
+                    y: contentContainer.contentY
+                    opacity: root.overviewOpen ? 1 : 0
+
+                    Behavior on y {
+                        enabled: root.useSlideAnimation
+                        NumberAnimation {
+                            duration: Style.animationNormal
+                            easing.type: Easing.OutCubic
+                        }
+                    }
+
+                    Behavior on opacity {
+                        enabled: root.useSlideAnimation
+                        NumberAnimation {
+                            duration: Style.animationFast
+                        }
+                    }
+
+                    Loader {
+                        id: overviewLoader
+
+                        active: root.overviewOpen
+
+                        sourceComponent: OverviewGrid {
+                            pluginMain: root
+                            panelWindow: overlayWindow
+                            visible: true
+                        }
+                    }
+                }
             }
 
             mask: Region {
