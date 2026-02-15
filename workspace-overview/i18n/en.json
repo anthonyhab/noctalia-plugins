@@ -11,6 +11,12 @@
     },
     "settings": {
         "title": "Workspace Overview Settings",
+        "tabs": {
+            "grid": "Grid",
+            "behavior": "Behavior",
+            "layout": "Layout",
+            "appearance": "Appearance"
+        },
         "grid": {
             "title": "Workspace Grid",
             "rows": {
@@ -25,7 +31,12 @@
                 "label": "Scale",
                 "description": "Overview scale factor (smaller = more compact)"
             },
-            "scale-warning": "Current settings exceed screen size. Overview is being scaled down to fit."
+            "spacing": {
+                "label": "Grid Spacing",
+                "description": "Gap between workspace thumbnails"
+            },
+            "scale-warning": "Current settings exceed screen size. Overview is being scaled down to fit.",
+            "total-workspaces": "{count} total workspaces"
         },
         "behavior": {
             "title": "Behavior",
@@ -46,6 +57,31 @@
                 "top": "Top",
                 "center": "Center",
                 "bottom": "Bottom"
+            },
+            "barMargin": {
+                "label": "Bar Margin",
+                "description": "Additional margin between overview and bar (when positioned at same edge)"
+            },
+            "slideAnimation": {
+                "label": "Slide animation",
+                "description": "Animate overview sliding in from the bar (disable for instant popup)"
+            }
+        },
+        "appearance": {
+            "title": "Appearance",
+            "accentColor": {
+                "label": "Accent color",
+                "description": "Color used for selection indicator and special workspaces",
+                "secondary": "Secondary (default)",
+                "primary": "Primary"
+            },
+            "containerBorder": {
+                "label": "Container border",
+                "description": "Border thickness of the overview container (-1 for default)"
+            },
+            "selectionBorder": {
+                "label": "Selection border",
+                "description": "Border thickness of the active workspace indicator (-1 for default)"
             }
         }
     },

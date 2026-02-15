@@ -28,7 +28,12 @@
             "hideEmptyRows": true,
             "showScratchpadWorkspaces": false,
             "gridSpacing": 0,
-            "position": "top"
+            "position": "top",
+            "barMargin": 0,
+            "useSlideAnimation": true,
+            "containerBorderWidth": -1,
+            "selectionBorderWidth": -1,
+            "accentColorType": "secondary"
         }
     }
 }

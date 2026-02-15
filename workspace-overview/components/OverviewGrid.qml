@@ -57,6 +57,10 @@ Item {
         return m.id === (root.monitor && root.monitor.id);
     })
     property real cellScale: pluginMain.gridScale
+    // === THEME CUSTOMIZATION ===
+    readonly property int containerBorderWidth: (pluginMain.containerBorderWidth >= 0) ? pluginMain.containerBorderWidth : Style.borderM
+    readonly property int selectionBorderWidth: (pluginMain.selectionBorderWidth >= 0) ? pluginMain.selectionBorderWidth : Style.borderL
+    readonly property color accentColor: pluginMain.accentColorType === "primary" ? Color.mPrimary : Color.mSecondary
     // === FIT-TO-SCREEN LOGIC ===
     // Available space calculation (accounting for margins based on position)
     readonly property real marginXL: Style.marginXL
@@ -272,7 +276,7 @@ Item {
             // Use standard panel radius
             radius: Style.radiusL
             color: Qt.alpha(Color.mSurface, Settings.data.ui.panelBackgroundOpacity)
-            border.width: Style.borderM
+            border.width: root.containerBorderWidth
             border.color: Color.mOutline
             // Shadow using MultiEffect
             layer.enabled: Settings.data.general.enableShadows && !PowerProfileService.noctaliaPerformanceMode
@@ -317,7 +321,7 @@ Item {
                                 // Use scaled screen radius for the workspace preview
                                 radius: Style.screenRadius * root.cellScale
                                 border.width: Style.borderS
-                                border.color: hoveredWhileDragging ? Qt.lighter(Color.mSecondary, 1.1) : Qt.rgba(Color.mOutline.r, Color.mOutline.g, Color.mOutline.b, 0.2)
+                                border.color: hoveredWhileDragging ? Qt.lighter(root.accentColor, 1.1) : Qt.rgba(Color.mOutline.r, Color.mOutline.g, Color.mOutline.b, 0.2)
 
                                 // Workspace number / special label
                                 Text {
@@ -326,7 +330,7 @@ Item {
                                     font.family: Settings.data.ui.fontDefault
                                     font.pixelSize: 250 * root.cellScale * ((monitor && monitor.scale) || 1)
                                     font.weight: Style.fontWeightSemiBold
-                                    color: workspace.isSpecialSlot ? Color.mSecondary : Qt.rgba(Color.mOnSurfaceVariant.r, Color.mOnSurfaceVariant.g, Color.mOnSurfaceVariant.b, 0.2)
+                                    color: workspace.isSpecialSlot ? root.accentColor : Qt.rgba(Color.mOnSurfaceVariant.r, Color.mOnSurfaceVariant.g, Color.mOnSurfaceVariant.b, 0.2)
                                     horizontalAlignment: Text.AlignHCenter
                                     verticalAlignment: Text.AlignVCenter
                                 }
@@ -603,8 +607,8 @@ Item {
                     height: root.workspaceImplicitHeight
                     color: "transparent"
                     radius: Style.screenRadius * root.cellScale
-                    border.width: Style.borderL
-                    border.color: Color.mSecondary
+                    border.width: root.selectionBorderWidth
+                    border.color: root.accentColor
 
                     Behavior on x {
                         NumberAnimation {
