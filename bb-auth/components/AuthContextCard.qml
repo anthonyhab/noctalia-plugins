@@ -15,29 +15,18 @@ NBox {
     visible: model !== null
     radius: Style.radiusM
     color: Color.mSurfaceVariant
-    border.color: clickArea.containsMouse ? Qt.lighter(
-                                                model ? model.accentColor : Color.mOutline,
-                                                1.3) : Color.mOutline
-    border.width: clickArea.containsMouse ? 2 : 1
+    border.color: clickArea.containsMouse ? Qt.alpha(model ? model.accentColor : Color.mOutline, 0.4) : Color.mOutline
+    border.width: 1
     implicitHeight: visible ? (contentLoader.implicitHeight + (Style.marginM * 2)) : 0
     Layout.preferredHeight: visible ? implicitHeight : 0
     Layout.fillWidth: true
 
-    Behavior on border.color {
-        ColorAnimation {
-            duration: 150
-        }
-    }
-    Behavior on border.width {
-        NumberAnimation {
-            duration: 150
-        }
-    }
-
-    // Invisible item at top of card to anchor tooltip above
+    // Anchor positioned above the card so tooltip doesn't interfere with hover
     Item {
         id: tooltipAnchor
-        anchors.top: parent.top
+
+        anchors.bottom: parent.top
+        anchors.bottomMargin: 4
         anchors.horizontalCenter: parent.horizontalCenter
         width: 1
         height: 1
@@ -45,67 +34,42 @@ NBox {
 
     MouseArea {
         id: clickArea
+
         anchors.fill: parent
         hoverEnabled: true
         cursorShape: Qt.PointingHandCursor
         onClicked: {
             if (model && model.copyText) {
-                Quickshell.execDetached(["wl-copy", model.copyText])
-                TooltipService.show(tooltipAnchor,
-                                    model.copyTooltip || "Copied to clipboard")
-                Qt.callLater(function () {
-                    TooltipService.hide()
-                })
+                Quickshell.execDetached(["wl-copy", model.copyText]);
+                TooltipService.show(tooltipAnchor, model.copyTooltip || "Copied to clipboard");
+                Qt.callLater(function() {
+                    TooltipService.hide();
+                });
             }
         }
         onEntered: {
-            if (model && model.copyText) {
-                TooltipService.show(tooltipAnchor,
-                                    model.copyHint || "Click to copy details")
-            }
+            if (model && model.copyText)
+                TooltipService.show(tooltipAnchor, model.copyHint || "Click to copy details");
+
         }
         onExited: TooltipService.hide()
     }
 
-    // Hover Tint Overlay
+    // Subtle hover tint - indicates this element is interactive
     Rectangle {
         anchors.fill: parent
         anchors.margins: 1
         radius: parent.radius
         color: model ? model.accentColor : "transparent"
-        opacity: clickArea.containsMouse ? (isDark ? 0.15 : 0.12) : 0
+        opacity: clickArea.containsMouse ? (isDark ? 0.05 : 0.03) : 0
 
         Behavior on opacity {
             NumberAnimation {
-                duration: Style.animationFast
+                duration: 150
             }
+
         }
-    }
 
-    // Gradient glow
-    Rectangle {
-        anchors.fill: parent
-        radius: parent.radius
-
-        gradient: Gradient {
-            orientation: Gradient.Horizontal
-
-            GradientStop {
-                position: 0
-                color: {
-                    if (!model)
-                        return "transparent"
-
-                    let opacity = isDark ? 0.3 : 0.22
-                    return Qt.alpha(model.accentColor, opacity)
-                }
-            }
-
-            GradientStop {
-                position: 0.18
-                color: "transparent"
-            }
-        }
     }
 
     Loader {
@@ -115,9 +79,9 @@ NBox {
         anchors.margins: Style.marginM
         sourceComponent: {
             if (!model)
-                return null
+                return null;
 
-            return model.variant === "gpg" ? gpgComponent : vaultComponent
+            return model.variant === "gpg" ? gpgComponent : vaultComponent;
         }
     }
 
@@ -131,13 +95,13 @@ NBox {
                 Layout.alignment: Qt.AlignVCenter
                 icon: model.tileIcon
                 accentColor: model.accentColor
-                iconPointSize: Math.round(
-                                   model.tileIconPointSize * Style.uiScaleRatio)
+                iconPointSize: Math.round(model.tileIconPointSize * Style.uiScaleRatio)
                 isDark: root.isDark
+                hovered: clickArea.containsMouse
             }
 
             ColumnLayout {
-                spacing: 2
+                spacing: 4
                 Layout.fillWidth: true
 
                 NText {
@@ -149,16 +113,27 @@ NBox {
                     color: Color.mOnSurface
                 }
 
-                NText {
+                // Email as a subtle pill - groups related info visually
+                Rectangle {
                     visible: model.email !== ""
-                    text: model.email
-                    color: Color.mOnSurfaceVariant
-                    opacity: 0.9
-                    pointSize: Style.fontSizeXS * root.fontScale
-                    Layout.fillWidth: true
-                    wrapMode: Text.Wrap
+                    color: Qt.alpha(model.accentColor, 0.1)
+                    radius: Style.radiusS
+                    implicitWidth: emailLabel.implicitWidth + 10
+                    implicitHeight: emailLabel.implicitHeight + 5
+
+                    NText {
+                        id: emailLabel
+
+                        anchors.centerIn: parent
+                        text: model.email
+                        color: model.accentColor
+                        opacity: 0.9
+                        pointSize: Style.fontSizeXS * root.fontScale
+                    }
+
                 }
 
+                // Meta info - technical details in subdued style
                 NText {
                     visible: model.meta !== ""
                     text: model.meta
@@ -169,8 +144,11 @@ NBox {
                     Layout.fillWidth: true
                     wrapMode: Text.Wrap
                 }
+
             }
+
         }
+
     }
 
     Component {
@@ -183,21 +161,31 @@ NBox {
                 Layout.alignment: Qt.AlignVCenter
                 icon: model.tileIcon
                 accentColor: model.accentColor
-                iconPointSize: Math.round(
-                                   model.tileIconPointSize * Style.uiScaleRatio)
+                iconPointSize: Math.round(model.tileIconPointSize * Style.uiScaleRatio)
                 isDark: root.isDark
-                tileSize: Math.round(40 * Style.uiScaleRatio)
+                hovered: clickArea.containsMouse
             }
 
             NText {
                 text: model.richText
                 textFormat: Text.RichText
-                pointSize: Style.fontSizeS
+                pointSize: Style.fontSizeS * root.fontScale
                 Layout.fillWidth: true
                 Layout.minimumWidth: 100
                 wrapMode: Text.WordWrap
                 horizontalAlignment: Text.AlignLeft
             }
+
         }
+
     }
+
+    // Border color transition - smooth state change feedback
+    Behavior on border.color {
+        ColorAnimation {
+            duration: 150
+        }
+
+    }
+
 }

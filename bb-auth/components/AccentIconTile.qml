@@ -7,18 +7,19 @@ Rectangle {
 
     property string icon: ""
     property color accentColor: Color.mPrimary
-    property int tileSize: Math.round(44 * Style.uiScaleRatio)
-    property int iconPointSize: Math.round(20 * Style.uiScaleRatio)
+    property int tileSize: Math.round(40 * Style.uiScaleRatio)
+    property int iconPointSize: Math.round(18 * Style.uiScaleRatio)
     property bool isDark: false
     property bool hovered: false
 
     implicitWidth: tileSize
     implicitHeight: tileSize
     radius: Style.radiusM
-    color: Qt.alpha(accentColor, isDark ? 0.15 : 0.1)
-    border.width: Math.round(1 * Style.uiScaleRatio)
-    border.color: Qt.alpha(accentColor, isDark ? 1 : 0.8)
-    scale: hovered ? 1.06 : 1.0
+    color: Qt.alpha(accentColor, isDark ? 0.12 : 0.08)
+    border.width: 1
+    border.color: Qt.alpha(accentColor, hovered ? 0.6 : 0.3)
+    // Subtle scale on hover - confirms interactivity
+    scale: hovered ? 1.02 : 1
 
     NIcon {
         anchors.centerIn: parent
@@ -29,20 +30,17 @@ Rectangle {
 
     Behavior on scale {
         NumberAnimation {
-            duration: 200
+            duration: 150
             easing.type: Easing.OutCubic
         }
-    }
 
-    Behavior on color {
-        ColorAnimation {
-            duration: Style.animationNormal
-        }
     }
 
     Behavior on border.color {
         ColorAnimation {
-            duration: Style.animationNormal
+            duration: 150
         }
+
     }
+
 }
