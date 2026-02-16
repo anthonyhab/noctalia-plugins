@@ -1,3 +1,5 @@
+![Omarchy](preview.png)
+
 # Omarchy Color Conversion
 
 Fast color scheme conversion for QuickShell/Noctalia with CIELAB-optimized colors.

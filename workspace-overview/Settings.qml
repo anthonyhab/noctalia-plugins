@@ -9,14 +9,9 @@ ColumnLayout {
     id: root
 
     property var pluginApi: null
-    readonly property var defaultSettings: (pluginApi && pluginApi.manifest && pluginApi.manifest.metadata && pluginApi.manifest.metadata.defaultSettings) || ({})
+    readonly property var defaultSettings: (pluginApi && pluginApi.manifest && pluginApi.manifest.metadata && pluginApi.manifest.metadata.defaultSettings) || ({
+    })
     readonly property var pluginMain: pluginApi && pluginApi.mainInstance
-
-    spacing: Style.marginL
-    Layout.fillWidth: true
-    Layout.minimumWidth: Math.round(520 * Style.uiScaleRatio)
-    Layout.preferredWidth: Layout.minimumWidth
-
     // Local state
     property int gridRows: 2
     property int gridColumns: 5
@@ -30,7 +25,6 @@ ColumnLayout {
     property int containerBorderWidth: -1
     property int selectionBorderWidth: -1
     property string accentColorType: "secondary"
-
     // Get primary screen info for predictive fit calculation
     readonly property var primaryScreen: Quickshell.screens.length > 0 ? Quickshell.screens[0] : null
     readonly property real screenWidth: primaryScreen ? primaryScreen.width : 1920
@@ -43,6 +37,7 @@ ColumnLayout {
         var pos = overviewPosition;
         if (pos === "top" || pos === "bottom")
             return marginXL + barHeightEstimate + marginM;
+
         return marginXL;
     }
     readonly property real availableWidth: (screenWidth / screenScale) - barAwareMargin * 2
@@ -59,23 +54,28 @@ ColumnLayout {
     function getSetting(key, fallback) {
         if (pluginApi && pluginApi.pluginSettings && pluginApi.pluginSettings[key] !== undefined)
             return pluginApi.pluginSettings[key];
+
         if (defaultSettings && defaultSettings[key] !== undefined)
             return defaultSettings[key];
+
         return fallback;
     }
 
     function tr(key, fallback) {
         if (!pluginApi || !pluginApi.tr)
             return fallback;
+
         var translated = pluginApi.tr(key);
         if (!translated)
             return fallback;
+
         return translated;
     }
 
     function syncFromPlugin() {
         if (!pluginApi)
-            return;
+            return ;
+
         gridRows = parseInt(getSetting("rows", 2)) || 2;
         gridColumns = parseInt(getSetting("columns", 5)) || 5;
         gridScale = parseFloat(getSetting("scale", 0.16)) || 0.16;
@@ -92,8 +92,10 @@ ColumnLayout {
 
     function saveSettings() {
         if (!pluginApi)
-            return;
-        var settings = pluginApi.pluginSettings || {};
+            return ;
+
+        var settings = pluginApi.pluginSettings || {
+        };
         settings.rows = gridRows;
         settings.columns = gridColumns;
         settings.scale = gridScale;
@@ -111,6 +113,10 @@ ColumnLayout {
         pluginMain && pluginMain.refresh();
     }
 
+    spacing: Style.marginL
+    Layout.fillWidth: true
+    Layout.minimumWidth: Math.round(520 * Style.uiScaleRatio)
+    Layout.preferredWidth: Layout.minimumWidth
     onPluginApiChanged: syncFromPlugin()
     Component.onCompleted: syncFromPlugin()
 
@@ -128,6 +134,7 @@ ColumnLayout {
     // Tab Bar
     NTabBar {
         id: tabBar
+
         Layout.fillWidth: true
         currentIndex: 0
         distributeEvenly: true
@@ -155,6 +162,7 @@ ColumnLayout {
             tabIndex: 3
             checked: tabBar.currentIndex === 3
         }
+
     }
 
     // Tab Content
@@ -201,6 +209,7 @@ ColumnLayout {
                         }
                     }
                 }
+
             }
 
             NValueSlider {
@@ -259,6 +268,7 @@ ColumnLayout {
             Item {
                 Layout.fillHeight: true
             }
+
         }
 
         // === Behavior Tab ===
@@ -289,6 +299,7 @@ ColumnLayout {
             Item {
                 Layout.fillHeight: true
             }
+
         }
 
         // === Layout Tab ===
@@ -347,6 +358,7 @@ ColumnLayout {
             Item {
                 Layout.fillHeight: true
             }
+
         }
 
         // === Appearance Tab ===
@@ -409,6 +421,9 @@ ColumnLayout {
             Item {
                 Layout.fillHeight: true
             }
+
         }
+
     }
+
 }

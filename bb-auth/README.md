@@ -1,3 +1,5 @@
+![BB Auth](preview.png)
+
 # BB Auth
 
 Use Noctalia as your Polkit authentication agent. When an app requests elevated privileges, a Noctalia panel opens for password entry.
