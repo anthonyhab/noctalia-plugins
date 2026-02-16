@@ -1,6 +1,6 @@
-# Bibe Plugins
+# bb's plugins
 
-A small collection of plugins and tooling for Noctalia Shell.
+A personal collection of plugins and tooling for [Noctalia Shell](https://github.com/noctalia-dev/noctalia-shell).
 
 ## Installation
 
@@ -16,7 +16,7 @@ Plugins are installed through the Noctalia plugin UI:
 
 [![BB Auth](bb-auth/preview.png)](bb-auth/README.md)
 
-[BB Auth](bb-auth/README.md) — Use Noctalia as your Polkit authentication agent. Supports authentication requests from apps, keyring unlock, and GPG pinentry with automatic fallback UI when the agent is unavailable.
+[BB Auth](bb-auth/README.md) — Use Noctalia as your Polkit + keyring authentication agent. Supports authentication requests from apps, keyring unlock, and GPG pinentry with automatic fallback UI when the shell UI  is unavailable. Requires [bb-auth](https://github.com/anthonyhab/bb-auth).
 
 ---
 
@@ -28,11 +28,11 @@ Plugins are installed through the Noctalia plugin UI:
 
 ---
 
-### Omarchy Integration
+### Omarchy Theme Sync
 
 [![Omarchy](omarchy/preview.png)](omarchy/README.md)
 
-[Omarchy Integration](omarchy/README.md) — Sync Noctalia colors from Omarchy themes.
+[Omarchy Integration](omarchy/README.md) — Synchronize Noctalia Color Scheme with Omarchy themes.
 
 ---
 
@@ -52,11 +52,6 @@ Plugins are installed through the Noctalia plugin UI:
 
 Forked from [quickshell-overview](https://github.com/Shanu-Kumawat/quickshell-overview) by [Shanu-Kumawat](https://github.com/Shanu-Kumawat).
 
----
-
-### waybar-converter
-
-Utility to help convert Waybar configs/themes into Noctalia compatible plugin.
 
 ## Validation
 
