@@ -12,21 +12,51 @@ Plugins are installed through the Noctalia plugin UI:
 
 ## Repo contents
 
-- `omarchy/` - Omarchy integration plugin that syncs Omarchy theme colors into Noctalia so the shell follows Omarchy themes.
-- `homeassistant/` - Home Assistant plugin that surfaces devices and controls in Noctalia panels/widgets.
-- `swww-picker/` - Wallpaper picker and auto-cycler powered by `swww`.
-- `bb-auth/` - BB Auth (Polkit authentication) integration for Noctalia panels.
-- `waybar-converter/` - Utility to help convert Waybar configs/themes into Noctalia compatible plugin.
-  
-## Demo videos
+### BB Auth
 
+[![BB Auth](bb-auth/preview.png)](bb-auth/README.md)
 
-#### Omarchy Integration
-https://github.com/user-attachments/assets/d1e9bd2c-7594-4c73-b744-59590e3d8b6a
+[BB Auth](bb-auth/README.md) — Use Noctalia as your Polkit authentication agent. Supports authentication requests from apps, keyring unlock, and GPG pinentry with automatic fallback UI when the agent is unavailable.
 
+---
 
-#### Home Assistant
-https://github.com/user-attachments/assets/37c017b4-bf07-4e77-9bcf-44638dec2ef8
+### Home Assistant
+
+[![Home Assistant](homeassistant/preview.png)](homeassistant/README.md)
+
+[Home Assistant](homeassistant/README.md) — Control Home Assistant media players from Noctalia Shell.
+
+---
+
+### Omarchy Integration
+
+[![Omarchy](omarchy/preview.png)](omarchy/README.md)
+
+[Omarchy Integration](omarchy/README.md) — Sync Noctalia colors from Omarchy themes.
+
+---
+
+### SWWW Wallpaper Picker
+
+[![SWWW Wallpaper Picker](swww-picker/preview.png)](swww-picker/README.md)
+
+[SWWW Wallpaper Picker](swww-picker/README.md) — Wallpaper management using `swww`.
+
+---
+
+### Workspace Overview
+
+[![Workspace Overview](workspace-overview/preview.png)](workspace-overview/README.md)
+
+[Workspace Overview](workspace-overview/README.md) — Visual workspace overview with live window previews, drag-and-drop, and keyboard navigation for Hyprland. Supports special/scratchpad workspaces.
+
+Forked from [quickshell-overview](https://github.com/Shanu-Kumawat/quickshell-overview) by [Shanu-Kumawat](https://github.com/Shanu-Kumawat).
+
+---
+
+### waybar-converter
+
+Utility to help convert Waybar configs/themes into Noctalia compatible plugin.
 
 ## Validation
 

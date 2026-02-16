@@ -8,51 +8,23 @@ Item {
     id: root
 
     property var pluginApi: null
-
-    // Settings getter with fallback to manifest defaults and error handling
-    function getSetting(key, fallback) {
-        if (!pluginApi)
-            return fallback
-        try {
-            const userVal = pluginApi && pluginApi.pluginSettings
-                          && pluginApi.pluginSettings[key]
-            if (userVal !== undefined && userVal !== null)
-                return userVal
-            const defaultVal = pluginApi && pluginApi.manifest
-                             && pluginApi.manifest.metadata
-                             && pluginApi.manifest.metadata.defaultSettings
-                             && pluginApi.manifest.metadata.defaultSettings[key]
-            if (defaultVal !== undefined && defaultVal !== null)
-                return defaultVal
-            return fallback
-        } catch (e) {
-            Logger.e("PolkitAuth", "Error accessing plugin settings:", e)
-            return fallback
-        }
-    }
-
     readonly property bool autoOpenPanel: true
     readonly property bool autoCloseOnSuccess: true
     readonly property bool autoCloseOnCancel: true
     readonly property bool showSuccessAnimation: true
-    readonly property string settingsPanelMode: getSetting("settingsPanelMode",
-                                                           "centered")
+    readonly property string settingsPanelMode: getSetting("settingsPanelMode", "centered")
     readonly property bool closeInstantly: getSetting("closeInstantly", false)
     readonly property bool colorizeIcons: getSetting("colorizeIcons", true)
     readonly property int successAnimationDuration: closeInstantly ? 0 : 300
-
     readonly property string socketPath: {
-        const runtimeDir = Quickshell.env("XDG_RUNTIME_DIR")
-        return runtimeDir
-                && runtimeDir.length > 0 ? (runtimeDir + "/bb-auth.sock") : ""
+        const runtimeDir = Quickshell.env("XDG_RUNTIME_DIR");
+        return runtimeDir && runtimeDir.length > 0 ? (runtimeDir + "/bb-auth.sock") : "";
     }
-
     property bool agentAvailable: false
     property string agentVersion: "1.0"
     property string agentConflictMode: "session"
     property string agentStatus: ""
     property string lastError: ""
-
     // === STATE MACHINE ===
     property string sessionState: "idle"
     property string closeReason: ""
@@ -78,340 +50,308 @@ Item {
     readonly property int maxTransientFailures: 3
     property bool isClosingUI: false
 
-    signal sessionReceived
+    signal sessionReceived()
     signal sessionCompleted(bool success)
-    signal sessionRetry
+    signal sessionRetry()
+
+    // Settings getter with fallback to manifest defaults and error handling
+    function getSetting(key, fallback) {
+        if (!pluginApi)
+            return fallback;
+
+        try {
+            const userVal = pluginApi && pluginApi.pluginSettings && pluginApi.pluginSettings[key];
+            if (userVal !== undefined && userVal !== null)
+                return userVal;
+
+            const defaultVal = pluginApi && pluginApi.manifest && pluginApi.manifest.metadata && pluginApi.manifest.metadata.defaultSettings && pluginApi.manifest.metadata.defaultSettings[key];
+            if (defaultVal !== undefined && defaultVal !== null)
+                return defaultVal;
+
+            return fallback;
+        } catch (e) {
+            Logger.e("PolkitAuth", "Error accessing plugin settings:", e);
+            return fallback;
+        }
+    }
 
     function clearError() {
-        lastError = ""
+        lastError = "";
     }
 
     function nowMs() {
-        return Date.now()
+        return Date.now();
     }
 
     function resetConnectionState() {
-        subscribed = false
-        providerRegistered = false
-        providerId = ""
-        providerActive = true
-        providerActivityKnown = false
-        pendingActiveKnown = false
-        pendingActiveProviderId = ""
-        subscribeAttempts = 0
-        writeFailureCount = 0
-        parseFailureCount = 0
-        subscribeDeadlineTimer.stop()
+        subscribed = false;
+        providerRegistered = false;
+        providerId = "";
+        providerActive = true;
+        providerActivityKnown = false;
+        pendingActiveKnown = false;
+        pendingActiveProviderId = "";
+        subscribeAttempts = 0;
+        writeFailureCount = 0;
+        parseFailureCount = 0;
+        subscribeDeadlineTimer.stop();
     }
 
     function registerProvider() {
         if (!agentSocket.connected)
-            return false
+            return false;
+
         return sendCommand({
-                               "type": "ui.register",
-                               "name": "bb-auth",
-                               "kind": "quickshell",
-                               "priority": 100,
-                               "version": agentVersion
-                           })
+            "type": "ui.register",
+            "name": "bb-auth",
+            "kind": "quickshell",
+            "priority": 100,
+            "version": agentVersion
+        });
     }
 
     function subscribeToAgent() {
         if (!agentSocket.connected)
-            return false
+            return false;
 
         const sent = sendCommand({
-                                     "type": "subscribe"
-                                 })
+            "type": "subscribe"
+        });
         if (sent) {
-            subscribeAttempts += 1
-            if (!subscribeDeadlineTimer.running) {
-                subscribeDeadlineTimer.restart()
-            }
+            subscribeAttempts += 1;
+            if (!subscribeDeadlineTimer.running)
+                subscribeDeadlineTimer.restart();
+
         }
-        return sent
+        return sent;
     }
 
     function forceReconnect(reason) {
-        Logger.w("PolkitAuth", "Forcing reconnect: " + reason)
-        agentStatus = "Reconnecting to auth daemon..."
-
-        scheduleReconnect(reason, 100)
+        Logger.w("PolkitAuth", "Forcing reconnect: " + reason);
+        agentStatus = "Reconnecting to auth daemon...";
+        scheduleReconnect(reason, 100);
     }
 
     function scheduleReconnect(reason, baseDelay) {
-        if (!socketPath) {
-            return
-        }
+        if (!socketPath)
+            return ;
 
-        const minDelay = Math.max(baseDelay || 100, 100)
-        const attemptDelay = Math.min(Math.max(reconnectDelay || minDelay,
-                                               minDelay), maxReconnectDelay)
+        const minDelay = Math.max(baseDelay || 100, 100);
+        const attemptDelay = Math.min(Math.max(reconnectDelay || minDelay, minDelay), maxReconnectDelay);
+        reconnectTimer.interval = attemptDelay;
+        reconnectDelay = Math.min(attemptDelay * 2, maxReconnectDelay);
+        if (!reconnectTimer.running)
+            reconnectTimer.start();
 
-        reconnectTimer.interval = attemptDelay
-        reconnectDelay = Math.min(attemptDelay * 2, maxReconnectDelay)
+        if (agentSocket.connected)
+            agentSocket.connected = false;
 
-        if (!reconnectTimer.running) {
-            reconnectTimer.start()
-        }
-
-        if (agentSocket.connected) {
-            agentSocket.connected = false
-        }
-
-        Logger.d("PolkitAuth",
-                 "Reconnect scheduled: " + reason + " in " + attemptDelay + "ms")
+        Logger.d("PolkitAuth", "Reconnect scheduled: " + reason + " in " + attemptDelay + "ms");
     }
 
     function refresh() {
-        checkAgent()
+        checkAgent();
     }
 
     function checkAgent() {
         if (!socketPath) {
-            agentAvailable = false
-            agentStatus = (pluginApi && pluginApi.tr(
-                               "status.socket-unavailable"))
-                    || "Auth daemon socket not available"
-            return
+            agentAvailable = false;
+            agentStatus = (pluginApi && pluginApi.tr("status.socket-unavailable")) || "Auth daemon socket not available";
+            return ;
         }
-
         if (!agentSocket.connected) {
-            agentSocket.connected = true
-            return
+            agentSocket.connected = true;
+            return ;
         }
+        if (!providerRegistered)
+            registerProvider();
 
-        if (!providerRegistered) {
-            registerProvider()
-        }
+        if (!subscribed)
+            subscribeToAgent();
 
-        if (!subscribed) {
-            subscribeToAgent()
-        }
     }
 
     function sendCommand(message) {
         if (!agentSocket.connected) {
-            Logger.w("PolkitAuth", "Cannot send command - not connected")
-            return false
+            Logger.w("PolkitAuth", "Cannot send command - not connected");
+            return false;
         }
-        const data = JSON.stringify(message) + "\n"
-        const written = agentSocket.write(data)
+        const data = JSON.stringify(message) + "\n";
+        const written = agentSocket.write(data);
         if (written <= 0) {
-            writeFailureCount += 1
-            Logger.w("PolkitAuth",
-                     "Socket write failed for command: " + message.type)
+            writeFailureCount += 1;
+            Logger.w("PolkitAuth", "Socket write failed for command: " + message.type);
+            if (writeFailureCount >= maxTransientFailures)
+                forceReconnect("socket-write-failure");
 
-            if (writeFailureCount >= maxTransientFailures) {
-                forceReconnect("socket-write-failure")
-            }
-            return false
+            return false;
         }
-
-        writeFailureCount = 0
-        agentSocket.flush()
-        return true
+        writeFailureCount = 0;
+        agentSocket.flush();
+        return true;
     }
 
     function setProviderActiveState(nextActive, inactiveStatus) {
-        const normalizedActive = !!nextActive
-        const changed = !providerActivityKnown
-                      || providerActive !== normalizedActive
-
-        providerActive = normalizedActive
-        providerActivityKnown = true
-
+        const normalizedActive = !!nextActive;
+        const changed = !providerActivityKnown || providerActive !== normalizedActive;
+        providerActive = normalizedActive;
+        providerActivityKnown = true;
         if (providerActive) {
-            agentStatus = ""
-            if (changed && providerRegistered && agentSocket.connected) {
-                subscribeToAgent()
-            }
-            return
-        }
+            agentStatus = "";
+            if (changed && providerRegistered && agentSocket.connected)
+                subscribeToAgent();
 
-        agentStatus = inactiveStatus
-                || "Another authentication UI is currently active"
-        if (changed && currentSession) {
-            transitionToIdle("provider-inactive")
+            return ;
         }
+        agentStatus = inactiveStatus || "Another authentication UI is currently active";
+        if (changed && currentSession)
+            transitionToIdle("provider-inactive");
+
     }
 
     function applyActiveProviderAnnouncement(active, activeId, inactiveStatus) {
         if (!active) {
             if (!providerRegistered) {
-                pendingActiveKnown = true
-                pendingActiveProviderId = ""
-                return
+                pendingActiveKnown = true;
+                pendingActiveProviderId = "";
+                return ;
             }
-
             // No active provider currently announced, remain ready for election.
-            setProviderActiveState(true, "")
-            pendingActiveKnown = false
-            pendingActiveProviderId = ""
-            return
+            setProviderActiveState(true, "");
+            pendingActiveKnown = false;
+            pendingActiveProviderId = "";
+            return ;
         }
-
-        const announcedId = activeId || ""
+        const announcedId = activeId || "";
         if (!providerId) {
-            pendingActiveKnown = true
-            pendingActiveProviderId = announcedId
-            return
+            pendingActiveKnown = true;
+            pendingActiveProviderId = announcedId;
+            return ;
         }
-
-        pendingActiveKnown = false
-        pendingActiveProviderId = ""
-        setProviderActiveState(
-                    announcedId === providerId, inactiveStatus
-                    || "Another authentication UI is currently active")
+        pendingActiveKnown = false;
+        pendingActiveProviderId = "";
+        setProviderActiveState(announcedId === providerId, inactiveStatus || "Another authentication UI is currently active");
     }
 
     function handleMessage(response) {
         if (!response)
-            return
+            return ;
 
-        parseFailureCount = 0
-
-        if (providerRegistered && providerActivityKnown && !providerActive
-                && (response.type === "session.created"
-                    || response.type === "session.updated"
-                    || response.type === "session.closed")) {
-            Logger.d("PolkitAuth",
-                     "Ignoring session event while inactive provider")
-            return
+        parseFailureCount = 0;
+        if (providerRegistered && providerActivityKnown && !providerActive && (response.type === "session.created" || response.type === "session.updated" || response.type === "session.closed")) {
+            Logger.d("PolkitAuth", "Ignoring session event while inactive provider");
+            return ;
         }
-
         switch (response.type) {
         case "subscribed":
-            Logger.d("PolkitAuth",
-                     "Subscribed, active sessions: " + response.sessionCount)
-            subscribed = true
-            agentAvailable = true
-            reconnectDelay = 0
-            subscribeAttempts = 0
-            subscribeDeadlineTimer.stop()
-            if (response.active !== undefined) {
-                setProviderActiveState(
-                            !!response.active,
-                            "Another authentication UI is currently active")
-            }
-            break
-        case "pong":
-            agentAvailable = true
-            lastPongMs = nowMs()
-            if (response.version)
-                agentVersion = response.version
-            if (response.bootstrap && response.bootstrap.mode) {
-                agentConflictMode = response.bootstrap.mode
-            }
-            if (response.provider) {
-                const activeProviderId = response.provider.id || ""
-                applyActiveProviderAnnouncement(true, activeProviderId,
-                                                "Fallback auth UI is active")
-            } else if (providerRegistered) {
-                applyActiveProviderAnnouncement(false, "", "")
-            }
-            break
-        case "ui.registered":
-            providerRegistered = true
-            providerId = response.id || providerId
-            if (response.active !== undefined) {
-                setProviderActiveState(
-                            !!response.active,
-                            "Another authentication UI is currently active")
-            } else if (pendingActiveKnown) {
-                if (pendingActiveProviderId.length > 0) {
-                    setProviderActiveState(
-                                pendingActiveProviderId === providerId,
-                                "Another authentication UI is currently active")
-                } else {
-                    setProviderActiveState(true, "")
-                }
-            } else {
-                setProviderActiveState(true, "")
-            }
+            Logger.d("PolkitAuth", "Subscribed, active sessions: " + response.sessionCount);
+            subscribed = true;
+            agentAvailable = true;
+            reconnectDelay = 0;
+            subscribeAttempts = 0;
+            subscribeDeadlineTimer.stop();
+            if (response.active !== undefined)
+                setProviderActiveState(!!response.active, "Another authentication UI is currently active");
 
-            pendingActiveKnown = false
-            pendingActiveProviderId = ""
-            break
+            break;
+        case "pong":
+            agentAvailable = true;
+            lastPongMs = nowMs();
+            if (response.version)
+                agentVersion = response.version;
+
+            if (response.bootstrap && response.bootstrap.mode)
+                agentConflictMode = response.bootstrap.mode;
+
+            if (response.provider) {
+                const activeProviderId = response.provider.id || "";
+                applyActiveProviderAnnouncement(true, activeProviderId, "Fallback auth UI is active");
+            } else if (providerRegistered) {
+                applyActiveProviderAnnouncement(false, "", "");
+            }
+            break;
+        case "ui.registered":
+            providerRegistered = true;
+            providerId = response.id || providerId;
+            if (response.active !== undefined) {
+                setProviderActiveState(!!response.active, "Another authentication UI is currently active");
+            } else if (pendingActiveKnown) {
+                if (pendingActiveProviderId.length > 0)
+                    setProviderActiveState(pendingActiveProviderId === providerId, "Another authentication UI is currently active");
+                else
+                    setProviderActiveState(true, "");
+            } else {
+                setProviderActiveState(true, "");
+            }
+            pendingActiveKnown = false;
+            pendingActiveProviderId = "";
+            break;
         case "ui.active":
-        {
-            const active = !!response.active
-            const activeId = (response.id || "")
-            applyActiveProviderAnnouncement(
-                        active, activeId,
-                        "Another authentication UI is currently active")
-            break
-        }
+            {
+                const active = !!response.active;
+                const activeId = (response.id || "");
+                applyActiveProviderAnnouncement(active, activeId, "Another authentication UI is currently active");
+                break;
+            };
         case "session.created":
-            handleSessionCreated(response)
-            break
+            handleSessionCreated(response);
+            break;
         case "session.updated":
-            handleSessionUpdated(response)
-            break
+            handleSessionUpdated(response);
+            break;
         case "session.closed":
-            handleSessionClosed(response)
-            break
+            handleSessionClosed(response);
+            break;
         case "ok":
             if (submitPending) {
-                submitPending = false
-                if (currentSession
-                        && currentSession.id === pendingSubmitSessionId
-                        && sessionState === "submitting") {
-                    sessionState = "verifying"
-                    lastError = ""
+                submitPending = false;
+                if (currentSession && currentSession.id === pendingSubmitSessionId && sessionState === "submitting") {
+                    sessionState = "verifying";
+                    lastError = "";
                 }
-                pendingSubmitSessionId = ""
+                pendingSubmitSessionId = "";
             }
-            break
+            break;
         case "error":
-            Logger.e("PolkitAuth", "Agent error: " + response.message)
+            Logger.e("PolkitAuth", "Agent error: " + response.message);
             if (response.message === "Provider not registered") {
-                providerRegistered = false
-                registerProvider()
+                providerRegistered = false;
+                registerProvider();
             } else if (response.message === "Not active UI provider") {
-                setProviderActiveState(
-                            false,
-                            "Another authentication UI is currently active")
+                setProviderActiveState(false, "Another authentication UI is currently active");
             }
-            if (submitPending || sessionState === "submitting"
-                    || sessionState === "verifying") {
-                submitPending = false
-                pendingSubmitSessionId = ""
-                sessionState = "prompting"
-                lastError = response.message || ((pluginApi && pluginApi.tr(
-                                                      "errors.agent-failed"))
-                                                 || "Authentication error")
+            if (submitPending || sessionState === "submitting" || sessionState === "verifying") {
+                submitPending = false;
+                pendingSubmitSessionId = "";
+                sessionState = "prompting";
+                lastError = response.message || ((pluginApi && pluginApi.tr("errors.agent-failed")) || "Authentication error");
             }
-            break
+            break;
         default:
-            Logger.w("PolkitAuth", "Unknown message type: " + response.type)
+            Logger.w("PolkitAuth", "Unknown message type: " + response.type);
         }
     }
 
     function handleSessionCreated(event) {
-        Logger.d("PolkitAuth",
-                 "Session created: " + event.id + " source: " + event.source)
-
+        Logger.d("PolkitAuth", "Session created: " + event.id + " source: " + event.source);
         if (currentSession && currentSession.id === event.id) {
-            Logger.d("PolkitAuth",
-                     "Ignoring duplicate create for active session: " + event.id)
-            return
+            Logger.d("PolkitAuth", "Ignoring duplicate create for active session: " + event.id);
+            return ;
         }
-
         if (findQueuedSessionIndex(event.id) !== -1) {
-            Logger.d("PolkitAuth",
-                     "Ignoring duplicate create for queued session: " + event.id)
-            return
+            Logger.d("PolkitAuth", "Ignoring duplicate create for queued session: " + event.id);
+            return ;
         }
-
         var session = {
             "id": event.id,
             "source": event.source,
             "message": event.context.message || "",
             "actionId": event.context.actionId || "",
             "user": event.context.user || "",
-            "details": event.context.details || {},
-            "requestor": event.context.requestor || {},
+            "details": event.context.details || {
+            },
+            "requestor": event.context.requestor || {
+            },
             "keyringName": event.context.keyringName || "",
             "description": event.context.description || "",
             "keyinfo": event.context.keyinfo || "",
@@ -422,337 +362,310 @@ Item {
             "error": "",
             "prompt": "",
             "echo": true
-        }
-
+        };
         if (currentSession) {
-            sessionQueue.push(session)
-            Logger.d("PolkitAuth",
-                     "Queued session, queue length: " + sessionQueue.length)
+            sessionQueue.push(session);
+            Logger.d("PolkitAuth", "Queued session, queue length: " + sessionQueue.length);
         } else {
-            activateSession(session)
+            activateSession(session);
         }
     }
 
     function handleSessionUpdated(event) {
         if (!currentSession || currentSession.id !== event.id) {
-            const queuedIdx = findQueuedSessionIndex(event.id)
+            const queuedIdx = findQueuedSessionIndex(event.id);
             if (queuedIdx !== -1) {
-                const queued = sessionQueue[queuedIdx]
-                if (event.curRetry !== undefined) {
-                    queued.curRetry = event.curRetry
-                }
-                if (event.maxRetries !== undefined) {
-                    queued.maxRetries = event.maxRetries
-                }
+                const queued = sessionQueue[queuedIdx];
+                if (event.curRetry !== undefined)
+                    queued.curRetry = event.curRetry;
+
+                if (event.maxRetries !== undefined)
+                    queued.maxRetries = event.maxRetries;
+
                 if (event.prompt) {
-                    queued.prompt = event.prompt
-                    queued.echo = event.echo !== undefined ? event.echo : true
+                    queued.prompt = event.prompt;
+                    queued.echo = event.echo !== undefined ? event.echo : true;
                 }
-                if (event.error) {
-                    queued.error = event.error
-                }
-                sessionQueue[queuedIdx] = queued
-                return
-            }
+                if (event.error)
+                    queued.error = event.error;
 
+                sessionQueue[queuedIdx] = queued;
+                return ;
+            }
             if (pendingSubmitSessionId === event.id) {
-                submitPending = false
-                pendingSubmitSessionId = ""
-                sessionState = "prompting"
-                if (event.error) {
-                    lastError = event.error
-                }
-                Logger.w("PolkitAuth",
-                         "Recovered non-current session update for pending submit: " + event.id)
-                return
+                submitPending = false;
+                pendingSubmitSessionId = "";
+                sessionState = "prompting";
+                if (event.error)
+                    lastError = event.error;
+
+                Logger.w("PolkitAuth", "Recovered non-current session update for pending submit: " + event.id);
+                return ;
             }
-
-            Logger.w("PolkitAuth", "Update for unknown session: " + event.id)
-            return
+            Logger.w("PolkitAuth", "Update for unknown session: " + event.id);
+            return ;
         }
-
         if (event.prompt) {
-            currentSession.prompt = event.prompt
-            currentSession.echo = event.echo !== undefined ? event.echo : true
+            currentSession.prompt = event.prompt;
+            currentSession.echo = event.echo !== undefined ? event.echo : true;
         }
-        if (event.curRetry !== undefined) {
-            currentSession.curRetry = event.curRetry
-        }
-        if (event.maxRetries !== undefined) {
-            currentSession.maxRetries = event.maxRetries
-        }
+        if (event.curRetry !== undefined)
+            currentSession.curRetry = event.curRetry;
+
+        if (event.maxRetries !== undefined)
+            currentSession.maxRetries = event.maxRetries;
 
         if (event.error) {
-            submitPending = false
-            pendingSubmitSessionId = ""
-            const shouldNotifyRetry = (sessionState === "verifying"
-                                       || sessionState === "submitting"
-                                       || lastError !== event.error)
-            currentSession.error = event.error
-            lastError = event.error
-            sessionState = "prompting"
+            submitPending = false;
+            pendingSubmitSessionId = "";
+            const shouldNotifyRetry = (sessionState === "verifying" || sessionState === "submitting" || lastError !== event.error);
+            currentSession.error = event.error;
+            lastError = event.error;
+            sessionState = "prompting";
             if (shouldNotifyRetry) {
-                retryCount++
-                sessionRetry()
-                Logger.d("PolkitAuth",
-                         "Retry #" + retryCount + ": " + event.error)
+                retryCount++;
+                sessionRetry();
+                Logger.d("PolkitAuth", "Retry #" + retryCount + ": " + event.error);
             }
-        } else if (sessionState === "verifying"
-                   || sessionState === "submitting") {
-            sessionState = "prompting"
+        } else if (sessionState === "verifying" || sessionState === "submitting") {
+            sessionState = "prompting";
         }
-
-        currentSessionChanged()
+        currentSessionChanged();
     }
 
     function handleSessionClosed(event) {
         if (!currentSession || currentSession.id !== event.id) {
-            const queuedIdx = findQueuedSessionIndex(event.id)
+            const queuedIdx = findQueuedSessionIndex(event.id);
             if (queuedIdx !== -1) {
-                sessionQueue.splice(queuedIdx, 1)
-                Logger.d("PolkitAuth",
-                         "Dropped closed queued session: " + event.id)
-                return
+                sessionQueue.splice(queuedIdx, 1);
+                Logger.d("PolkitAuth", "Dropped closed queued session: " + event.id);
+                return ;
             }
-
             if (pendingSubmitSessionId === event.id) {
-                const result = (event.result || "").toString()
-                const wasSuccess = result === "success"
-                const wasCancelled = result === "cancelled"
-                                   || result === "canceled"
-
-                submitPending = false
-                pendingSubmitSessionId = ""
-
+                const result = (event.result || "").toString();
+                const wasSuccess = result === "success";
+                const wasCancelled = result === "cancelled" || result === "canceled";
+                submitPending = false;
+                pendingSubmitSessionId = "";
                 if (wasSuccess) {
-                    sessionState = "success"
-                    closeReason = "success"
+                    sessionState = "success";
+                    closeReason = "success";
                     if (autoCloseOnSuccess) {
-                        if (closeInstantly) {
-                            transitionToIdle("success")
-                        } else if (showSuccessAnimation) {
-                            successTimer.restart()
-                        } else {
-                            transitionToIdle("success")
-                        }
+                        if (closeInstantly)
+                            transitionToIdle("success");
+                        else if (showSuccessAnimation)
+                            successTimer.restart();
+                        else
+                            transitionToIdle("success");
                     }
                 } else {
-                    closeReason = wasCancelled ? "cancelled" : "error"
-                    if (!wasCancelled) {
-                        lastError = event.error || ((pluginApi && pluginApi.tr(
-                                                         "errors.auth-failed"))
-                                                    || "Authentication failed")
-                    }
+                    closeReason = wasCancelled ? "cancelled" : "error";
+                    if (!wasCancelled)
+                        lastError = event.error || ((pluginApi && pluginApi.tr("errors.auth-failed")) || "Authentication failed");
 
-                    if (wasCancelled && autoCloseOnCancel) {
-                        transitionToIdle("cancelled")
-                    } else {
-                        sessionState = "idle"
-                    }
+                    if (wasCancelled && autoCloseOnCancel)
+                        transitionToIdle("cancelled");
+                    else
+                        sessionState = "idle";
                 }
-
-                Logger.w("PolkitAuth",
-                         "Recovered non-current session close for pending submit: " + event.id)
-                return
+                Logger.w("PolkitAuth", "Recovered non-current session close for pending submit: " + event.id);
+                return ;
             }
-
-            Logger.w("PolkitAuth", "Close for unknown session: " + event.id)
-            return
+            Logger.w("PolkitAuth", "Close for unknown session: " + event.id);
+            return ;
         }
-
-        const result = (event.result || "").toString()
-        const wasSuccess = result === "success"
-        const wasCancelled = result === "cancelled" || result === "canceled"
-
-        submitPending = false
-        pendingSubmitSessionId = ""
-
-        Logger.d("PolkitAuth", "Session closed: " + result)
-
+        const result = (event.result || "").toString();
+        const wasSuccess = result === "success";
+        const wasCancelled = result === "cancelled" || result === "canceled";
+        submitPending = false;
+        pendingSubmitSessionId = "";
+        Logger.d("PolkitAuth", "Session closed: " + result);
         if (wasSuccess) {
-            sessionState = "success"
-            closeReason = "success"
+            sessionState = "success";
+            closeReason = "success";
         } else {
-            closeReason = wasCancelled ? "cancelled" : "error"
-            if (wasCancelled) {
-                lastError = "Cancelled"
-            } else if (event.error) {
-                lastError = event.error
-            } else {
-                lastError = (pluginApi && pluginApi.tr("errors.auth-failed"))
-                        || "Authentication failed"
-            }
+            closeReason = wasCancelled ? "cancelled" : "error";
+            if (wasCancelled)
+                lastError = "Cancelled";
+            else if (event.error)
+                lastError = event.error;
+            else
+                lastError = (pluginApi && pluginApi.tr("errors.auth-failed")) || "Authentication failed";
         }
-
-        sessionCompleted(wasSuccess)
-
+        sessionCompleted(wasSuccess);
         if (wasSuccess) {
             if (!autoCloseOnSuccess)
-                return
-            if (closeInstantly) {
-                transitionToIdle("success")
-            } else if (showSuccessAnimation) {
-                successTimer.restart()
-            } else {
-                transitionToIdle("success")
-            }
-            return
-        }
+                return ;
 
+            if (closeInstantly)
+                transitionToIdle("success");
+            else if (showSuccessAnimation)
+                successTimer.restart();
+            else
+                transitionToIdle("success");
+            return ;
+        }
         if (wasCancelled && autoCloseOnCancel) {
-            transitionToIdle("cancelled")
-            return
+            transitionToIdle("cancelled");
+            return ;
         }
-
         // Session is closed and won't accept further input. If the agent immediately creates a new
         // session (common for retries), switch to it without closing the UI to avoid flicker.
-        currentSession = null
-        currentSessionId = ""
-
+        currentSession = null;
+        currentSessionId = "";
         if (sessionQueue.length > 0) {
-            advanceSessionQueue()
-            return
+            advanceSessionQueue();
+            return ;
         }
-
-        sessionState = "idle"
+        sessionState = "idle";
     }
 
     function activateSession(session) {
-        closeReason = ""
-        currentSession = session
-        currentSessionId = session.id
-        sessionState = "prompting"
-        submitPending = false
-        pendingSubmitSessionId = ""
-        successTimer.stop()
+        closeReason = "";
+        currentSession = session;
+        currentSessionId = session.id;
+        sessionState = "prompting";
+        submitPending = false;
+        pendingSubmitSessionId = "";
+        successTimer.stop();
+        const isRetry = (session.curRetry || 0) > 0;
+        if (!isRetry)
+            lastError = "";
+        else if (session.error)
+            lastError = session.error;
+        retryCount = 0;
+        sessionReceived();
+        if (autoOpenPanel)
+            openPanelTimer.restart();
 
-        const isRetry = (session.curRetry || 0) > 0
-        if (!isRetry) {
-            lastError = ""
-        } else if (session.error) {
-            lastError = session.error
-        }
-        retryCount = 0
-        sessionReceived()
-
-        if (autoOpenPanel) {
-            openPanelTimer.restart()
-        }
     }
 
     function submitPassword(password) {
         if (!currentSession || sessionState !== "prompting" || submitPending)
-            return
+            return ;
 
         const sent = sendCommand({
-                                     "type": "session.respond",
-                                     "id": currentSession.id,
-                                     "response": password
-                                 })
-
+            "type": "session.respond",
+            "id": currentSession.id,
+            "response": password
+        });
         if (sent) {
-            submitPending = true
-            pendingSubmitSessionId = currentSession.id
-            sessionState = "submitting"
-            lastError = ""
-            return
+            submitPending = true;
+            pendingSubmitSessionId = currentSession.id;
+            sessionState = "submitting";
+            lastError = "";
+            return ;
         }
-
-        submitPending = false
-        pendingSubmitSessionId = ""
-        sessionState = "prompting"
-        lastError = (pluginApi && pluginApi.tr("errors.agent-failed"))
-                || "Authentication error"
+        submitPending = false;
+        pendingSubmitSessionId = "";
+        sessionState = "prompting";
+        lastError = (pluginApi && pluginApi.tr("errors.agent-failed")) || "Authentication error";
     }
 
     function cancelSession() {
         if (!currentSession)
-            return
+            return ;
 
         sendCommand({
-                        "type": "session.cancel",
-                        "id": currentSession.id
-                    })
+            "type": "session.cancel",
+            "id": currentSession.id
+        });
     }
 
     function advanceSessionQueue() {
         if (sessionQueue.length === 0) {
-            currentSession = null
-            currentSessionId = ""
-            sessionState = "idle"
-            return
+            currentSession = null;
+            currentSessionId = "";
+            sessionState = "idle";
+            return ;
         }
-
-        const nextSession = sessionQueue[0]
-        sessionQueue = sessionQueue.slice(1)
-        activateSession(nextSession)
+        const nextSession = sessionQueue[0];
+        sessionQueue = sessionQueue.slice(1);
+        activateSession(nextSession);
     }
 
     function findQueuedSessionIndex(id) {
         for (var i = 0; i < sessionQueue.length; i++) {
-            if (sessionQueue[i].id === id) {
-                return i
-            }
+            if (sessionQueue[i].id === id)
+                return i;
+
         }
-        return -1
+        return -1;
     }
 
     function openAuthUI() {
         if (!currentSession)
-            return
+            return ;
 
         if (settingsPanelMode === "window") {
-            authWindow.visible = true
+            authWindow.visible = true;
         } else {
             if (!pluginApi)
-                return
-            pluginApi.withCurrentScreen(function (screen) {
-                pluginApi.openPanel(screen)
-            })
+                return ;
+
+            pluginApi.withCurrentScreen(function(screen) {
+                pluginApi.openPanel(screen);
+            });
         }
     }
 
     function closeAuthUI(reason) {
-        if (settingsPanelMode === "window") {
-            authWindow.visible = false
-        } else {
-            pluginApi && pluginApi.withCurrentScreen(function (screen) {
-                pluginApi && pluginApi.closePanel(screen)
-            })
-        }
+        if (settingsPanelMode === "window")
+            authWindow.visible = false;
+        else
+            pluginApi && pluginApi.withCurrentScreen(function(screen) {
+                pluginApi && pluginApi.closePanel(screen);
+            });
     }
 
     function requestClose() {
         if (!currentSession) {
-            closeAuthUI("user-close")
-            return
+            closeAuthUI("user-close");
+            return ;
         }
-        cancelSession()
+        cancelSession();
     }
 
     function transitionToIdle(reason) {
-        Logger.d("PolkitAuth", "Transition to idle: " + reason)
-        isClosingUI = true
-        closeAuthUI(reason)
+        Logger.d("PolkitAuth", "Transition to idle: " + reason);
+        isClosingUI = true;
+        closeAuthUI(reason);
         // Delay state cleanup until after close animation completes
-        cleanupTimer.start()
+        cleanupTimer.start();
+    }
+
+    onSessionStateChanged: {
+        if (sessionState !== "idle" && sessionState !== "success")
+            staleRequestTimer.restart();
+        else
+            staleRequestTimer.stop();
+    }
+    Component.onCompleted: {
+        if (!pluginApi) {
+            Logger.e("PolkitAuth", "Plugin initialized without API");
+            Qt.callLater(refresh);
+        } else {
+            Logger.d("PolkitAuth", "Plugin initialized successfully with API");
+            refresh();
+        }
     }
 
     Timer {
         id: reconnectTimer
+
         interval: 100
         repeat: false
         onTriggered: {
             if (!agentSocket.connected && socketPath) {
-                Logger.d("PolkitAuth",
-                         "Reconnecting... (delay: " + reconnectDelay + "ms)")
-                agentSocket.connected = true
+                Logger.d("PolkitAuth", "Reconnecting... (delay: " + reconnectDelay + "ms)");
+                agentSocket.connected = true;
             }
         }
     }
 
     Timer {
         id: successTimer
+
         interval: root.successAnimationDuration
         repeat: false
         onTriggered: transitionToIdle("success")
@@ -760,105 +673,115 @@ Item {
 
     Timer {
         id: cleanupTimer
+
         interval: Style.animationNormal || 300 // Match close animation duration
         repeat: false
         onTriggered: {
-            currentSession = null
-            currentSessionId = ""
-            sessionState = "idle"
-            submitPending = false
-            pendingSubmitSessionId = ""
-            lastError = ""
-            closeReason = ""
-            isClosingUI = false
-            advanceSessionQueue()
+            currentSession = null;
+            currentSessionId = "";
+            sessionState = "idle";
+            submitPending = false;
+            pendingSubmitSessionId = "";
+            lastError = "";
+            closeReason = "";
+            isClosingUI = false;
+            advanceSessionQueue();
         }
     }
 
     Timer {
         id: pingTimer
+
         interval: 3000
         repeat: true
         running: true
         onTriggered: {
             if (agentSocket.connected) {
-                if (!providerRegistered) {
-                    registerProvider()
-                }
-                if (!subscribed) {
-                    subscribeToAgent()
-                }
+                if (!providerRegistered)
+                    registerProvider();
+
+                if (!subscribed)
+                    subscribeToAgent();
+
                 sendCommand({
-                                "type": "ping"
-                            })
+                    "type": "ping"
+                });
             } else {
-                checkAgent()
+                checkAgent();
             }
         }
     }
 
     Timer {
         id: subscribeWatchdogTimer
+
         interval: 1200
         repeat: true
         running: agentSocket.connected && (!providerRegistered || !subscribed)
         onTriggered: {
             if (!agentSocket.connected)
-                return
-            if (!providerRegistered) {
-                registerProvider()
-            }
-            if (!subscribed) {
-                subscribeToAgent()
-            }
+                return ;
+
+            if (!providerRegistered)
+                registerProvider();
+
+            if (!subscribed)
+                subscribeToAgent();
+
         }
     }
 
     Timer {
         id: subscribeDeadlineTimer
+
         interval: 6000
         repeat: false
         onTriggered: {
-            if (agentSocket.connected && (!providerRegistered || !subscribed)) {
-                forceReconnect("subscribe-timeout")
-            }
+            if (agentSocket.connected && (!providerRegistered || !subscribed))
+                forceReconnect("subscribe-timeout");
+
         }
     }
 
     Timer {
         id: providerHeartbeatTimer
+
         interval: 4000
         repeat: true
         running: agentSocket.connected && providerRegistered
         onTriggered: {
             if (!agentSocket.connected || !providerRegistered)
-                return
+                return ;
+
             sendCommand({
-                            "type": "ui.heartbeat",
-                            "id": providerId
-                        })
+                "type": "ui.heartbeat",
+                "id": providerId
+            });
         }
     }
 
     Timer {
         id: livenessTimer
+
         interval: 2000
         repeat: true
         running: true
         onTriggered: {
             if (!agentSocket.connected || !subscribed)
-                return
-            if (lastPongMs <= 0)
-                return
+                return ;
 
-            if ((nowMs() - lastPongMs) > 12000) {
-                forceReconnect("pong-timeout")
-            }
+            if (lastPongMs <= 0)
+                return ;
+
+            if ((nowMs() - lastPongMs) > 12000)
+                forceReconnect("pong-timeout");
+
         }
     }
 
     Timer {
         id: openPanelTimer
+
         interval: 16
         repeat: false
         running: false
@@ -867,121 +790,102 @@ Item {
 
     Timer {
         id: staleRequestTimer
+
         interval: 30000
         repeat: false
-        running: sessionState === "prompting" || sessionState === "submitting"
-                 || sessionState === "error" || sessionState === "verifying"
+        running: sessionState === "prompting" || sessionState === "submitting" || sessionState === "error" || sessionState === "verifying"
         onTriggered: {
-            Logger.w("PolkitAuth",
-                     "Session timed out in state: " + sessionState)
-            closeReason = "timeout"
-            transitionToIdle("timeout")
-        }
-    }
-
-    onSessionStateChanged: {
-        if (sessionState !== "idle" && sessionState !== "success") {
-            staleRequestTimer.restart()
-        } else {
-            staleRequestTimer.stop()
+            Logger.w("PolkitAuth", "Session timed out in state: " + sessionState);
+            closeReason = "timeout";
+            transitionToIdle("timeout");
         }
     }
 
     Socket {
         id: agentSocket
+
         path: root.socketPath
         connected: false
-
         onConnectionStateChanged: {
             if (connected) {
-                Logger.d("PolkitAuth", "Connected to agent, subscribing...")
-                reconnectTimer.stop()
-                reconnectDelay = 0
-                resetConnectionState()
-                agentAvailable = true
-                agentStatus = ""
-                lastPongMs = nowMs()
-                registerProvider()
-                subscribeToAgent()
+                Logger.d("PolkitAuth", "Connected to agent, subscribing...");
+                reconnectTimer.stop();
+                reconnectDelay = 0;
+                resetConnectionState();
+                agentAvailable = true;
+                agentStatus = "";
+                lastPongMs = nowMs();
+                registerProvider();
+                subscribeToAgent();
             } else {
-                Logger.w("PolkitAuth", "Disconnected from agent")
-                agentAvailable = false
-                resetConnectionState()
-                agentStatus = (pluginApi && pluginApi.tr(
-                                   "status.agent-unavailable"))
-                        || "Auth daemon not reachable"
-                scheduleReconnect("socket-disconnected", 100)
+                Logger.w("PolkitAuth", "Disconnected from agent");
+                agentAvailable = false;
+                resetConnectionState();
+                agentStatus = (pluginApi && pluginApi.tr("status.agent-unavailable")) || "Auth daemon not reachable";
+                scheduleReconnect("socket-disconnected", 100);
             }
         }
-
-        onError: function (error) {
-            Logger.w("PolkitAuth", "Socket error: " + error)
-            agentAvailable = false
-            scheduleReconnect("socket-error", 150)
+        onError: function(error) {
+            Logger.w("PolkitAuth", "Socket error: " + error);
+            agentAvailable = false;
+            scheduleReconnect("socket-error", 150);
         }
 
         parser: SplitParser {
-            onRead: function (line) {
-                const response = (line || "").trim()
+            onRead: function(line) {
+                const response = (line || "").trim();
                 if (!response)
-                    return
+                    return ;
 
                 try {
-                    const parsed = JSON.parse(response)
-                    handleMessage(parsed)
+                    const parsed = JSON.parse(response);
+                    handleMessage(parsed);
                 } catch (e) {
-                    parseFailureCount += 1
-                    Logger.e("PolkitAuth", "Failed to parse: " + e)
+                    parseFailureCount += 1;
+                    Logger.e("PolkitAuth", "Failed to parse: " + e);
+                    if (parseFailureCount >= maxTransientFailures)
+                        forceReconnect("socket-parse-failure");
 
-                    if (parseFailureCount >= maxTransientFailures) {
-                        forceReconnect("socket-parse-failure")
-                    }
                 }
             }
         }
+
     }
 
     FloatingWindow {
         id: authWindow
-        title: "Authentication Required"
-        visible: false
-        color: Color.mSurface
 
         readonly property int windowWidth: Math.round(420 * Style.uiScaleRatio)
         readonly property int minWindowHeight: Math.round(280 * Style.uiScaleRatio)
 
+        title: "Authentication Required"
+        visible: false
+        color: Color.mSurface
         implicitWidth: windowWidth
         implicitHeight: floatingAuthContent.implicitHeight + Math.round(Style.marginXL * 2)
         minimumSize: Qt.size(windowWidth, minWindowHeight)
 
         AuthContent {
             id: floatingAuthContent
+
             anchors.fill: parent
             pluginMain: root
             incomingSession: root.currentSession
-            busy: root.sessionState === "verifying"
-                  || root.sessionState === "submitting"
+            busy: root.sessionState === "verifying" || root.sessionState === "submitting"
             agentAvailable: root.agentAvailable
             statusText: root.agentStatus
             errorText: root.lastError
             onCloseRequested: root.requestClose()
         }
-    }
 
-    Component.onCompleted: {
-        if (!pluginApi) {
-            Logger.e("PolkitAuth", "Plugin initialized without API")
-            Qt.callLater(refresh)
-        } else {
-            Logger.d("PolkitAuth", "Plugin initialized successfully with API")
-            refresh()
-        }
     }
 
     Connections {
-        target: pluginApi
         function onPluginSettingsChanged() {
-            refresh()
+            refresh();
         }
+
+        target: pluginApi
     }
+
 }

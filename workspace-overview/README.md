@@ -1,3 +1,5 @@
+![Workspace Overview](preview.png)
+
 # Workspace Overview
 
 A visual workspace overview plugin for **Noctalia Shell + Hyprland**, ported from [quickshell-overview](https://github.com/Shanu-Kumawat/quickshell-overview) by [Shanu-Kumawat](https://github.com/Shanu-Kumawat) (originally extracted from [illogical-impulse](https://github.com/end-4/dots-hyprland) by end-4).

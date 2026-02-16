@@ -1,3 +1,5 @@
+![SWWW Wallpaper Picker](preview.png)
+
 # SWWW Wallpaper Picker
 
 Wallpaper management plugin for Noctalia Shell using `swww`.

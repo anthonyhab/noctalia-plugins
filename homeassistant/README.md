@@ -1,3 +1,5 @@
+![Home Assistant](preview.png)
+
 # Home Assistant Plugin
 
 Control Home Assistant media players from Noctalia Shell.

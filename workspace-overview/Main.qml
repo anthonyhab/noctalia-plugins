@@ -621,29 +621,31 @@ Item {
             Item {
                 id: contentContainer
 
-                anchors.fill: parent
-
                 // Calculate effective margin based on bar position + height
                 readonly property real barHeight: Style.getBarHeightForScreen(overlayWindow.screen.name)
                 readonly property string barPosition: Commons.Settings.getBarPositionForScreen(overlayWindow.screen.name)
-
                 // Margin: bar height + user-configurable additional margin
                 readonly property real baseMargin: {
                     if (root.overviewPosition === "top" && barPosition === "top")
                         return barHeight + root.barMargin;
+
                     if (root.overviewPosition === "bottom" && barPosition === "bottom")
                         return barHeight + root.barMargin;
+
                     return Style.marginM + root.barMargin;
                 }
-
                 // Position the content based on setting
                 readonly property real contentY: {
                     if (root.overviewPosition === "top")
                         return baseMargin;
+
                     if (root.overviewPosition === "bottom")
                         return parent.height - contentColumn.height - baseMargin;
+
                     return (parent.height - contentColumn.height) / 2; // center
                 }
+
+                anchors.fill: parent
 
                 Column {
                     id: contentColumn
@@ -652,21 +654,6 @@ Item {
                     x: (parent.width - width) / 2
                     y: contentContainer.contentY
                     opacity: root.overviewOpen ? 1 : 0
-
-                    Behavior on y {
-                        enabled: root.useSlideAnimation
-                        NumberAnimation {
-                            duration: Style.animationNormal
-                            easing.type: Easing.OutCubic
-                        }
-                    }
-
-                    Behavior on opacity {
-                        enabled: root.useSlideAnimation
-                        NumberAnimation {
-                            duration: Style.animationFast
-                        }
-                    }
 
                     Loader {
                         id: overviewLoader
@@ -678,8 +665,30 @@ Item {
                             panelWindow: overlayWindow
                             visible: true
                         }
+
                     }
+
+                    Behavior on y {
+                        enabled: root.useSlideAnimation
+
+                        NumberAnimation {
+                            duration: Style.animationNormal
+                            easing.type: Easing.OutCubic
+                        }
+
+                    }
+
+                    Behavior on opacity {
+                        enabled: root.useSlideAnimation
+
+                        NumberAnimation {
+                            duration: Style.animationFast
+                        }
+
+                    }
+
                 }
+
             }
 
             mask: Region {

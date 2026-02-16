@@ -20,12 +20,16 @@ plugins=(
   swww-picker
 )
 
+noctalia_path="${1:-}"
+
 echo "[validate] running qmllint"
 for plugin in "${plugins[@]}"; do
   if compgen -G "$plugin/*.qml" > /dev/null; then
-    qml_output="$(qmllint "$plugin"/*.qml 2>&1 || true)"
-    if [[ -n "$qml_output" ]]; then
-      echo "$qml_output"
+    qmllint_args=(-s)
+    if [[ -n "$noctalia_path" ]]; then
+      qmllint_args+=(-I "$noctalia_path")
+    fi
+    if ! qmllint "${qmllint_args[@]}" "$plugin"/*.qml 2>&1; then
       echo "error: qmllint reported issues for $plugin"
       exit 1
     fi
