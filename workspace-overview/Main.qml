@@ -34,6 +34,39 @@ Item {
     property int containerBorderWidth: getSetting("containerBorderWidth", -1)
     property int selectionBorderWidth: getSetting("selectionBorderWidth", -1)
     property string accentColorType: getSetting("accentColorType", "secondary")
+    property string visualMode: getSetting("visualMode", getSetting("useSimplifiedPreview", false) ? "simplified" : "live")
+    property string shaderPreset: getSetting("shaderPreset", "classic")
+    property real shaderPresetStrength: getSetting("shaderPresetStrength", 0.7)
+    property bool useSimplifiedPreview: visualMode !== "live"
+    property bool showWindowTitleStrip: getSetting("showWindowTitleStrip", true)
+    property int titleStripHeight: getSetting("titleStripHeight", 20)
+    property string titleStripMode: getSetting("titleStripMode", "auto")
+    property string titleStripMeta: getSetting("titleStripMeta", "class")
+    property bool showWindowIcons: getSetting("showWindowIcons", true)
+    property bool showWorkspaceLabels: getSetting("showWorkspaceLabels", true)
+    property string workspaceLabelMode: getSetting("workspaceLabelMode", "number-name")
+    property bool showFocusedWindowGlow: getSetting("showFocusedWindowGlow", true)
+    property bool showUrgencyBadge: getSetting("showUrgencyBadge", true)
+    property bool showFloatingBadge: getSetting("showFloatingBadge", true)
+    property bool showFullscreenBadge: getSetting("showFullscreenBadge", false)
+    property bool showMonitorBadge: getSetting("showMonitorBadge", false)
+    property real dimInactiveWorkspaces: getSetting("dimInactiveWorkspaces", 0.35)
+    property real inactiveWorkspaceSaturation: getSetting("inactiveWorkspaceSaturation", 0.75)
+    property int hoverLiftAmount: getSetting("hoverLiftAmount", 4)
+    property string previewCornerMode: getSetting("previewCornerMode", "hyprland")
+    property int previewFixedCornerRadius: getSetting("previewFixedCornerRadius", 10)
+    property bool useBorderGradient: getSetting("useBorderGradient", true)
+    property string dragPreviewMode: getSetting("dragPreviewMode", "smart")
+    property real dragSnapThreshold: getSetting("dragSnapThreshold", 0.33)
+    property real retilePreviewOpacity: getSetting("retilePreviewOpacity", 0.55)
+    property bool showRowColumnGuides: getSetting("showRowColumnGuides", false)
+    property string specialWorkspaceStyle: getSetting("specialWorkspaceStyle", "pill")
+    property string animationProfile: getSetting("animationProfile", "hyprlike")
+    property int animationDurationMs: getSetting("animationDurationMs", 200)
+    property real simplifiedPixelDensity: getSetting("simplifiedPixelDensity", 0.5)
+    property real simplifiedColorDepth: getSetting("simplifiedColorDepth", 6)
+    property real simplifiedSaturation: getSetting("simplifiedSaturation", 1.1)
+    property real simplifiedContrast: getSetting("simplifiedContrast", 1.1)
     // === OVERVIEW STATE ===
     property bool overviewOpen: false
     // Track the last navigated index for smooth keyboard/mouse navigation
@@ -49,6 +82,7 @@ Item {
     })
     property var monitors: []
     property var activeWorkspace: null
+    property string activeWindowAddress: ""
     property var workspaces: []
     readonly property var specialWorkspaces: {
         if (!showScratchpadWorkspaces)
@@ -129,6 +163,34 @@ Item {
         }
     }
 
+    function clamp(value, minValue, maxValue) {
+        if (value < minValue)
+            return minValue;
+
+        if (value > maxValue)
+            return maxValue;
+
+        return value;
+    }
+
+    function getAnimationDuration(kind) {
+        var profile = animationProfile || "hyprlike";
+        if (profile === "none")
+            return 0;
+
+        if (profile === "custom")
+            return clamp(animationDurationMs, 80, 400);
+
+        if (profile === "fast")
+            return kind === "fast" ? 90 : 140;
+
+        if (profile === "slow")
+            return kind === "fast" ? 190 : 300;
+
+        // hyprlike default
+        return kind === "fast" ? 120 : 200;
+    }
+
     function toggle() {
         overviewOpen = !overviewOpen;
         if (overviewOpen) {
@@ -163,9 +225,41 @@ Item {
         overviewPosition = getSetting("position", "top");
         barMargin = getSetting("barMargin", 0);
         useSlideAnimation = getSetting("useSlideAnimation", true);
+        animationProfile = getSetting("animationProfile", "hyprlike");
+        animationDurationMs = getSetting("animationDurationMs", 200);
+        showRowColumnGuides = getSetting("showRowColumnGuides", false);
         containerBorderWidth = getSetting("containerBorderWidth", -1);
         selectionBorderWidth = getSetting("selectionBorderWidth", -1);
         accentColorType = getSetting("accentColorType", "secondary");
+        visualMode = getSetting("visualMode", getSetting("useSimplifiedPreview", false) ? "simplified" : "live");
+        shaderPreset = getSetting("shaderPreset", "classic");
+        shaderPresetStrength = getSetting("shaderPresetStrength", 0.7);
+        showWindowTitleStrip = getSetting("showWindowTitleStrip", true);
+        titleStripHeight = getSetting("titleStripHeight", 20);
+        titleStripMode = getSetting("titleStripMode", "auto");
+        titleStripMeta = getSetting("titleStripMeta", "class");
+        showWindowIcons = getSetting("showWindowIcons", true);
+        showWorkspaceLabels = getSetting("showWorkspaceLabels", true);
+        workspaceLabelMode = getSetting("workspaceLabelMode", "number-name");
+        showFocusedWindowGlow = getSetting("showFocusedWindowGlow", true);
+        showUrgencyBadge = getSetting("showUrgencyBadge", true);
+        showFloatingBadge = getSetting("showFloatingBadge", true);
+        showFullscreenBadge = getSetting("showFullscreenBadge", false);
+        showMonitorBadge = getSetting("showMonitorBadge", false);
+        dimInactiveWorkspaces = getSetting("dimInactiveWorkspaces", 0.35);
+        inactiveWorkspaceSaturation = getSetting("inactiveWorkspaceSaturation", 0.75);
+        hoverLiftAmount = getSetting("hoverLiftAmount", 4);
+        previewCornerMode = getSetting("previewCornerMode", "hyprland");
+        previewFixedCornerRadius = getSetting("previewFixedCornerRadius", 10);
+        useBorderGradient = getSetting("useBorderGradient", true);
+        dragPreviewMode = getSetting("dragPreviewMode", "smart");
+        dragSnapThreshold = getSetting("dragSnapThreshold", 0.33);
+        retilePreviewOpacity = getSetting("retilePreviewOpacity", 0.55);
+        specialWorkspaceStyle = getSetting("specialWorkspaceStyle", "pill");
+        simplifiedPixelDensity = getSetting("simplifiedPixelDensity", 0.5);
+        simplifiedColorDepth = getSetting("simplifiedColorDepth", 6);
+        simplifiedSaturation = getSetting("simplifiedSaturation", 1.1);
+        simplifiedContrast = getSetting("simplifiedContrast", 1.1);
     }
 
     function updateWindowList() {
@@ -181,10 +275,19 @@ Item {
         getWorkspaces.running = true;
     }
 
+    function updateActiveWindow() {
+        getActiveWindow.running = true;
+    }
+
     function updateAll() {
         updateWindowList();
         updateMonitors();
         updateWorkspaces();
+        updateActiveWindow();
+    }
+
+    function refreshWindows() {
+        updateWindowList();
     }
 
     // === SPECIAL WORKSPACE LOGIC ===
@@ -301,6 +404,12 @@ Item {
                     root.addresses = root.windowList.map(function(win) {
                         return win.address;
                     });
+                    var focused = root.windowList.find(function(win) {
+                        return !!win.focused || win.focusHistoryID === 0;
+                    });
+                    if (focused && focused.address)
+                        root.activeWindowAddress = focused.address;
+
                 } catch (e) {
                     Logger.e("WorkspaceOverview", "Failed to parse clients: " + e);
                 }
@@ -360,6 +469,26 @@ Item {
                     root.workspaces = JSON.parse(workspacesCollector.text);
                 } catch (e) {
                     Logger.e("WorkspaceOverview", "Failed to parse workspaces: " + e);
+                }
+            }
+        }
+
+    }
+
+    Process {
+        id: getActiveWindow
+
+        command: ["hyprctl", "activewindow", "-j"]
+
+        stdout: StdioCollector {
+            id: activeWindowCollector
+
+            onStreamFinished: {
+                try {
+                    var activeWindow = JSON.parse(activeWindowCollector.text);
+                    root.activeWindowAddress = (activeWindow && activeWindow.address) || "";
+                } catch (e) {
+                    Logger.e("WorkspaceOverview", "Failed to parse active window: " + e);
                 }
             }
         }
@@ -664,25 +793,29 @@ Item {
                             pluginMain: root
                             panelWindow: overlayWindow
                             visible: true
+                            simplifiedPixelDensity: root.simplifiedPixelDensity
+                            simplifiedColorDepth: root.simplifiedColorDepth
+                            simplifiedSaturation: root.simplifiedSaturation
+                            simplifiedContrast: root.simplifiedContrast
                         }
 
                     }
 
                     Behavior on y {
-                        enabled: root.useSlideAnimation
+                        enabled: root.useSlideAnimation && root.getAnimationDuration("normal") > 0
 
                         NumberAnimation {
-                            duration: Style.animationNormal
+                            duration: root.getAnimationDuration("normal")
                             easing.type: Easing.OutCubic
                         }
 
                     }
 
                     Behavior on opacity {
-                        enabled: root.useSlideAnimation
+                        enabled: root.useSlideAnimation && root.getAnimationDuration("fast") > 0
 
                         NumberAnimation {
-                            duration: Style.animationFast
+                            duration: root.getAnimationDuration("fast")
                         }
 
                     }

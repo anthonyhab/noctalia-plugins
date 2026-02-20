@@ -57,6 +57,15 @@ Item {
         return m.id === (root.monitor && root.monitor.id);
     })
     property real cellScale: pluginMain.gridScale
+    // === SHADER PROPERTIES ===
+    property real simplifiedPixelDensity: pluginMain.simplifiedPixelDensity
+    property real simplifiedColorDepth: pluginMain.simplifiedColorDepth
+    property real simplifiedSaturation: pluginMain.simplifiedSaturation
+    property real simplifiedContrast: pluginMain.simplifiedContrast
+    property string visualMode: pluginMain.visualMode
+    property string shaderPreset: pluginMain.shaderPreset
+    property real shaderPresetStrength: pluginMain.shaderPresetStrength
+    property bool useSimplifiedPreview: pluginMain.useSimplifiedPreview
     // === THEME CUSTOMIZATION ===
     readonly property int containerBorderWidth: (pluginMain.containerBorderWidth >= 0) ? pluginMain.containerBorderWidth : Style.borderM
     readonly property int selectionBorderWidth: (pluginMain.selectionBorderWidth >= 0) ? pluginMain.selectionBorderWidth : Style.borderL
@@ -481,6 +490,14 @@ Item {
                         yOffset: root.getVisualYOffset(workspaceRowIndex)
                         z: atInitPosition ? (root.windowZ + index) : root.windowDraggingZ
                         windowRounding: hyprConfig.rounding
+                        useSimplifiedPreview: root.useSimplifiedPreview
+                        visualMode: root.visualMode
+                        shaderPreset: root.shaderPreset
+                        shaderPresetStrength: root.shaderPresetStrength
+                        simplifiedPixelDensity: root.simplifiedPixelDensity
+                        simplifiedColorDepth: root.simplifiedColorDepth
+                        simplifiedSaturation: root.simplifiedSaturation
+                        simplifiedContrast: root.simplifiedContrast
                         Drag.hotSpot.x: targetWindowWidth / 2
                         Drag.hotSpot.y: targetWindowHeight / 2
 
