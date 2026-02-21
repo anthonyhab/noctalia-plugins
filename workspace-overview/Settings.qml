@@ -32,7 +32,8 @@ ColumnLayout {
     property string visualMode: "live"
     property string shaderPreset: "classic"
     property real shaderPresetStrength: 0.7
-    property bool useSimplifiedPreview: false
+    property bool useSimplifiedPreview: (pluginMain && pluginMain.useSimplifiedPreview) || false
+    property real overviewBackgroundOpacityRatio: (pluginMain && pluginMain.overviewBackgroundOpacityRatio) || 1.0
     property bool showWindowTitleStrip: true
     property int titleStripHeight: 20
     property string titleStripMode: "auto"
@@ -939,6 +940,23 @@ ColumnLayout {
                 onMoved: (value) => {
                     if (root.barMargin !== value) {
                         root.barMargin = value;
+                        root.saveSettings();
+                    }
+                }
+            }
+
+            NValueSlider {
+                Layout.fillWidth: true
+                label: tr("settings.layout.backgroundOpacity.label", "Background opacity")
+                description: tr("settings.layout.backgroundOpacity.description", "Adjust the transparency of the overview backdrop")
+                from: 0.0
+                to: 1.0
+                stepSize: 0.05
+                value: root.overviewBackgroundOpacityRatio
+                text: Math.round(value * 100) + "%"
+                onMoved: (value) => {
+                    if (Math.abs(root.overviewBackgroundOpacityRatio - value) > 0.001) {
+                        root.overviewBackgroundOpacityRatio = value;
                         root.saveSettings();
                     }
                 }

@@ -62,6 +62,10 @@
                 "label": "Bar Margin",
                 "description": "Additional margin between overview and bar (when positioned at same edge)"
             },
+            "backgroundOpacity": {
+                "label": "Background opacity",
+                "description": "Adjust the transparency of the overview backdrop"
+            },
             "slideAnimation": {
                 "label": "Slide animation",
                 "description": "Animate overview sliding in from the bar (disable for instant popup)"

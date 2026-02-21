@@ -4,6 +4,7 @@ import Quickshell.Hyprland
 import Quickshell.Io
 import Quickshell.Wayland
 import "components"
+import "helpers"
 import qs.Commons
 import qs.Commons as Commons
 
@@ -67,8 +68,16 @@ Item {
     property real simplifiedColorDepth: getSetting("simplifiedColorDepth", 6)
     property real simplifiedSaturation: getSetting("simplifiedSaturation", 1.1)
     property real simplifiedContrast: getSetting("simplifiedContrast", 1.1)
+    property real overviewBackgroundOpacityRatio: getSetting("overviewBackgroundOpacityRatio", 1.0)
     // === OVERVIEW STATE ===
     property bool overviewOpen: false
+    onOverviewOpenChanged: {
+        if (overviewOpen) {
+            hyprConfig.enableDragMode();
+        } else {
+            hyprConfig.disableDragMode();
+        }
+    }
     // Track the last navigated index for smooth keyboard/mouse navigation
     // This is needed because activeWorkspace might not update immediately after dispatch
     property int lastNavigatedIndex: -1
@@ -791,12 +800,14 @@ Item {
 
                         sourceComponent: OverviewGrid {
                             pluginMain: root
+                            hyprConfig: hyprConfig
                             panelWindow: overlayWindow
                             visible: true
                             simplifiedPixelDensity: root.simplifiedPixelDensity
                             simplifiedColorDepth: root.simplifiedColorDepth
                             simplifiedSaturation: root.simplifiedSaturation
                             simplifiedContrast: root.simplifiedContrast
+                            backgroundOpacityRatio: root.overviewBackgroundOpacityRatio
                         }
 
                     }
@@ -830,6 +841,10 @@ Item {
 
         }
 
+    }
+
+    HyprlandConfig {
+        id: hyprConfig
     }
 
 }

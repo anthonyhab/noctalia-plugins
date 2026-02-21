@@ -103,16 +103,19 @@ Item {
     readonly property color baseBorderColor: isFocusedWindow ? activeBorderColor : inactiveBorderColor
     readonly property color workspaceAdjustedBorderColor: {
         if (!isFocusedWindow && isActiveWorkspaceWindow)
-            return Qt.lighter(baseBorderColor, 1.05);
+            return Qt.rgba(baseBorderColor.r, baseBorderColor.g, baseBorderColor.b, 1.0);
+
+        if (!isFocusedWindow)
+            return Qt.rgba(baseBorderColor.r, baseBorderColor.g, baseBorderColor.b, 1.0);
 
         return baseBorderColor;
     }
     readonly property color effectiveBorderColor: {
         if (root.isDragging)
-            return Qt.lighter(workspaceAdjustedBorderColor, 1.22);
+            return Qt.rgba(workspaceAdjustedBorderColor.r, workspaceAdjustedBorderColor.g, workspaceAdjustedBorderColor.b, 1.0);
 
         if (root.hovered || root.pressed)
-            return Qt.lighter(workspaceAdjustedBorderColor, 1.1);
+            return Qt.rgba(workspaceAdjustedBorderColor.r, workspaceAdjustedBorderColor.g, workspaceAdjustedBorderColor.b, 1.0);
 
         return workspaceAdjustedBorderColor;
     }
@@ -353,7 +356,7 @@ Item {
         radius: root.effectiveCornerRadius
         color: "transparent"
         border.width: root.scaledBorderWidth
-        border.color: root.useBorderGradient ? Qt.rgba(root.effectiveBorderColor.r, root.effectiveBorderColor.g, root.effectiveBorderColor.b, 0.76) : root.effectiveBorderColor
+        border.color: root.useBorderGradient ? Qt.rgba(root.effectiveBorderColor.r, root.effectiveBorderColor.g, root.effectiveBorderColor.b, 1.0) : root.effectiveBorderColor
 
         Rectangle {
             visible: root.useBorderGradient && root.scaledBorderWidth > 0
