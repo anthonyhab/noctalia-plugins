@@ -29,12 +29,12 @@ Item {
     property bool useSimplifiedPreview: (pluginMain && pluginMain.useSimplifiedPreview) || false
     property real backgroundOpacityRatio: 1.0
     property var hyprConfig
-    readonly property HyprlandMonitor monitor: Hyprland.monitorFor(panelWindow.screen)
-    readonly property var toplevels: ToplevelManager.toplevels
-    readonly property int workspacesShown: pluginMain.gridRows * pluginMain.gridColumns
-    readonly property bool isViewingSpecialWorkspace: (monitor.activeWorkspace && monitor.activeWorkspace.id) < 0
-    readonly property int workspaceGroup: isViewingSpecialWorkspace ? 0 : Math.floor((((monitor.activeWorkspace && monitor.activeWorkspace.id) || 1) - 1) / workspacesShown)
-    readonly property var specialWorkspaces: pluginMain.specialWorkspaces || []
+    readonly property HyprlandMonitor monitor: (panelWindow && panelWindow.screen) ? Hyprland.monitorFor(panelWindow.screen) : null
+    readonly property var toplevels: typeof ToplevelManager !== "undefined" ? ToplevelManager.toplevels : null
+    readonly property int workspacesShown: pluginMain ? (pluginMain.gridRows * pluginMain.gridColumns) : 10
+    readonly property bool isViewingSpecialWorkspace: (monitor && monitor.activeWorkspace && monitor.activeWorkspace.id) < 0
+    readonly property int workspaceGroup: isViewingSpecialWorkspace ? 0 : Math.floor((((monitor && monitor.activeWorkspace && monitor.activeWorkspace.id) || 1) - 1) / workspacesShown)
+    readonly property var specialWorkspaces: (pluginMain && pluginMain.specialWorkspaces) || []
     // Property to track active workspace for indicator updates
     // Uses activeSpecialWorkspaceName to handle special workspaces that hyprctl doesn't report correctly
     property var _activeWsForIndicator: {
@@ -61,7 +61,7 @@ Item {
     readonly property int groupFirstWorkspaceId: root.workspaceGroup * root.workspacesShown + 1
     readonly property int groupLastWorkspaceId: root.groupFirstWorkspaceId + root.workspacesShown - 1
     readonly property int lastNumericWorkspaceId: root.groupLastWorkspaceId - root.reservedSpecialSlots
-    property bool monitorIsFocused: (Hyprland.focusedMonitor && Hyprland.focusedMonitor.name) == monitor.name
+    property bool monitorIsFocused: (Hyprland && Hyprland.focusedMonitor && monitor && Hyprland.focusedMonitor.name === monitor.name)
     property var windows: pluginMain.windowList
     property var windowByAddress: pluginMain.windowByAddress
     property var windowAddresses: pluginMain.addresses
@@ -70,18 +70,19 @@ Item {
     })
     property real cellScale: pluginMain.gridScale
     // === THEME CUSTOMIZATION ===
-    readonly property int containerBorderWidth: (pluginMain.containerBorderWidth >= 0) ? pluginMain.containerBorderWidth : Style.borderM
-    readonly property int selectionBorderWidth: (pluginMain.selectionBorderWidth >= 0) ? pluginMain.selectionBorderWidth : Style.borderL
-    readonly property color accentColor: pluginMain.accentColorType === "primary" ? Color.mPrimary : Color.mSecondary
+    readonly property int containerBorderWidth: (pluginMain && pluginMain.containerBorderWidth >= 0) ? pluginMain.containerBorderWidth : Style.borderM
+    readonly property int selectionBorderWidth: (pluginMain && pluginMain.selectionBorderWidth >= 0) ? pluginMain.selectionBorderWidth : Style.borderL
+    readonly property color accentColor: (pluginMain && pluginMain.accentColorType === "primary") ? Color.mPrimary : Color.mSecondary
     // === FIT-TO-SCREEN LOGIC ===
     // Available space calculation (accounting for margins based on position)
     readonly property real marginXL: Style.marginXL
     readonly property real marginM: Style.marginM
     readonly property real barAwareMargin: {
         // Get bar info from parent context (passed via property or calculated)
-        var barHeight = Style.getBarHeightForScreen(panelWindow.screen.name);
-        var barPos = Commons.Settings.getBarPositionForScreen(panelWindow.screen.name);
-        var pos = pluginMain.overviewPosition;
+        var sn = (panelWindow && panelWindow.screen) ? panelWindow.screen.name : "";
+        var barHeight = sn ? Style.getBarHeightForScreen(sn) : 0;
+        var barPos = sn ? Commons.Settings.getBarPositionForScreen(sn) : "bottom";
+        var pos = pluginMain ? pluginMain.overviewPosition : "top";
         if (pos === "top" && barPos === "top")
             return marginXL + barHeight + marginM;
 
@@ -90,13 +91,15 @@ Item {
 
         return marginXL;
     }
-    readonly property real availableWidth: (monitorData && monitorData.transform % 2 === 1) ? (monitor.height / monitor.scale) - barAwareMargin * 2 : (monitor.width / monitor.scale) - barAwareMargin * 2
-    readonly property real availableHeight: (monitorData && monitorData.transform % 2 === 1) ? (monitor.width / monitor.scale) - barAwareMargin * 2 : (monitor.height / monitor.scale) - barAwareMargin * 2
+    readonly property real availableWidth: (monitorData && monitorData.transform % 2 === 1) ? ((monitor && monitor.height ? monitor.height : 1080) / (monitor && monitor.scale ? monitor.scale : 1)) - barAwareMargin * 2 : ((monitor && monitor.width ? monitor.width : 1920) / (monitor && monitor.scale ? monitor.scale : 1)) - barAwareMargin * 2
+    readonly property real availableHeight: (monitorData && monitorData.transform % 2 === 1) ? ((monitor && monitor.width ? monitor.width : 1920) / (monitor && monitor.scale ? monitor.scale : 1)) - barAwareMargin * 2 : ((monitor && monitor.height ? monitor.height : 1080) / (monitor && monitor.scale ? monitor.scale : 1)) - barAwareMargin * 2
     // Grid's natural size (without fit scaling)
-    readonly property real gridNaturalWidth: pluginMain.gridColumns * workspaceImplicitWidth + (pluginMain.gridColumns - 1) * workspaceSpacing + 40
+    readonly property real gridNaturalWidth: (pluginMain ? pluginMain.gridColumns : 5) * workspaceImplicitWidth + ((pluginMain ? pluginMain.gridColumns : 5) - 1) * workspaceSpacing + 40
     // 20px padding each side
     readonly property real gridNaturalHeight: {
-        var visibleRows = pluginMain.hideEmptyRows && rowsWithContent ? rowsWithContent.size : pluginMain.gridRows;
+        var rows = pluginMain ? pluginMain.gridRows : 2;
+        var hideRows = pluginMain ? pluginMain.hideEmptyRows : false;
+        var visibleRows = hideRows && rowsWithContent ? rowsWithContent.size : rows;
         if (visibleRows === 0)
             visibleRows = 1;
 
@@ -106,8 +109,8 @@ Item {
     // Fit scale to ensure grid stays on screen (never upscale, only downscale if needed)
     readonly property real fitScale: Math.min(1, Math.min(availableWidth / Math.max(1, gridNaturalWidth), availableHeight / Math.max(1, gridNaturalHeight)))
     // Workspace cell dimensions (accounting for rotated monitors)
-    property real workspaceImplicitWidth: (monitorData && monitorData.transform % 2 === 1) ? (monitor.height / monitor.scale * root.cellScale) : (monitor.width / monitor.scale * root.cellScale)
-    property real workspaceImplicitHeight: (monitorData && monitorData.transform % 2 === 1) ? (monitor.width / monitor.scale * root.cellScale) : (monitor.height / monitor.scale * root.cellScale)
+    property real workspaceImplicitWidth: (monitorData && monitorData.transform % 2 === 1) ? ((monitor && monitor.height ? monitor.height : 1080) / (monitor && monitor.scale ? monitor.scale : 1) * root.cellScale) : ((monitor && monitor.width ? monitor.width : 1920) / (monitor && monitor.scale ? monitor.scale : 1) * root.cellScale)
+    property real workspaceImplicitHeight: (monitorData && monitorData.transform % 2 === 1) ? ((monitor && monitor.width ? monitor.width : 1920) / (monitor && monitor.scale ? monitor.scale : 1) * root.cellScale) : ((monitor && monitor.height ? monitor.height : 1080) / (monitor && monitor.scale ? monitor.scale : 1) * root.cellScale)
     // Calculate centering offsets to "split the difference" of reserved space (bars)
     // reserved: [left, top, right, bottom]
     property real reservedLeft: (monitorData && monitorData.reserved && monitorData.reserved[0]) || 0
@@ -148,7 +151,7 @@ Item {
     property real pendingRetileConfidence: 0
     // Rows that have windows or contain the active workspace slot.
     property var rowsWithContent: {
-        if (!pluginMain.hideEmptyRows)
+        if (!pluginMain || !pluginMain.hideEmptyRows)
             return null;
 
         var rows = new Set();
@@ -340,7 +343,7 @@ Item {
     }
 
     function getVisualYOffset(rowIndex) {
-        if (!pluginMain.hideEmptyRows)
+        if (!pluginMain || !pluginMain.hideEmptyRows)
             return rowIndex * (root.workspaceImplicitHeight + root.workspaceSpacing);
 
         var visualIndex = 0;
@@ -883,7 +886,7 @@ Item {
         height: overviewBackground.implicitHeight + 20
         scale: root.fitScale
 
-        // Background (with Shadow)
+        // Background container properly styled directly
         Rectangle {
             id: overviewBackground
 
@@ -893,13 +896,23 @@ Item {
             anchors.margins: 10
             implicitWidth: workspaceColumnLayout.implicitWidth + padding * 2
             implicitHeight: workspaceColumnLayout.implicitHeight + padding * 2
-            // Use standard panel radius
+
+            // UI Tightening via native components/properties
             radius: Style.radiusL
-            color: Qt.alpha(Color.mSurface, Settings.data.ui.panelBackgroundOpacity)
+            color: Qt.alpha(Color.mSurface, Commons.Settings.data.ui.panelBackgroundOpacity || 0.8)
             border.width: root.containerBorderWidth
             border.color: Color.mOutline
-            // Shadow using MultiEffect
-            layer.enabled: Settings.data.general.enableShadows && !PowerProfileService.noctaliaPerformanceMode
+
+            layer.enabled: Commons.Settings.data.general.enableShadows && !PowerProfileService.noctaliaPerformanceMode
+            layer.effect: MultiEffect {
+                shadowEnabled: true
+                blurMax: Style.shadowBlurMax
+                shadowBlur: Style.shadowBlur * 1.5
+                shadowOpacity: Style.shadowOpacity
+                shadowColor: "black"
+                shadowHorizontalOffset: Commons.Settings.data.general.shadowOffsetX || 0
+                shadowVerticalOffset: Commons.Settings.data.general.shadowOffsetY || 4
+            }
 
             // === WORKSPACE GRID ===
             ColumnLayout {
@@ -916,7 +929,7 @@ Item {
                         id: row
 
                         property int rowIndex: index
-                        property bool rowVisible: !pluginMain.hideEmptyRows || (root.rowsWithContent && root.rowsWithContent.has(rowIndex))
+                        property bool rowVisible: !pluginMain || !pluginMain.hideEmptyRows || (root.rowsWithContent && root.rowsWithContent.has(rowIndex))
 
                         spacing: workspaceSpacing
                         visible: rowVisible
@@ -945,8 +958,8 @@ Item {
                                 opacity: baseOpacity
                                 // Use scaled screen radius for the workspace preview
                                 radius: Style.screenRadius * root.cellScale
-                                border.width: Style.borderS
-                                border.color: hoveredWhileDragging ? Qt.lighter(root.accentColor, 1.1) : Qt.rgba(Color.mOutline.r, Color.mOutline.g, Color.mOutline.b, 0.2)
+                                border.width: Math.max(1, Style.borderS)
+                                border.color: hoveredWhileDragging ? Qt.lighter(root.accentColor, 1.1) : (isActiveCell ? "transparent" : Qt.rgba(Color.mOutline.r, Color.mOutline.g, Color.mOutline.b, 0.15))
 
                                 Rectangle {
                                     visible: pluginMain.showRowColumnGuides
@@ -966,14 +979,17 @@ Item {
                                     color: Qt.rgba(root.accentColor.r, root.accentColor.g, root.accentColor.b, 0.14)
                                 }
 
-                                // Watermark number/letter
+                                // Watermark number/letter - Disabled per user feedback
                                 Text {
+                                    visible: false
                                     anchors.centerIn: parent
                                     text: workspace.watermarkLabel
                                     font.family: Settings.data.ui.fontDefault
                                     font.pixelSize: 250 * root.cellScale * ((monitor && monitor.scale) || 1)
-                                    font.weight: Style.fontWeightSemiBold
-                                    color: workspace.isSpecialSlot ? Qt.rgba(root.accentColor.r, root.accentColor.g, root.accentColor.b, 0.24) : Qt.rgba(Color.mOnSurfaceVariant.r, Color.mOnSurfaceVariant.g, Color.mOnSurfaceVariant.b, workspace.isActiveCell ? 0.22 : 0.16)
+                                    font.weight: Font.Black
+                                    color: workspace.isSpecialSlot ? Qt.rgba(root.accentColor.r, root.accentColor.g, root.accentColor.b, 0.15) : Qt.rgba(Color.mOnSurfaceVariant.r, Color.mOnSurfaceVariant.g, Color.mOnSurfaceVariant.b, workspace.isActiveCell ? 0.15 : 0.08)
+                                    style: Text.Outline
+                                    styleColor: Qt.rgba(Color.mSurface.r, Color.mSurface.g, Color.mSurface.b, 0.6)
                                     horizontalAlignment: Text.AlignHCenter
                                     verticalAlignment: Text.AlignVCenter
                                 }
@@ -984,21 +1000,21 @@ Item {
                                     visible: pluginMain.showWorkspaceLabels
                                     anchors.left: parent.left
                                     anchors.top: parent.top
-                                    anchors.leftMargin: Math.max(6, parent.width * 0.03)
-                                    anchors.topMargin: Math.max(6, parent.height * 0.03)
-                                    radius: pluginMain.specialWorkspaceStyle === "pill" ? Math.max(8, height / 2) : (pluginMain.specialWorkspaceStyle === "chip" ? 8 : 0)
+                                    anchors.leftMargin: Math.max(8, parent.width * 0.04)
+                                    anchors.topMargin: Math.max(8, parent.height * 0.04)
+                                    radius: pluginMain.specialWorkspaceStyle === "pill" ? height / 2 : (pluginMain.specialWorkspaceStyle === "chip" ? Style.radiusS : 0)
                                     color: {
                                         if (pluginMain.specialWorkspaceStyle === "plain")
                                             return "transparent";
 
                                         if (workspace.isSpecialSlot)
-                                            return Qt.rgba(root.accentColor.r, root.accentColor.g, root.accentColor.b, workspace.isActiveCell ? 0.2 : 0.14);
+                                            return Qt.rgba(root.accentColor.r, root.accentColor.g, root.accentColor.b, workspace.isActiveCell ? 0.3 : 0.2);
 
-                                        return Qt.rgba(Color.mSurface.r, Color.mSurface.g, Color.mSurface.b, workspace.isActiveCell ? 0.75 : 0.62);
+                                        return Qt.rgba(Color.mSurface.r, Color.mSurface.g, Color.mSurface.b, workspace.isActiveCell ? 0.85 : 0.5);
                                     }
                                     border.width: pluginMain.specialWorkspaceStyle === "plain" ? 0 : 1
-                                    border.color: workspace.isSpecialSlot ? Qt.rgba(root.accentColor.r, root.accentColor.g, root.accentColor.b, workspace.isActiveCell ? 0.7 : 0.5) : Qt.rgba(Color.mOutline.r, Color.mOutline.g, Color.mOutline.b, 0.45)
-                                    width: Math.min(parent.width * 0.86, labelText.implicitWidth + 14)
+                                    border.color: workspace.isSpecialSlot ? Qt.rgba(root.accentColor.r, root.accentColor.g, root.accentColor.b, workspace.isActiveCell ? 0.8 : 0.4) : Qt.rgba(Color.mOutline.r, Color.mOutline.g, Color.mOutline.b, workspace.isActiveCell ? 0.6 : 0.2)
+                                    width: Math.min(parent.width * 0.86, labelText.implicitWidth + 16)
                                     height: Math.max(20, Math.min(30, parent.height * 0.2))
 
                                     Text {
@@ -1178,7 +1194,7 @@ Item {
                         availableWorkspaceHeight: root.workspaceImplicitHeight
                         centeringX: root.centeringXOffset
                         centeringY: root.centeringYOffset
-                        widgetMonitorId: root.monitor.id
+                        widgetMonitorId: root.monitor ? root.monitor.id : 0
                         overviewOpen: root.pluginMain.overviewOpen
                         useSimplifiedPreview: root.useSimplifiedPreview
                         visualMode: root.visualMode
@@ -1365,7 +1381,8 @@ Item {
                                     var wsId = (windowDelegate.windowData.workspace && windowDelegate.windowData.workspace.id) || -1;
                                     var wsName = (windowDelegate.windowData.workspace && windowDelegate.windowData.workspace.name) || "";
                                     
-                                    root.pluginMain.close();
+                                    Logger.i("WorkspaceOverview", "Clicked window " + address + ", dispatching close then focus.");
+                                    if (pluginMain) pluginMain.close();
                                     
                                     if (wsName.startsWith("special:")) {
                                         Hyprland.dispatch("togglespecialworkspace " + wsName.substring(8));
@@ -1453,9 +1470,9 @@ Item {
                     z: root.windowZ
                     width: root.workspaceImplicitWidth
                     height: root.workspaceImplicitHeight
-                    color: "transparent"
+                    color: Qt.rgba(root.accentColor.r, root.accentColor.g, root.accentColor.b, 0.08)
                     radius: Style.screenRadius * root.cellScale
-                    border.width: root.selectionBorderWidth
+                    border.width: Math.max(3, root.selectionBorderWidth)
                     border.color: root.accentColor
 
                     Behavior on x {
@@ -1480,16 +1497,6 @@ Item {
 
                 }
 
-            }
-
-            layer.effect: MultiEffect {
-                shadowEnabled: true
-                blurMax: Style.shadowBlurMax
-                shadowBlur: Style.shadowBlur * 1.5
-                shadowOpacity: Style.shadowOpacity
-                shadowColor: "black"
-                shadowHorizontalOffset: Settings.data.general.shadowOffsetX
-                shadowVerticalOffset: Settings.data.general.shadowOffsetY
             }
 
         }
