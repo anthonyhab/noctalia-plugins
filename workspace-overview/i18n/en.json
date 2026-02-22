@@ -144,6 +144,23 @@
                 "label": "Window icons",
                 "description": "Show app icons inside each window preview card"
             },
+            "colorizeIcons": {
+                "label": "Colorize icons",
+                "description": "Tint the app icons using the system accent color"
+            },
+            "iconPlacement": {
+                "label": "Icon placement",
+                "description": "Where to position the icon inside the window preview",
+                "center": "Center",
+                "corner": "Bottom Corner"
+            },
+            "titleStripPosition": {
+                "label": "Title strip position",
+                "description": "Where the window title and controls are rendered",
+                "overlay-top": "Overlay (Top)",
+                "overlay-bottom": "Overlay (Bottom)",
+                "external": "External Titlebar"
+            },
             "titleStripMode": {
                 "label": "Title strip mode",
                 "description": "Control when the bottom title strip is displayed",
