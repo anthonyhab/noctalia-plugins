@@ -37,8 +37,11 @@ ColumnLayout {
     property bool showWindowTitleStrip: true
     property int titleStripHeight: 20
     property string titleStripMode: "auto"
+    property string titleStripPosition: "overlay-top"
     property string titleStripMeta: "class"
     property bool showWindowIcons: true
+    property bool colorizeWindowIcons: false
+    property string windowIconPlacement: "center"
     property bool showWorkspaceLabels: true
     property string workspaceLabelMode: "number-name"
     property bool showFocusedWindowGlow: true
@@ -54,6 +57,8 @@ ColumnLayout {
     property bool useBorderGradient: true
     property string dragPreviewMode: "smart"
     property real dragSnapThreshold: 0.33
+    property real previewWindowX: root.pluginMain && root.pluginMain.previewWindowX !== undefined ? root.pluginMain.previewWindowX : -1
+    property real previewWindowY: root.pluginMain && root.pluginMain.previewWindowY !== undefined ? root.pluginMain.previewWindowY : -1
     property real retilePreviewOpacity: 0.55
     property string animationProfile: "hyprlike"
     property int animationDurationMs: 200
@@ -526,10 +531,12 @@ ColumnLayout {
         shaderPresetStrength = parseFloatSetting(getSetting("shaderPresetStrength", 0.7), 0.7);
         useSimplifiedPreview = visualMode !== "live";
         titleStripMode = getSetting("titleStripMode", getSetting("showWindowTitleStrip", true) ? "auto" : "off") || "auto";
+        titleStripPosition = getSetting("titleStripPosition", "overlay-top") || "overlay-top";
         showWindowTitleStrip = titleStripMode !== "off";
         titleStripHeight = parseIntSetting(getSetting("titleStripHeight", 20), 20);
-        titleStripMeta = getSetting("titleStripMeta", "class") || "class";
         showWindowIcons = !!getSetting("showWindowIcons", true);
+        colorizeWindowIcons = !!getSetting("colorizeWindowIcons", false);
+        windowIconPlacement = getSetting("windowIconPlacement", "center");
         showWorkspaceLabels = !!getSetting("showWorkspaceLabels", true);
         workspaceLabelMode = getSetting("workspaceLabelMode", "number-name") || "number-name";
         showFocusedWindowGlow = !!getSetting("showFocusedWindowGlow", true);
@@ -570,6 +577,8 @@ ColumnLayout {
         settings.useSlideAnimation = useSlideAnimation;
         settings.animationProfile = animationProfile;
         settings.animationDurationMs = animationDurationMs;
+        settings.previewWindowX = previewWindowX;
+        settings.previewWindowY = previewWindowY;
         settings.showRowColumnGuides = showRowColumnGuides;
         settings.containerBorderWidth = containerBorderWidth;
         settings.selectionBorderWidth = selectionBorderWidth;
@@ -579,9 +588,12 @@ ColumnLayout {
         settings.shaderPresetStrength = shaderPresetStrength;
         settings.useSimplifiedPreview = visualMode !== "live";
         settings.titleStripMode = titleStripMode;
+        settings.titleStripPosition = titleStripPosition;
         settings.titleStripMeta = titleStripMeta;
-        settings.showWindowTitleStrip = titleStripMode !== "off";
+        settings.showWindowTitleStrip = showWindowTitleStrip;
         settings.showWindowIcons = showWindowIcons;
+        settings.colorizeWindowIcons = colorizeWindowIcons;
+        settings.windowIconPlacement = windowIconPlacement;
         settings.showWorkspaceLabels = showWorkspaceLabels;
         settings.workspaceLabelMode = workspaceLabelMode;
         settings.showFocusedWindowGlow = showFocusedWindowGlow;
@@ -1043,229 +1055,6 @@ ColumnLayout {
             Layout.fillWidth: true
             Layout.fillHeight: true
 
-            Rectangle {
-                id: workspacePreviewDock
-
-                visible: root.previewWorkspaceOptions && root.previewWorkspaceOptions.length > 0
-                Layout.fillWidth: true
-                Layout.preferredHeight: Math.round(190 * Style.uiScaleRatio)
-                Layout.maximumHeight: Layout.preferredHeight
-                radius: Style.radiusM
-                color: Qt.rgba(Color.mSurfaceVariant.r, Color.mSurfaceVariant.g, Color.mSurfaceVariant.b, 0.35)
-                border.width: Style.borderS
-                border.color: Qt.rgba(Color.mOutline.r, Color.mOutline.g, Color.mOutline.b, 0.45)
-
-                ColumnLayout {
-                    anchors.fill: parent
-                    anchors.margins: Style.marginM
-                    spacing: Style.marginS
-
-                    RowLayout {
-                        Layout.fillWidth: true
-                        spacing: Style.marginS
-
-                        NText {
-                            text: tr("settings.appearance.previewWorkspace.label", "Preview workspace")
-                            color: Color.mOnSurface
-                            pointSize: Style.fontSizeS
-                            font.weight: Style.fontWeightMedium
-                        }
-
-                        Item {
-                            Layout.fillWidth: true
-                        }
-
-                        NComboBox {
-                            Layout.preferredWidth: Math.max(200, workspacePreviewDock.width * 0.36)
-                            model: root.previewWorkspaceOptions || []
-                            currentKey: root.previewWorkspaceKey
-                            onSelected: (key) => {
-                                root.previewWorkspaceKey = key;
-                            }
-                        }
-
-                    }
-
-                    Item {
-                        Layout.fillWidth: true
-                        Layout.fillHeight: true
-
-                        Rectangle {
-                            anchors.fill: parent
-                            radius: Style.radiusS
-                            color: Qt.rgba(Color.mSurface.r, Color.mSurface.g, Color.mSurface.b, 0.85)
-                            border.width: Style.borderS
-                            border.color: Qt.rgba(Color.mOutline.r, Color.mOutline.g, Color.mOutline.b, 0.45)
-                        }
-
-                        Item {
-                            id: previewWorkspaceViewport
-
-                            property real rawMonitorWidth: ((root.previewMonitorData && root.previewMonitorData.width) || 1920) / ((root.previewMonitorData && root.previewMonitorData.scale) || 1)
-                            property real rawMonitorHeight: ((root.previewMonitorData && root.previewMonitorData.height) || 1080) / ((root.previewMonitorData && root.previewMonitorData.scale) || 1)
-                            property real sourceMonitorWidth: (root.previewMonitorData && root.previewMonitorData.transform % 2 === 1) ? rawMonitorHeight : rawMonitorWidth
-                            property real sourceMonitorHeight: (root.previewMonitorData && root.previewMonitorData.transform % 2 === 1) ? rawMonitorWidth : rawMonitorHeight
-                            property real aspectRatio: sourceMonitorWidth / Math.max(1, sourceMonitorHeight)
-
-                            anchors.centerIn: parent
-                            width: Math.min(parent.width - Style.marginS * 2, (parent.height - Style.marginS * 2) * aspectRatio)
-                            height: width / Math.max(0.01, aspectRatio)
-
-                            Rectangle {
-                                id: previewWorkspaceSurface
-
-                                anchors.fill: parent
-                                color: Color.mSurfaceVariant
-                                radius: Style.screenRadius * 0.35
-                                border.width: root.selectionBorderWidth >= 0 ? root.selectionBorderWidth : Style.borderM
-                                border.color: root.accentColorType === "primary" ? Color.mPrimary : Color.mSecondary
-
-                                Rectangle {
-                                    visible: root.showRowColumnGuides
-                                    anchors.centerIn: parent
-                                    width: parent.width * 0.8
-                                    height: 1
-                                    color: Qt.rgba((root.accentColorType === "primary" ? Color.mPrimary.r : Color.mSecondary.r), (root.accentColorType === "primary" ? Color.mPrimary.g : Color.mSecondary.g), (root.accentColorType === "primary" ? Color.mPrimary.b : Color.mSecondary.b), 0.2)
-                                }
-
-                                Rectangle {
-                                    visible: root.showRowColumnGuides
-                                    anchors.centerIn: parent
-                                    width: 1
-                                    height: parent.height * 0.8
-                                    color: Qt.rgba((root.accentColorType === "primary" ? Color.mPrimary.r : Color.mSecondary.r), (root.accentColorType === "primary" ? Color.mPrimary.g : Color.mSecondary.g), (root.accentColorType === "primary" ? Color.mPrimary.b : Color.mSecondary.b), 0.2)
-                                }
-
-                                Text {
-                                    anchors.centerIn: parent
-                                    text: root.previewWorkspaceWatermark
-                                    font.family: Settings.data.ui.fontDefault
-                                    font.pixelSize: Math.max(40, parent.height * 0.42)
-                                    font.weight: Style.fontWeightSemiBold
-                                    color: Qt.rgba(Color.mOnSurfaceVariant.r, Color.mOnSurfaceVariant.g, Color.mOnSurfaceVariant.b, 0.2)
-                                }
-
-                                Rectangle {
-                                    visible: root.showWorkspaceLabels && root.selectedPreviewWorkspaceOption
-                                    anchors.left: parent.left
-                                    anchors.top: parent.top
-                                    anchors.leftMargin: Math.max(6, parent.width * 0.03)
-                                    anchors.topMargin: Math.max(6, parent.height * 0.03)
-                                    radius: root.specialWorkspaceStyle === "pill" ? Math.max(8, height / 2) : (root.specialWorkspaceStyle === "chip" ? 8 : 0)
-                                    color: root.specialWorkspaceStyle === "plain" ? "transparent" : Qt.rgba(Color.mSurface.r, Color.mSurface.g, Color.mSurface.b, 0.72)
-                                    border.width: root.specialWorkspaceStyle === "plain" ? 0 : 1
-                                    border.color: Qt.rgba(Color.mOutline.r, Color.mOutline.g, Color.mOutline.b, 0.45)
-                                    width: Math.min(parent.width * 0.78, workspaceLabelText.implicitWidth + 14)
-                                    height: Math.max(20, Math.min(30, parent.height * 0.2))
-
-                                    Text {
-                                        id: workspaceLabelText
-
-                                        anchors.centerIn: parent
-                                        width: parent.width - 10
-                                        horizontalAlignment: Text.AlignHCenter
-                                        elide: Text.ElideRight
-                                        text: (root.selectedPreviewWorkspaceOption && root.selectedPreviewWorkspaceOption.name) || "Workspace"
-                                        font.family: Settings.data.ui.fontDefault
-                                        font.pixelSize: Math.max(10, Math.min(13, parent.height * 0.52))
-                                        color: Color.mOnSurface
-                                    }
-
-                                }
-
-                                Repeater {
-                                    model: root.previewWorkspaceWindows || []
-
-                                    delegate: WindowPreview {
-                                        required property var modelData
-                                        required property int index
-                                        property int monitorId: ((modelData.win && modelData.win.monitor) || root.previewMonitorId)
-                                        property var windowMonitor: {
-                                            var monitors = root.pluginMain && root.pluginMain.monitors ? root.pluginMain.monitors : [];
-                                            for (var i = 0; i < monitors.length; i++) {
-                                                if (monitors[i] && monitors[i].id === monitorId)
-                                                    return monitors[i];
-
-                                            }
-                                            return root.previewMonitorData;
-                                        }
-                                        property real rawMonitorWidth: ((windowMonitor && windowMonitor.width) || 1920) / ((windowMonitor && windowMonitor.scale) || 1)
-                                        property real rawMonitorHeight: ((windowMonitor && windowMonitor.height) || 1080) / ((windowMonitor && windowMonitor.scale) || 1)
-                                        property real sourceMonitorWidth: (windowMonitor && windowMonitor.transform % 2 === 1) ? rawMonitorHeight : rawMonitorWidth
-                                        property real sourceMonitorHeight: (windowMonitor && windowMonitor.transform % 2 === 1) ? rawMonitorWidth : rawMonitorHeight
-
-                                        pluginMain: root.pluginMain
-                                        toplevel: modelData.toplevel
-                                        windowData: modelData.win
-                                        monitorData: windowMonitor
-                                        windowScale: Math.min(previewWorkspaceViewport.width / Math.max(1, sourceMonitorWidth), previewWorkspaceViewport.height / Math.max(1, sourceMonitorHeight))
-                                        positionScaleX: previewWorkspaceViewport.width / Math.max(1, sourceMonitorWidth)
-                                        positionScaleY: previewWorkspaceViewport.height / Math.max(1, sourceMonitorHeight)
-                                        availableWorkspaceWidth: previewWorkspaceViewport.width
-                                        availableWorkspaceHeight: previewWorkspaceViewport.height
-                                        centeringX: root.previewCenteringX
-                                        centeringY: root.previewCenteringY
-                                        xOffset: 0
-                                        yOffset: 0
-                                        widgetMonitorId: root.previewMonitorId
-                                        overviewOpen: true
-                                        useSimplifiedPreview: root.visualMode !== "live"
-                                        visualMode: root.visualMode
-                                        shaderPreset: root.shaderPreset
-                                        shaderPresetStrength: root.shaderPresetStrength
-                                        simplifiedPixelDensity: root.simplifiedPixelDensity
-                                        simplifiedColorDepth: root.simplifiedColorDepth
-                                        simplifiedSaturation: root.simplifiedSaturation
-                                        simplifiedContrast: root.simplifiedContrast
-                                        windowBorderSize: previewHyprConfig.borderSize || 1
-                                        activeBorderColor: previewHyprConfig.activeBorderColor || Color.mPrimary
-                                        inactiveBorderColor: previewHyprConfig.inactiveBorderColor || Qt.rgba(Color.mOutline.r, Color.mOutline.g, Color.mOutline.b, 0.85)
-                                        isActiveWorkspaceWindow: true
-                                        isFocusedWindow: root.isPreviewWindowFocused(modelData.win)
-                                        showWindowIcons: root.showWindowIcons
-                                        showFocusedGlow: root.showFocusedWindowGlow
-                                        showUrgencyBadge: root.showUrgencyBadge
-                                        showFloatingBadge: root.showFloatingBadge
-                                        showFullscreenBadge: root.showFullscreenBadge
-                                        showMonitorBadge: root.showMonitorBadge
-                                        inactiveWorkspaceDimAmount: root.dimInactiveWorkspaces
-                                        inactiveWorkspaceSaturation: root.inactiveWorkspaceSaturation
-                                        hoverLiftAmount: root.hoverLiftAmount
-                                        previewCornerMode: root.previewCornerMode
-                                        previewFixedCornerRadius: root.previewFixedCornerRadius
-                                        useBorderGradient: root.useBorderGradient
-                                        showTitleStrip: root.showWindowTitleStrip
-                                        titleStripHeight: root.titleStripHeight
-                                        titleStripMode: root.titleStripMode
-                                        titleStripMeta: root.titleStripMeta
-                                        windowRounding: previewHyprConfig.rounding || 0
-                                        animationProfile: root.animationProfile
-                                        animationDurationMs: root.animationDurationMs
-                                        z: index + 1
-                                        hovered: false
-                                        pressed: false
-                                    }
-
-                                }
-
-                                NText {
-                                    anchors.centerIn: parent
-                                    visible: (root.previewWorkspaceWindows || []).length === 0
-                                    text: tr("settings.appearance.previewWorkspace.no-windows", "Open windows in this workspace to preview styles")
-                                    color: Color.mOnSurfaceVariant
-                                    pointSize: Style.fontSizeS
-                                }
-
-                            }
-
-                        }
-
-                    }
-
-                }
-
-            }
-
             Flickable {
                 id: appearanceSettingsFlickable
 
@@ -1448,6 +1237,36 @@ ColumnLayout {
                         }
                     }
 
+                    NToggle {
+                        visible: root.showWindowIcons
+                        label: tr("settings.appearance.colorizeIcons.label", "Colorize icons")
+                        description: tr("settings.appearance.colorizeIcons.description", "Tint the app icons using the system accent color")
+                        checked: root.colorizeWindowIcons
+                        onToggled: (checked) => {
+                            root.colorizeWindowIcons = checked;
+                            root.saveSettings();
+                        }
+                    }
+
+                    NComboBox {
+                        visible: root.showWindowIcons
+                        Layout.fillWidth: true
+                        label: tr("settings.appearance.iconPlacement.label", "Icon placement")
+                        description: tr("settings.appearance.iconPlacement.description", "Where to position the icon inside the window preview")
+                        model: [{
+                            "key": "center",
+                            "name": tr("settings.appearance.iconPlacement.center", "Center")
+                        }, {
+                            "key": "corner",
+                            "name": tr("settings.appearance.iconPlacement.corner", "Bottom Corner")
+                        }]
+                        currentKey: root.windowIconPlacement
+                        onSelected: (key) => {
+                            root.windowIconPlacement = key;
+                            root.saveSettings();
+                        }
+                    }
+
                     NComboBox {
                         Layout.fillWidth: true
                         label: tr("settings.appearance.titleStripMode.label", "Title strip mode")
@@ -1466,6 +1285,28 @@ ColumnLayout {
                         onSelected: (key) => {
                             root.titleStripMode = key;
                             root.showWindowTitleStrip = key !== "off";
+                            root.saveSettings();
+                        }
+                    }
+
+                    NComboBox {
+                        visible: root.showWindowTitleStrip
+                        Layout.fillWidth: true
+                        label: tr("settings.appearance.titleStripPosition.label", "Title strip position")
+                        description: tr("settings.appearance.titleStripPosition.description", "Where the window title and controls are rendered")
+                        model: [{
+                            "key": "overlay-top",
+                            "name": tr("settings.appearance.titleStripPosition.overlay-top", "Overlay (Top)")
+                        }, {
+                            "key": "overlay-bottom",
+                            "name": tr("settings.appearance.titleStripPosition.overlay-bottom", "Overlay (Bottom)")
+                        }, {
+                            "key": "external",
+                            "name": tr("settings.appearance.titleStripPosition.external", "External Titlebar")
+                        }]
+                        currentKey: root.titleStripPosition
+                        onSelected: (key) => {
+                            root.titleStripPosition = key;
                             root.saveSettings();
                         }
                     }
@@ -1706,6 +1547,66 @@ ColumnLayout {
 
         }
 
+    } // End of setupSettings
+
+    SettingsPreviewWindow {
+        id: settingsPreviewWindow
+        
+        // Context
+        pluginMain: root.pluginMain
+        previewWorkspaceOptions: root.previewWorkspaceOptions
+        previewWorkspaceKey: root.previewWorkspaceKey
+        previewWorkspaceWindows: root.previewWorkspaceWindows
+        previewMonitorData: root.previewMonitorData
+        previewMonitorId: root.previewMonitorId
+        previewCenteringX: root.previewCenteringX
+        previewCenteringY: root.previewCenteringY
+        previewWorkspaceWatermark: root.previewWorkspaceWatermark
+        
+        // Persistent Memory
+        pluginWindowX: root.previewWindowX
+        pluginWindowY: root.previewWindowY
+        
+        onPositionSaved: (xPos, yPos) => {
+            root.previewWindowX = xPos;
+            root.previewWindowY = yPos;
+            root.saveSettings();
+        }
+        
+        // Bindings to active UI state to allow live previewing of un-saved tweaks
+        visualMode: root.visualMode
+        shaderPreset: root.shaderPreset
+        shaderPresetStrength: root.shaderPresetStrength
+        simplifiedPixelDensity: root.simplifiedPixelDensity
+        simplifiedColorDepth: root.simplifiedColorDepth
+        simplifiedSaturation: root.simplifiedSaturation
+        simplifiedContrast: root.simplifiedContrast
+        accentColorType: root.accentColorType
+        showWindowIcons: root.showWindowIcons
+        colorizeWindowIcons: root.colorizeWindowIcons
+        windowIconPlacement: root.windowIconPlacement
+        showFocusedWindowGlow: root.showFocusedWindowGlow
+        showUrgencyBadge: root.showUrgencyBadge
+        showFloatingBadge: root.showFloatingBadge
+        showFullscreenBadge: root.showFullscreenBadge
+        showMonitorBadge: root.showMonitorBadge
+        dimInactiveWorkspaces: root.dimInactiveWorkspaces
+        inactiveWorkspaceSaturation: root.inactiveWorkspaceSaturation
+        hoverLiftAmount: root.hoverLiftAmount
+        previewCornerMode: root.previewCornerMode
+        previewFixedCornerRadius: root.previewFixedCornerRadius
+        useBorderGradient: root.useBorderGradient
+        showWindowTitleStrip: root.showWindowTitleStrip
+        titleStripPosition: root.titleStripPosition
+        titleStripHeight: root.titleStripHeight
+        titleStripMode: root.titleStripMode
+        titleStripMeta: root.titleStripMeta
+        selectionBorderWidth: root.selectionBorderWidth
+        showRowColumnGuides: root.showRowColumnGuides
+        showWorkspaceLabels: root.showWorkspaceLabels
+        specialWorkspaceStyle: root.specialWorkspaceStyle
+        animationProfile: root.animationProfile
+        animationDurationMs: root.animationDurationMs
     }
 
 }

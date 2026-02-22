@@ -60,6 +60,8 @@ Item {
     property string dragPreviewMode: getSetting("dragPreviewMode", "smart")
     property real dragSnapThreshold: getSetting("dragSnapThreshold", 0.33)
     property real retilePreviewOpacity: getSetting("retilePreviewOpacity", 0.55)
+    property real previewWindowX: getSetting("previewWindowX", -1)
+    property real previewWindowY: getSetting("previewWindowY", -1)
     property bool showRowColumnGuides: getSetting("showRowColumnGuides", false)
     property string specialWorkspaceStyle: getSetting("specialWorkspaceStyle", "pill")
     property string animationProfile: getSetting("animationProfile", "hyprlike")
@@ -201,11 +203,10 @@ Item {
     }
 
     function toggle() {
-        overviewOpen = !overviewOpen;
         if (overviewOpen) {
-            lastNavigatedIndex = -1;
-            activeSpecialWorkspaceName = "";
-            updateAll();
+            close();
+        } else {
+            open();
         }
     }
 
@@ -219,9 +220,11 @@ Item {
     }
 
     function close() {
-        overviewOpen = false;
-        lastNavigatedIndex = -1;
-        activeSpecialWorkspaceName = "";
+        if (overviewOpen) {
+            overviewOpen = false;
+            lastNavigatedIndex = -1;
+            activeSpecialWorkspaceName = "";
+        }
     }
 
     function refresh() {
@@ -509,7 +512,15 @@ Item {
             root.toggle();
         }
 
+        function togglePanel() {
+            root.toggle();
+        }
+
         function close() {
+            root.close();
+        }
+
+        function closePanel() {
             root.close();
         }
 
@@ -517,9 +528,12 @@ Item {
             root.open();
         }
 
+        function openPanel() {
+            root.open();
+        }
+
         target: "plugin:workspace-overview"
     }
-
     // === OVERLAY WINDOWS (one per screen) ===
     Variants {
         id: overviewVariants
@@ -588,8 +602,6 @@ Item {
 
             // === INPUT HANDLER (keyboard + scroll) ===
             Item {
-                // Simple wrap or clamp? simple wrap.
-
                 id: keyHandler
 
                 anchors.fill: parent
@@ -759,6 +771,19 @@ Item {
             Item {
                 id: contentContainer
 
+                // Full screen dimming backdrop to improve a11y contrast
+                Rectangle {
+                    anchors.fill: parent
+                    color: "black"
+                    opacity: root.overviewOpen ? 0.75 : 0
+                    Behavior on opacity {
+                        NumberAnimation {
+                            duration: root.getAnimationDuration("normal")
+                            easing.type: Easing.OutCubic
+                        }
+                    }
+                }
+
                 // Calculate effective margin based on bar position + height
                 readonly property real barHeight: Style.getBarHeightForScreen(overlayWindow.screen.name)
                 readonly property string barPosition: Commons.Settings.getBarPositionForScreen(overlayWindow.screen.name)
@@ -784,6 +809,13 @@ Item {
                 }
 
                 anchors.fill: parent
+
+                MouseArea {
+                    anchors.fill: parent
+                    onClicked: {
+                        root.close();
+                    }
+                }
 
                 Column {
                     id: contentColumn
