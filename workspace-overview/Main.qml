@@ -42,8 +42,11 @@ Item {
     property bool showWindowTitleStrip: getSetting("showWindowTitleStrip", true)
     property int titleStripHeight: getSetting("titleStripHeight", 20)
     property string titleStripMode: getSetting("titleStripMode", "auto")
+    property string titleStripPosition: getSetting("titleStripPosition", "overlay-top")
     property string titleStripMeta: getSetting("titleStripMeta", "class")
     property bool showWindowIcons: getSetting("showWindowIcons", true)
+    property bool colorizeWindowIcons: getSetting("colorizeWindowIcons", false)
+    property string windowIconPlacement: getSetting("windowIconPlacement", "center")
     property bool showWorkspaceLabels: getSetting("showWorkspaceLabels", true)
     property string workspaceLabelMode: getSetting("workspaceLabelMode", "number-name")
     property bool showFocusedWindowGlow: getSetting("showFocusedWindowGlow", true)
@@ -62,6 +65,8 @@ Item {
     property real retilePreviewOpacity: getSetting("retilePreviewOpacity", 0.55)
     property real previewWindowX: getSetting("previewWindowX", -1)
     property real previewWindowY: getSetting("previewWindowY", -1)
+    property var previewWindowPositions: getSetting("previewWindowPositions", ({
+    }))
     property bool showRowColumnGuides: getSetting("showRowColumnGuides", false)
     property string specialWorkspaceStyle: getSetting("specialWorkspaceStyle", "pill")
     property string animationProfile: getSetting("animationProfile", "hyprlike")
@@ -70,16 +75,9 @@ Item {
     property real simplifiedColorDepth: getSetting("simplifiedColorDepth", 6)
     property real simplifiedSaturation: getSetting("simplifiedSaturation", 1.1)
     property real simplifiedContrast: getSetting("simplifiedContrast", 1.1)
-    property real overviewBackgroundOpacityRatio: getSetting("overviewBackgroundOpacityRatio", 1.0)
+    property real overviewBackgroundOpacityRatio: getSetting("overviewBackgroundOpacityRatio", 1)
     // === OVERVIEW STATE ===
     property bool overviewOpen: false
-    onOverviewOpenChanged: {
-        if (overviewOpen) {
-            hyprConfig.enableDragMode();
-        } else {
-            hyprConfig.disableDragMode();
-        }
-    }
     // Track the last navigated index for smooth keyboard/mouse navigation
     // This is needed because activeWorkspace might not update immediately after dispatch
     property int lastNavigatedIndex: -1
@@ -95,6 +93,10 @@ Item {
     property var activeWorkspace: null
     property string activeWindowAddress: ""
     property var workspaces: []
+    property bool pendingWindowListRefresh: false
+    property bool pendingMonitorRefresh: false
+    property bool pendingWorkspaceRefresh: false
+    property bool pendingActiveWindowRefresh: false
     readonly property var specialWorkspaces: {
         if (!showScratchpadWorkspaces)
             return [];
@@ -203,11 +205,10 @@ Item {
     }
 
     function toggle() {
-        if (overviewOpen) {
+        if (overviewOpen)
             close();
-        } else {
+        else
             open();
-        }
     }
 
     function open() {
@@ -249,8 +250,11 @@ Item {
         showWindowTitleStrip = getSetting("showWindowTitleStrip", true);
         titleStripHeight = getSetting("titleStripHeight", 20);
         titleStripMode = getSetting("titleStripMode", "auto");
+        titleStripPosition = getSetting("titleStripPosition", "overlay-top");
         titleStripMeta = getSetting("titleStripMeta", "class");
         showWindowIcons = getSetting("showWindowIcons", true);
+        colorizeWindowIcons = getSetting("colorizeWindowIcons", false);
+        windowIconPlacement = getSetting("windowIconPlacement", "center");
         showWorkspaceLabels = getSetting("showWorkspaceLabels", true);
         workspaceLabelMode = getSetting("workspaceLabelMode", "number-name");
         showFocusedWindowGlow = getSetting("showFocusedWindowGlow", true);
@@ -267,11 +271,16 @@ Item {
         dragPreviewMode = getSetting("dragPreviewMode", "smart");
         dragSnapThreshold = getSetting("dragSnapThreshold", 0.33);
         retilePreviewOpacity = getSetting("retilePreviewOpacity", 0.55);
+        previewWindowX = getSetting("previewWindowX", -1);
+        previewWindowY = getSetting("previewWindowY", -1);
+        previewWindowPositions = getSetting("previewWindowPositions", ({
+        }));
         specialWorkspaceStyle = getSetting("specialWorkspaceStyle", "pill");
         simplifiedPixelDensity = getSetting("simplifiedPixelDensity", 0.5);
         simplifiedColorDepth = getSetting("simplifiedColorDepth", 6);
         simplifiedSaturation = getSetting("simplifiedSaturation", 1.1);
         simplifiedContrast = getSetting("simplifiedContrast", 1.1);
+        overviewBackgroundOpacityRatio = getSetting("overviewBackgroundOpacityRatio", 1);
     }
 
     function updateWindowList() {
@@ -298,8 +307,108 @@ Item {
         updateActiveWindow();
     }
 
-    function refreshWindows() {
-        updateWindowList();
+    function copyObject(source) {
+        var target = {
+        };
+        if (!source)
+            return target;
+
+        for (var key in source) target[key] = source[key]
+        return target;
+    }
+
+    function queueRefresh(windowListRefresh, monitorRefresh, workspaceRefresh, activeWindowRefresh, immediate) {
+        if (windowListRefresh)
+            pendingWindowListRefresh = true;
+
+        if (monitorRefresh)
+            pendingMonitorRefresh = true;
+
+        if (workspaceRefresh)
+            pendingWorkspaceRefresh = true;
+
+        if (activeWindowRefresh)
+            pendingActiveWindowRefresh = true;
+
+        if (immediate) {
+            eventRefreshDebounce.stop();
+            flushQueuedRefresh();
+            return ;
+        }
+        eventRefreshDebounce.restart();
+    }
+
+    function flushQueuedRefresh() {
+        var shouldRefreshWindows = pendingWindowListRefresh;
+        var shouldRefreshMonitors = pendingMonitorRefresh;
+        var shouldRefreshWorkspaces = pendingWorkspaceRefresh;
+        var shouldRefreshActiveWindow = pendingActiveWindowRefresh;
+        pendingWindowListRefresh = false;
+        pendingMonitorRefresh = false;
+        pendingWorkspaceRefresh = false;
+        pendingActiveWindowRefresh = false;
+        if (shouldRefreshWindows)
+            updateWindowList();
+
+        if (shouldRefreshMonitors)
+            updateMonitors();
+
+        if (shouldRefreshWorkspaces)
+            updateWorkspaces();
+
+        if (shouldRefreshActiveWindow)
+            updateActiveWindow();
+
+    }
+
+    function queueRefreshForEvent(eventName) {
+        var name = (eventName || "").toString();
+        if (name === "") {
+            queueRefresh(true, true, true, true, false);
+            return ;
+        }
+        var windowRefresh = name.startsWith("openwindow") || name.startsWith("closewindow") || name.startsWith("movewindow") || name.startsWith("windowtitle") || name.startsWith("changefloatingmode") || name.startsWith("fullscreen") || name.startsWith("pin") || name.startsWith("minimize") || name.startsWith("urgent");
+        var workspaceRefresh = name.startsWith("workspace") || name.startsWith("workspacev2") || name.startsWith("moveworkspace") || name.startsWith("createworkspace") || name.startsWith("destroyworkspace") || name.startsWith("renameworkspace") || name.startsWith("activespecial");
+        var monitorRefresh = name.startsWith("monitoradded") || name.startsWith("monitorremoved") || name.startsWith("focusedmon");
+        var activeWindowRefresh = name.startsWith("activewindow") || name.startsWith("activewindowv2");
+        if (!windowRefresh && !workspaceRefresh && !monitorRefresh && !activeWindowRefresh)
+            queueRefresh(true, false, true, true, false);
+        else
+            queueRefresh(windowRefresh, monitorRefresh, workspaceRefresh, activeWindowRefresh, false);
+    }
+
+    function refreshWindows(immediate) {
+        queueRefresh(true, false, false, false, !!immediate);
+    }
+
+    function applyOptimisticWindowMove(address, x, y, workspaceId) {
+        if (!address || !windowByAddress || !windowByAddress[address])
+            return false;
+
+        var nextByAddress = copyObject(windowByAddress);
+        var currentWindow = nextByAddress[address];
+        var nextWindow = copyObject(currentWindow);
+        nextWindow.at = [Math.round(x), Math.round(y)];
+        if (workspaceId !== undefined && workspaceId !== null) {
+            var nextWorkspace = copyObject(currentWindow && currentWindow.workspace);
+            nextWorkspace.id = workspaceId;
+            if (!nextWorkspace.name && workspaceId >= 0)
+                nextWorkspace.name = "" + workspaceId;
+
+            nextWindow.workspace = nextWorkspace;
+        }
+        nextByAddress[address] = nextWindow;
+        windowByAddress = nextByAddress;
+        var nextWindowList = [];
+        for (var i = 0; i < windowList.length; i++) {
+            var win = windowList[i];
+            if (win && win.address === address)
+                nextWindowList.push(nextWindow);
+            else
+                nextWindowList.push(win);
+        }
+        windowList = nextWindowList;
+        return true;
     }
 
     // === SPECIAL WORKSPACE LOGIC ===
@@ -365,22 +474,42 @@ Item {
         return visible;
     }
 
+    onOverviewOpenChanged: {
+        if (overviewOpen)
+            hyprConfig.enableDragMode();
+        else
+            hyprConfig.disableDragMode();
+        if (!overviewOpen) {
+            eventRefreshDebounce.stop();
+            pendingWindowListRefresh = false;
+            pendingMonitorRefresh = false;
+            pendingWorkspaceRefresh = false;
+            pendingActiveWindowRefresh = false;
+        }
+    }
     Component.onCompleted: {
         updateAll();
     }
 
+    Timer {
+        id: eventRefreshDebounce
+
+        interval: 40
+        repeat: false
+        onTriggered: {
+            if (!root.overviewOpen)
+                return ;
+
+            root.flushQueuedRefresh();
+        }
+    }
+
     Connections {
         function onRawEvent(event) {
-            if (root.overviewOpen) {
-                // If special workspace toggled/moved, update
-                if (event.name.startsWith("createworkspace") || event.name.startsWith("destroyworkspace") || event.name.startsWith("activespecial"))
-                    root.updateAll();
+            if (!root.overviewOpen)
+                return ;
 
-                // General update for other events if needed, throttled?
-                // For now, just rely on open/toggle to strict update, and maybe some specific events.
-                // Actually, let's just update on everything if open, safeguards are good.
-                root.updateAll();
-            }
+            root.queueRefreshForEvent(event && event.name);
         }
 
         target: Hyprland
@@ -535,6 +664,7 @@ Item {
         target: "plugin:workspace-overview"
     }
     // === OVERLAY WINDOWS (one per screen) ===
+
     Variants {
         id: overviewVariants
 
@@ -771,19 +901,6 @@ Item {
             Item {
                 id: contentContainer
 
-                // Full screen dimming backdrop to improve a11y contrast
-                Rectangle {
-                    anchors.fill: parent
-                    color: "black"
-                    opacity: root.overviewOpen ? 0.75 : 0
-                    Behavior on opacity {
-                        NumberAnimation {
-                            duration: root.getAnimationDuration("normal")
-                            easing.type: Easing.OutCubic
-                        }
-                    }
-                }
-
                 // Calculate effective margin based on bar position + height
                 readonly property real barHeight: Style.getBarHeightForScreen(overlayWindow.screen.name)
                 readonly property string barPosition: Commons.Settings.getBarPositionForScreen(overlayWindow.screen.name)
@@ -809,6 +926,22 @@ Item {
                 }
 
                 anchors.fill: parent
+
+                // Full screen dimming backdrop to improve a11y contrast
+                Rectangle {
+                    anchors.fill: parent
+                    color: "black"
+                    opacity: root.overviewOpen ? 0.75 : 0
+
+                    Behavior on opacity {
+                        NumberAnimation {
+                            duration: root.getAnimationDuration("normal")
+                            easing.type: Easing.OutCubic
+                        }
+
+                    }
+
+                }
 
                 MouseArea {
                     anchors.fill: parent

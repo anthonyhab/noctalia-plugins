@@ -27,7 +27,7 @@ Item {
     property string shaderPreset: (pluginMain && pluginMain.shaderPreset) || "classic"
     property real shaderPresetStrength: (pluginMain && pluginMain.shaderPresetStrength) || 0.7
     property bool useSimplifiedPreview: (pluginMain && pluginMain.useSimplifiedPreview) || false
-    property real backgroundOpacityRatio: 1.0
+    property real backgroundOpacityRatio: 1
     property var hyprConfig
     readonly property HyprlandMonitor monitor: (panelWindow && panelWindow.screen) ? Hyprland.monitorFor(panelWindow.screen) : null
     readonly property var toplevels: typeof ToplevelManager !== "undefined" ? ToplevelManager.toplevels : null
@@ -134,7 +134,7 @@ Item {
     // Workspace ID when dragging within same workspace
     property string draggingTargetAddress: ""
     // Address of window being dragged
-    readonly property real zoneEdgeSize: Math.max(0.15, Math.min(0.50, pluginMain.dragSnapThreshold || 0.33))
+    readonly property real zoneEdgeSize: Math.max(0.15, Math.min(0.5, pluginMain.dragSnapThreshold || 0.33))
     readonly property real zoneDeadzone: 0.04
     readonly property real directionSwitchConfidenceMargin: 0.12
     readonly property real directionFastCommitConfidence: 0.85
@@ -149,6 +149,11 @@ Item {
     // "idle", "targeting", "lockedDirection"
     property string pendingRetileDirection: ""
     property real pendingRetileConfidence: 0
+    readonly property int floatingDropMaxOffsetSteps: 6
+    readonly property real floatingDropMinStepPx: 28
+    readonly property real floatingOverlapThresholdRatio: 0.32
+    readonly property real floatingDropSnapBasePx: 42
+    readonly property real floatingDropSnapRatio: 0.1
     // Rows that have windows or contain the active workspace slot.
     property var rowsWithContent: {
         if (!pluginMain || !pluginMain.hideEmptyRows)
@@ -400,6 +405,146 @@ Item {
             "y": scaledPosY,
             "w": winW,
             "h": winH
+        };
+    }
+
+    function getMonitorLogicalSize(monitorObj) {
+        if (!monitorObj)
+            return {
+            "width": 1920,
+            "height": 1080
+        };
+
+        var rawWidth = ((monitorObj.width) || 1920) / ((monitorObj.scale) || 1);
+        var rawHeight = ((monitorObj.height) || 1080) / ((monitorObj.scale) || 1);
+        if ((monitorObj.transform || 0) % 2 === 1)
+            return {
+            "width": rawHeight,
+            "height": rawWidth
+        };
+
+        return {
+            "width": rawWidth,
+            "height": rawHeight
+        };
+    }
+
+    function hasFloatingOverlapAt(draggedAddress, workspaceId, monitorId, xPos, yPos, widthPx, heightPx) {
+        var minOverlapX = Math.max(16, Math.min(widthPx, 200) * root.floatingOverlapThresholdRatio);
+        var minOverlapY = Math.max(16, Math.min(heightPx, 200) * root.floatingOverlapThresholdRatio);
+        for (var addr in root.windowByAddress) {
+            if (addr === draggedAddress)
+                continue;
+
+            var win = root.windowByAddress[addr];
+            if (!win || !win.workspace || win.workspace.id !== workspaceId || !win.floating)
+                continue;
+
+            if (((win.monitor) || -1) !== monitorId)
+                continue;
+
+            var winX = ((win.at && win.at[0]) || 0);
+            var winY = ((win.at && win.at[1]) || 0);
+            var winW = ((win.size && win.size[0]) || 1);
+            var winH = ((win.size && win.size[1]) || 1);
+            var overlapX = Math.min(xPos + widthPx, winX + winW) - Math.max(xPos, winX);
+            var overlapY = Math.min(yPos + heightPx, winY + winH) - Math.max(yPos, winY);
+            if (overlapX >= minOverlapX && overlapY >= minOverlapY)
+                return true;
+
+        }
+        return false;
+    }
+
+    function snapToCandidates(value, candidates, minValue, maxValue, thresholdPx) {
+        if (!candidates || candidates.length === 0)
+            return value;
+
+        var bestValue = value;
+        var bestDistance = thresholdPx + 1;
+        for (var i = 0; i < candidates.length; i++) {
+            var candidate = Math.round(root.clamp(candidates[i], minValue, maxValue));
+            var distance = Math.abs(value - candidate);
+            if (distance < bestDistance) {
+                bestDistance = distance;
+                bestValue = candidate;
+            }
+        }
+        if (bestDistance <= thresholdPx)
+            return bestValue;
+
+        return value;
+    }
+
+    function resolveFloatingDropPosition(delegateItem) {
+        if (!delegateItem || !delegateItem.windowData || !delegateItem.windowData.workspace)
+            return null;
+
+        var localX = delegateItem.x - delegateItem.xOffset;
+        var localY = delegateItem.y - delegateItem.yOffset;
+        var inset = delegateItem.workspaceInset || 0;
+        var frameMaxX = Math.max(inset, delegateItem.availableWorkspaceWidth - delegateItem.width - inset);
+        var frameMaxY = Math.max(inset, delegateItem.availableWorkspaceHeight - delegateItem.height - inset);
+        var clampedFrameX = root.clamp(localX, inset, frameMaxX);
+        var clampedFrameY = root.clamp(localY, inset, frameMaxY);
+        var scaleX = Math.max(0.0001, delegateItem.positionScaleX || 1);
+        var scaleY = Math.max(0.0001, delegateItem.positionScaleY || 1);
+        var rawX = ((clampedFrameX - inset) / scaleX) - (delegateItem.centeringX || 0);
+        var rawY = ((clampedFrameY + (delegateItem.externalTitlebarOffset || 0) - inset) / scaleY) - (delegateItem.centeringY || 0);
+        var monitorObj = delegateItem.windowMonitor || null;
+        var logicalSize = root.getMonitorLogicalSize(monitorObj);
+        var monitorX = (monitorObj && monitorObj.x) || 0;
+        var monitorY = (monitorObj && monitorObj.y) || 0;
+        var winW = ((delegateItem.windowData.size && delegateItem.windowData.size[0]) || 1);
+        var winH = ((delegateItem.windowData.size && delegateItem.windowData.size[1]) || 1);
+        var minX = monitorX;
+        var minY = monitorY;
+        var maxX = Math.max(minX, monitorX + logicalSize.width - winW);
+        var maxY = Math.max(minY, monitorY + logicalSize.height - winH);
+        var nextX = Math.round(root.clamp(rawX + monitorX, minX, maxX));
+        var nextY = Math.round(root.clamp(rawY + monitorY, minY, maxY));
+        var wsId = delegateItem.windowData.workspace.id;
+        var monitorId = ((delegateItem.windowData && delegateItem.windowData.monitor) || -1);
+        var snapThreshold = Math.max(root.floatingDropSnapBasePx, Math.round(Math.min(winW, winH) * root.floatingDropSnapRatio));
+        var xCandidates = [minX, maxX];
+        var yCandidates = [minY, maxY];
+        for (var addr in root.windowByAddress) {
+            if (addr === delegateItem.address)
+                continue;
+
+            var otherWin = root.windowByAddress[addr];
+            if (!otherWin || !otherWin.workspace || !otherWin.floating || otherWin.workspace.id !== wsId)
+                continue;
+
+            if (((otherWin.monitor) || -1) !== monitorId)
+                continue;
+
+            var otherX = ((otherWin.at && otherWin.at[0]) || 0);
+            var otherY = ((otherWin.at && otherWin.at[1]) || 0);
+            var otherW = ((otherWin.size && otherWin.size[0]) || 1);
+            var otherH = ((otherWin.size && otherWin.size[1]) || 1);
+            xCandidates.push(otherX);
+            xCandidates.push(otherX + otherW - winW);
+            xCandidates.push(otherX - winW);
+            xCandidates.push(otherX + otherW);
+            yCandidates.push(otherY);
+            yCandidates.push(otherY + otherH - winH);
+            yCandidates.push(otherY - winH);
+            yCandidates.push(otherY + otherH);
+        }
+        nextX = root.snapToCandidates(nextX, xCandidates, minX, maxX, snapThreshold);
+        nextY = root.snapToCandidates(nextY, yCandidates, minY, maxY, snapThreshold);
+        var step = Math.max(root.floatingDropMinStepPx, Math.round(Math.min(winW, winH) * 0.12));
+        for (var i = 0; i < root.floatingDropMaxOffsetSteps; i++) {
+            if (!root.hasFloatingOverlapAt(delegateItem.address, wsId, monitorId, nextX, nextY, winW, winH))
+                break;
+
+            nextX = Math.round(root.clamp(nextX + step, minX, maxX));
+            nextY = Math.round(root.clamp(nextY + step, minY, maxY));
+        }
+        return {
+            "x": nextX,
+            "y": nextY
         };
     }
 
@@ -896,23 +1041,12 @@ Item {
             anchors.margins: 10
             implicitWidth: workspaceColumnLayout.implicitWidth + padding * 2
             implicitHeight: workspaceColumnLayout.implicitHeight + padding * 2
-
             // UI Tightening via native components/properties
             radius: Style.radiusL
             color: Qt.alpha(Color.mSurface, Commons.Settings.data.ui.panelBackgroundOpacity || 0.8)
             border.width: root.containerBorderWidth
             border.color: Color.mOutline
-
             layer.enabled: Commons.Settings.data.general.enableShadows && !PowerProfileService.noctaliaPerformanceMode
-            layer.effect: MultiEffect {
-                shadowEnabled: true
-                blurMax: Style.shadowBlurMax
-                shadowBlur: Style.shadowBlur * 1.5
-                shadowOpacity: Style.shadowOpacity
-                shadowColor: "black"
-                shadowHorizontalOffset: Commons.Settings.data.general.shadowOffsetX || 0
-                shadowVerticalOffset: Commons.Settings.data.general.shadowOffsetY || 4
-            }
 
             // === WORKSPACE GRID ===
             ColumnLayout {
@@ -1206,10 +1340,12 @@ Item {
                         simplifiedContrast: root.simplifiedContrast
                         windowBorderSize: (hyprConfig && hyprConfig.borderSize) || 2
                         activeBorderColor: (hyprConfig && hyprConfig.activeBorderColor) || Color.mPrimary
-                        inactiveBorderColor: (hyprConfig && hyprConfig.inactiveBorderColor) || Qt.rgba(Color.mOutline.r, Color.mOutline.g, Color.mOutline.b, 1.0)
+                        inactiveBorderColor: (hyprConfig && hyprConfig.inactiveBorderColor) || Qt.rgba(Color.mOutline.r, Color.mOutline.g, Color.mOutline.b, 1)
                         isActiveWorkspaceWindow: root.isWindowInActiveWorkspace(windowData)
                         isFocusedWindow: root.isWindowFocused(address, windowData)
                         showWindowIcons: root.pluginMain.showWindowIcons
+                        colorizeWindowIcons: root.pluginMain.colorizeWindowIcons
+                        windowIconPlacement: root.pluginMain.windowIconPlacement
                         showFocusedGlow: root.pluginMain.showFocusedWindowGlow
                         showUrgencyBadge: root.pluginMain.showUrgencyBadge
                         showFloatingBadge: root.pluginMain.showFloatingBadge
@@ -1222,6 +1358,7 @@ Item {
                         previewFixedCornerRadius: root.pluginMain.previewFixedCornerRadius
                         useBorderGradient: root.pluginMain.useBorderGradient
                         showTitleStrip: root.pluginMain.showWindowTitleStrip
+                        titleStripPosition: root.pluginMain.titleStripPosition
                         titleStripHeight: root.pluginMain.titleStripHeight
                         titleStripMode: root.pluginMain.titleStripMode
                         titleStripMeta: root.pluginMain.titleStripMeta
@@ -1230,7 +1367,7 @@ Item {
                         // Position within the grid slot
                         xOffset: (root.workspaceImplicitWidth + root.workspaceSpacing) * workspaceColIndex
                         yOffset: root.getVisualYOffset(workspaceRowIndex)
-                        z: atInitPosition ? (root.windowZ + index) : root.windowDraggingZ
+                        z: windowDelegate.isDragging ? root.windowDraggingZ : (windowDelegate.hovered ? (root.windowDraggingZ - 1) : (atInitPosition ? (root.windowZ + index) : (root.windowDraggingZ - 2)))
                         windowRounding: (hyprConfig && hyprConfig.rounding) || 0
                         Drag.hotSpot.x: targetWindowWidth / 2
                         Drag.hotSpot.y: targetWindowHeight / 2
@@ -1243,7 +1380,7 @@ Item {
                         Timer {
                             id: updateWindowPosition
 
-                            interval: 150
+                            interval: 16
                             repeat: false
                             running: false
                             onTriggered: {
@@ -1251,13 +1388,38 @@ Item {
                                 var rawY = ((windowDelegate.windowData && windowDelegate.windowData.at[1]) || 0) - ((windowDelegate.windowMonitor && windowDelegate.windowMonitor.y) || 0);
                                 var scaledX = (rawX + windowDelegate.centeringX) * windowDelegate.positionScaleX;
                                 var scaledY = (rawY + windowDelegate.centeringY) * windowDelegate.positionScaleY;
+                                windowDelegate.suppressPositionAnimation = true;
                                 windowDelegate.x = Math.round(Math.max(0, Math.min(scaledX, windowDelegate.availableWorkspaceWidth - windowDelegate.width)) + windowDelegate.xOffset);
                                 windowDelegate.y = Math.round(Math.max(0, Math.min(scaledY, windowDelegate.availableWorkspaceHeight - windowDelegate.height)) + windowDelegate.yOffset);
+                                releasePositionAnimation.restart();
+                            }
+                        }
+
+                        Timer {
+                            id: releasePositionAnimation
+
+                            interval: 0
+                            repeat: false
+                            running: false
+                            onTriggered: {
+                                windowDelegate.suppressPositionAnimation = false;
+                            }
+                        }
+
+                        Timer {
+                            id: floatingReconcileRefresh
+
+                            interval: 120
+                            repeat: false
+                            running: false
+                            onTriggered: {
+                                if (pluginMain && pluginMain.refreshWindows)
+                                    pluginMain.refreshWindows();
+
                             }
                         }
 
                         MouseArea {
-                            // Throttle to ~60fps
                             // Skip no-op previews/commits to avoid misleading split hints.
 
                             id: dragArea
@@ -1272,6 +1434,8 @@ Item {
                             onExited: windowDelegate.hovered = false
                             acceptedButtons: Qt.LeftButton | Qt.MiddleButton
                             drag.target: parent
+                            drag.threshold: 0
+                            drag.smoothed: false
                             onPressed: (mouse) => {
                                 root.draggingFromWorkspace = ((windowDelegate.windowData && windowDelegate.windowData.workspace && windowDelegate.windowData.workspace.id) || -1);
                                 root.draggingTargetAddress = (windowDelegate.windowData && windowDelegate.windowData.address) || "";
@@ -1291,12 +1455,9 @@ Item {
                                     return ;
 
                                 var currentTime = Date.now();
-                                var deltaTime = currentTime - lastUpdateTime;
-                                if (deltaTime < 16)
-                                    return ;
-
+                                var deltaTime = Math.max(1, currentTime - lastUpdateTime);
                                 var deltaX = parent.x - previousX;
-                                var velocity = deltaX / (deltaTime / 16); // Normalize to per-frame
+                                var velocity = deltaX / (deltaTime / 16);
                                 windowDelegate.dragVelocity = velocity;
                                 windowDelegate.dragTilt = Math.min(Math.max(velocity * 1.5, -3), 3);
                                 previousX = parent.x;
@@ -1351,8 +1512,21 @@ Item {
                                         pluginMain.refreshWindows();
 
                                 } else if (isFloating) {
-                                    windowDelegate.x = windowDelegate.initX;
-                                    windowDelegate.y = windowDelegate.initY;
+                                    var dropPos = root.resolveFloatingDropPosition(windowDelegate);
+                                    if (dropPos && windowAddress !== "") {
+                                        if (pluginMain && pluginMain.applyOptimisticWindowMove)
+                                            pluginMain.applyOptimisticWindowMove(windowAddress, dropPos.x, dropPos.y, currentWsId);
+
+                                        root.runHyprBatch(["movewindowpixel exact " + dropPos.x + " " + dropPos.y + ",address:" + windowAddress]);
+                                        updateWindowPosition.restart();
+                                        if (pluginMain && pluginMain.refreshWindows) {
+                                            pluginMain.refreshWindows();
+                                            floatingReconcileRefresh.restart();
+                                        }
+                                    } else {
+                                        windowDelegate.x = windowDelegate.initX;
+                                        windowDelegate.y = windowDelegate.initY;
+                                    }
                                 } else {
                                     windowDelegate.x = windowDelegate.initX;
                                     windowDelegate.y = windowDelegate.initY;
@@ -1380,15 +1554,14 @@ Item {
                                     var address = windowDelegate.windowData.address;
                                     var wsId = (windowDelegate.windowData.workspace && windowDelegate.windowData.workspace.id) || -1;
                                     var wsName = (windowDelegate.windowData.workspace && windowDelegate.windowData.workspace.name) || "";
-                                    
                                     Logger.i("WorkspaceOverview", "Clicked window " + address + ", dispatching close then focus.");
-                                    if (pluginMain) pluginMain.close();
-                                    
-                                    if (wsName.startsWith("special:")) {
+                                    if (pluginMain)
+                                        pluginMain.close();
+
+                                    if (wsName.startsWith("special:"))
                                         Hyprland.dispatch("togglespecialworkspace " + wsName.substring(8));
-                                    } else if (wsId >= 0) {
+                                    else if (wsId >= 0)
                                         Hyprland.dispatch("workspace " + wsId);
-                                    }
                                     Hyprland.dispatch("focuswindow address:" + address);
                                     event.accepted = true;
                                 } else if (event.button === Qt.MiddleButton) {
@@ -1396,31 +1569,6 @@ Item {
                                     event.accepted = true;
                                 }
                             }
-
-                            // Tooltip
-                            Rectangle {
-                                id: windowTooltip
-
-                                visible: dragArea.containsMouse && !windowDelegate.Drag.active
-                                x: (parent.width - width) / 2
-                                y: parent.height + 4
-                                z: 99999
-                                width: tooltipText.implicitWidth + 12
-                                height: tooltipText.implicitHeight + 8
-                                radius: Style.radiusS
-                                color: Color.mOnSurface
-
-                                NText {
-                                    id: tooltipText
-
-                                    anchors.centerIn: parent
-                                    text: ((windowDelegate.windowData && windowDelegate.windowData.title) || (pluginMain.pluginApi && pluginMain.pluginApi.tr("overview.tooltip.unknown") || "Unknown")) + "\n[" + ((windowDelegate.windowData && windowDelegate.windowData.class) || (pluginMain.pluginApi && pluginMain.pluginApi.tr("overview.tooltip.unknown-class") || "unknown")) + "]" + (windowDelegate.windowData && windowDelegate.windowData.xwayland ? (" [" + (pluginMain.pluginApi && pluginMain.pluginApi.tr("overview.tooltip.xwayland") || "XWayland") + "]") : "")
-                                    color: Color.mSurface
-                                    pointSize: 11
-                                }
-
-                            }
-
                         }
 
                     }
@@ -1497,6 +1645,16 @@ Item {
 
                 }
 
+            }
+
+            layer.effect: MultiEffect {
+                shadowEnabled: true
+                blurMax: Style.shadowBlurMax
+                shadowBlur: Style.shadowBlur * 1.5
+                shadowOpacity: Style.shadowOpacity
+                shadowColor: "black"
+                shadowHorizontalOffset: Commons.Settings.data.general.shadowOffsetX || 0
+                shadowVerticalOffset: Commons.Settings.data.general.shadowOffsetY || 4
             }
 
         }
