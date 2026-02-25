@@ -4,13 +4,13 @@
     {
       "id": "homeassistant",
       "name": "Home Assistant",
-      "version": "0.1.4",
+      "version": "0.1.5",
       "author": "habibe",
       "description": "Control Home Assistant media players from your bar.",
       "repository": "https://github.com/anthonyhab/noctalia-plugins/",
       "minNoctaliaVersion": "3.6.0",
       "license": "MIT",
-      "lastUpdated": "2026-02-10T12:00:00Z"
+      "lastUpdated": "2026-02-25T12:00:00Z"
     },
     {
       "id": "omarchy",

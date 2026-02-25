@@ -11,6 +11,7 @@ import qs.Widgets
 
 Item {
   id: root
+
   property var pluginApi: null
   property ShellScreen screen
   property string widgetId: ""
@@ -18,6 +19,7 @@ Item {
   property int sectionWidgetIndex: -1
   property int sectionWidgetsCount: 0
   property real scaling: 1.0
+
   readonly property string barPosition: Settings.data.bar.position
   readonly property bool isBarVertical: barPosition === "left" || barPosition === "right"
   readonly property var pluginMain: pluginApi?.mainInstance
@@ -29,7 +31,7 @@ Item {
 
   onIsConnectedChanged: {
     if (isConnected)
-      hasEverConnected = true;
+      hasEverConnected = true
   }
 
   readonly property string mediaTitle: pluginMain?.mediaTitle || ""
@@ -38,68 +40,98 @@ Item {
 
   readonly property string labelText: {
     if (!isConnected)
-      return pluginApi?.tr("title") || "Home Assistant";
+      return pluginApi?.tr("title") || "Home Assistant"
     if (mediaTitle)
-      return mediaTitle;
-    return friendlyName || (pluginApi?.tr("title") || "Home Assistant");
+      return mediaTitle
+    return friendlyName || (pluginApi?.tr("title") || "Home Assistant")
   }
 
   readonly property string pillText: isBarVertical ? "" : labelText
 
   readonly property string iconName: {
     if (isConnecting)
-      return "home-search";
+      return "home-search"
     if (!isConnected)
-      return "home-off";
+      return "home-off"
     if (isPlaying)
-      return "player-play";
+      return "player-play"
     if (isPaused)
-      return "player-pause";
-    return "home";
+      return "player-pause"
+    return "home"
   }
 
   readonly property string tooltipText: {
     if (isConnecting)
-      return pluginApi?.tr("status.connecting") || "Connecting...";
+      return pluginApi?.tr("status.connecting") || "Connecting..."
     if (!isConnected)
-      return pluginApi?.tr("tooltips.disconnected") || "Home Assistant (disconnected)\nClick to configure";
+      return pluginApi?.tr("tooltips.disconnected") || "Home Assistant (disconnected)\nClick to configure"
     if (isPlaying && mediaTitle) {
-      let tooltip = mediaTitle;
+      let tooltip = mediaTitle
       if (mediaArtist)
-        tooltip += "\n" + mediaArtist;
-      tooltip += "\n" + (pluginApi?.tr("tooltips.click-hint") || "Click to control");
-      return tooltip;
+        tooltip += "\n" + mediaArtist
+      tooltip += "\n" + (pluginApi?.tr("tooltips.click-hint") || "Click to control")
+      return tooltip
     }
     return pluginApi?.tr("tooltips.connected", {
                            count: pluginMain?.mediaPlayers?.length || 0
-                         }) || "Home Assistant\n" + (pluginMain?.mediaPlayers?.length || 0) + " devices available";
+                         }) || "Home Assistant\n" + (pluginMain?.mediaPlayers?.length || 0) + " devices available"
   }
 
   readonly property var defaultSettings: pluginApi?.manifest?.metadata?.defaultSettings || ({})
   readonly property string scrollingMode: pluginApi?.pluginSettings?.barWidgetScrollingMode || defaultSettings.barWidgetScrollingMode || "hover"
+  readonly property int barWidgetMaxWidth: pluginApi?.pluginSettings?.barWidgetMaxWidth ?? defaultSettings.barWidgetMaxWidth ?? 200
+  readonly property bool barWidgetUseFixedWidth: pluginApi?.pluginSettings?.barWidgetUseFixedWidth ?? defaultSettings.barWidgetUseFixedWidth ?? false
 
-  readonly property bool forceOpen: !isBarVertical && scrollingMode === "always" && pillText !== ""
-  readonly property bool forceClose: isBarVertical || scrollingMode === "never" || pillText === ""
+  readonly property real capsuleHeight: Style.getCapsuleHeightForScreen(screen?.name)
+  readonly property real barHeight: Style.getBarHeightForScreen(screen?.name)
+  readonly property real barFontSize: Style.getBarFontSizeForScreen(screen?.name)
+  readonly property int iconSize: Style.toOdd(capsuleHeight * 0.7)
+  readonly property int verticalSize: Style.toOdd(capsuleHeight * 0.85)
 
-  readonly property color customBgColor: {
-    if (!isConnected && hasEverConnected)
-      return Color.mSurfaceVariant;
-    return Qt.rgba(0, 0, 0, 0);
+  function calculateContentWidth() {
+    var contentWidth = 0
+    var margins = isBarVertical ? 0 : Style.margin2S
+
+    contentWidth += iconSize
+    contentWidth += Style.marginS
+
+    if (!isBarVertical && pillText !== "") {
+      contentWidth += titleContainer.measuredWidth
+      contentWidth += Style.margin2XXS
+    }
+
+    contentWidth += margins
+    return Math.ceil(contentWidth)
   }
 
-  readonly property color customFgColor: {
-    if (!isConnected && hasEverConnected)
-      return Color.mOnSurface;
-    return Qt.rgba(0, 0, 0, 0);
+  readonly property real dynamicWidth: {
+    if (barWidgetUseFixedWidth) {
+      return barWidgetMaxWidth
+    }
+    return Math.min(calculateContentWidth(), barWidgetMaxWidth)
   }
 
-  implicitWidth: pill.width
-  implicitHeight: pill.height
+  implicitWidth: isBarVertical ? verticalSize : dynamicWidth
+  implicitHeight: isBarVertical ? verticalSize : barHeight
+
+  Behavior on implicitWidth {
+    NumberAnimation {
+      duration: Style.animationNormal
+      easing.type: Easing.InOutCubic
+    }
+  }
+
+  Behavior on implicitHeight {
+    NumberAnimation {
+      duration: Style.animationNormal
+      easing.type: Easing.InOutCubic
+    }
+  }
 
   function popupWindow() {
     if (!screen)
-      return null;
-    return PanelService.getPopupMenuWindow(screen);
+      return null
+    return PanelService.getPopupMenuWindow(screen)
   }
 
   NPopupContextMenu {
@@ -137,58 +169,182 @@ Item {
     ]
 
     onTriggered: action => {
-                   PanelService.closeContextMenu(screen);
+                   PanelService.closeContextMenu(screen)
                    if (action === "play-pause") {
-                     pluginMain?.mediaPlayPause();
+                     pluginMain?.mediaPlayPause()
                    } else if (action === "next") {
-                     pluginMain?.mediaNext();
+                     pluginMain?.mediaNext()
                    } else if (action === "previous") {
-                     pluginMain?.mediaPrevious();
+                     pluginMain?.mediaPrevious()
                    } else if (action === "refresh") {
-                     pluginMain?.refresh();
+                     pluginMain?.refresh()
                    } else if (action === "settings") {
-                     openPluginSettings();
+                     openPluginSettings()
                    }
                  }
   }
 
-  BarPill {
-    id: pill
-    screen: root.screen
-    oppositeDirection: BarService.getPillDirection(root)
-    icon: iconName
-    text: pillText
-    tooltipText: root.tooltipText
-    autoHide: false
-    forceOpen: root.forceOpen
-    forceClose: root.forceClose
-    customBackgroundColor: customBgColor
-    customTextIconColor: customFgColor
+  Rectangle {
+    id: container
 
-    onClicked: {
-      pluginApi?.togglePanel(root.screen, pill);
+    x: isBarVertical ? Style.pixelAlignCenter(parent.width, width) : 0
+    y: isBarVertical ? 0 : Style.pixelAlignCenter(parent.height, height)
+    width: isBarVertical ? verticalSize : dynamicWidth
+    height: isBarVertical ? verticalSize : capsuleHeight
+    radius: Style.radiusM
+
+    color: {
+      if (!isConnected && hasEverConnected)
+        return Color.mSurfaceVariant
+      return Style.capsuleColor
     }
-    onRightClicked: {
-      PanelService.showContextMenu(contextMenu, pill, screen);
+
+    border.color: Style.capsuleBorderColor
+    border.width: Style.capsuleBorderWidth
+
+    Behavior on width {
+      NumberAnimation {
+        duration: Style.animationNormal
+        easing.type: Easing.InOutCubic
+      }
     }
-    onMiddleClicked: {
-      pluginMain?.mediaPlayPause();
+
+    Item {
+      id: mainContainer
+
+      anchors.fill: parent
+      anchors.leftMargin: isBarVertical ? 0 : Style.marginS
+      anchors.rightMargin: isBarVertical ? 0 : Style.marginS
+
+      RowLayout {
+        id: rowLayout
+
+        height: iconSize
+        y: Style.pixelAlignCenter(parent.height, height)
+        spacing: Style.marginS
+        visible: !isBarVertical
+
+        Item {
+          Layout.preferredWidth: iconSize
+          Layout.preferredHeight: iconSize
+          Layout.alignment: Qt.AlignVCenter
+
+          NIcon {
+            anchors.centerIn: parent
+            icon: iconName
+            pointSize: iconSize * 0.5
+            color: {
+              if (!isConnected && hasEverConnected)
+                return Color.mOnSurface
+              return Color.mOnSurface
+            }
+          }
+        }
+
+        NScrollText {
+          id: titleContainer
+
+          text: pillText
+          Layout.alignment: Qt.AlignVCenter
+          maxWidth: {
+            var iconWidth = iconSize + Style.marginS
+            var margins = Style.margin2XXS
+            var available = mainContainer.width - iconWidth - margins
+            return Math.max(20, available)
+          }
+          scrollMode: {
+            var mode = NScrollText.ScrollMode.Never
+            if (scrollingMode === "always")
+              mode = NScrollText.ScrollMode.Always
+            else if (scrollingMode === "hover")
+              mode = NScrollText.ScrollMode.Hover
+            return mode
+          }
+          forcedHover: mainMouseArea.containsMouse
+          gradientColor: container.color
+          gradientWidth: Math.round(8 * Style.uiScaleRatio)
+          cornerRadius: Style.radiusM
+          cursorShape: Qt.PointingHandCursor
+          visible: pillText !== ""
+
+          NText {
+            text: pillText
+            color: {
+              if (!isConnected && hasEverConnected)
+                return Color.mOnSurface
+              return Color.mOnSurface
+            }
+            pointSize: barFontSize
+            applyUiScale: false
+          }
+        }
+      }
+
+      Item {
+        id: verticalLayout
+
+        width: parent.width - Style.margin2M
+        height: parent.height - Style.margin2M
+        x: Style.pixelAlignCenter(parent.width, width)
+        y: Style.pixelAlignCenter(parent.height, height)
+        visible: isBarVertical
+
+        NIcon {
+          anchors.centerIn: parent
+          icon: iconName
+          pointSize: iconSize * 0.5
+          color: Color.mOnSurface
+        }
+      }
     }
-    onWheel: delta => {
+  }
+
+  MouseArea {
+    id: mainMouseArea
+
+    anchors.fill: parent
+    anchors.leftMargin: (!isBarVertical && section === "left" && sectionWidgetIndex === 0) ? -Style.marginS : 0
+    anchors.rightMargin: (!isBarVertical && section === "right" && sectionWidgetIndex === sectionWidgetsCount - 1) ? -Style.marginS : 0
+    anchors.topMargin: (isBarVertical && section === "left" && sectionWidgetIndex === 0) ? -Style.marginM : 0
+    anchors.bottomMargin: (isBarVertical && section === "right" && sectionWidgetIndex === sectionWidgetsCount - 1) ? -Style.marginM : 0
+
+    hoverEnabled: true
+    cursorShape: Qt.PointingHandCursor
+    acceptedButtons: Qt.LeftButton | Qt.RightButton | Qt.MiddleButton
+
+    onEntered: {
+      if (isBarVertical || scrollingMode === "never") {
+        TooltipService.show(root, tooltipText, BarService.getTooltipDirection(screen?.name))
+      }
+    }
+    onExited: {
+      TooltipService.hide()
+    }
+    onClicked: mouse => {
+                 TooltipService.hide()
+                 if (mouse.button === Qt.LeftButton) {
+                   pluginApi?.togglePanel(root.screen, container)
+                 } else if (mouse.button === Qt.RightButton) {
+                   PanelService.showContextMenu(contextMenu, container, screen)
+                 } else if (mouse.button === Qt.MiddleButton) {
+                   pluginMain?.mediaPlayPause()
+                 }
+               }
+    onWheel: wheel => {
                if (!isConnected)
-               return;
-               if (delta > 0) {
-                 pluginMain?.volumeUp();
+                 return
+               if (wheel.angleDelta.y > 0) {
+                 pluginMain?.volumeUp()
                } else {
-                 pluginMain?.volumeDown();
+                 pluginMain?.volumeDown()
                }
              }
   }
 
   function openPluginSettings() {
     if (!pluginApi || !root.screen)
-      return;
-    PanelService.closeContextMenu(screen);
-    BarService.openPluginSettings(root.screen, pluginApi.manifest);
+      return
+    PanelService.closeContextMenu(screen)
+    BarService.openPluginSettings(root.screen, pluginApi.manifest)
   }
 }
