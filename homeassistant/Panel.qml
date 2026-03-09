@@ -47,8 +47,8 @@ Item {
       localVolumeLevel = volumeLevel;
   }
   Component.onCompleted: {
-    pluginMain?.refresh();
-    Qt.callLater(updateCalculatedPosition);
+    pluginMain?.refreshIfStale(4000)
+    Qt.callLater(updateCalculatedPosition)
   }
   property real calculatedPosition: mediaPosition
 

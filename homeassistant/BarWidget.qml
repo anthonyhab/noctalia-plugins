@@ -333,11 +333,8 @@ Item {
     onWheel: wheel => {
                if (!isConnected)
                  return
-               if (wheel.angleDelta.y > 0) {
-                 pluginMain?.volumeUp()
-               } else {
-                 pluginMain?.volumeDown()
-               }
+               const step = pluginMain?.wheelVolumeStep || 0.05
+               pluginMain?.queueVolumeStep(wheel.angleDelta.y > 0 ? step : -step)
              }
   }
 
