@@ -2,7 +2,7 @@
 
 # BB Auth
 
-Use Noctalia as your Polkit authentication agent. When an app requests elevated privileges, a Noctalia panel opens for password entry.
+Use Noctalia as your Polkit authentication agent. BB Auth handles password prompts, keyring unlock, and GPG pinentry requests, with fallback UI when the shell is unavailable.
 
 ## Availability
 
@@ -11,6 +11,11 @@ Install and update through the Noctalia plugin directory:
 1. Open `Settings -> Plugins -> Sources`
 2. Click `Add custom repository`
 3. Add `https://github.com/anthonyhab/noctalia-plugins/`
+
+## Requirements
+
+- [bb-auth](https://github.com/anthonyhab/bb-auth) installed and running as a user service
+- A compositor rule for the authentication window if you want centered floating behavior
 
 ## Setup
 

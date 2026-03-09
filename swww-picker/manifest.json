@@ -6,7 +6,7 @@
   "author": "habibe",
   "license": "MIT",
   "repository": "https://github.com/anthonyhab/noctalia-plugins",
-  "description": "Cycle wallpapers using swww with manual and automatic controls.",
+  "description": "Wallpaper management with swww — manual cycling, auto-rotation, shuffle, and transition effects.",
   "tags": ["Bar", "Desktop", "System"],
   "entryPoints": {
     "main": "Main.qml",

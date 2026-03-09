@@ -6,7 +6,7 @@
   "author": "habibe",
   "license": "MIT",
   "repository": "https://github.com/anthonyhab/noctalia-plugins",
-  "description": "Sync Noctalia colors from Omarchy themes.",
+  "description": "Automatic color scheme sync from Omarchy themes using CIELAB-optimized palettes.",
   "tags": ["Bar", "System"],
   "entryPoints": {
     "main": "Main.qml",

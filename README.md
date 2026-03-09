@@ -1,22 +1,24 @@
-# bb's plugins
+# Noctalia Plugins
 
-A personal collection of plugins and tooling for [Noctalia Shell](https://github.com/noctalia-dev/noctalia-shell).
+Curated plugins for [Noctalia Shell](https://github.com/noctalia-dev/noctalia-shell) on Hyprland and Wayland. Built and maintained by habibe.
 
-## Installation
+This repo focuses on stable, installable plugins with polished bar widgets, panels, and shell integrations.
 
-Plugins are installed through the Noctalia plugin UI:
+## Install
+
+Add this repo in the Noctalia plugin UI:
 
 1. Open `Settings -> Plugins -> Sources`
 2. Click `Add custom repository`
-3. Add: `https://github.com/anthonyhab/noctalia-plugins/`
+3. Add `https://github.com/anthonyhab/noctalia-plugins/`
 
-## Repo contents
+## Stable Plugins
 
 ### BB Auth
 
 [![BB Auth](bb-auth/preview.png)](bb-auth/README.md)
 
-[BB Auth](bb-auth/README.md) — Use Noctalia as your Polkit + keyring authentication agent. Supports authentication requests from apps, keyring unlock, and GPG pinentry with automatic fallback UI when the shell UI  is unavailable. Requires [bb-auth](https://github.com/anthonyhab/bb-auth).
+[BB Auth](bb-auth/README.md) turns Noctalia into a Polkit authentication agent with keyring unlock, GPG pinentry support, and automatic fallback UI when the shell is unavailable. Requires the companion [bb-auth](https://github.com/anthonyhab/bb-auth) daemon.
 
 ---
 
@@ -24,15 +26,15 @@ Plugins are installed through the Noctalia plugin UI:
 
 [![Home Assistant](homeassistant/preview.png)](homeassistant/README.md)
 
-[Home Assistant](homeassistant/README.md) — Control Home Assistant media players from Noctalia Shell.
+[Home Assistant](homeassistant/README.md) adds Home Assistant media controls to Noctalia with a compact bar widget, a richer panel UI, seek and volume controls, and optional default-player selection.
 
 ---
 
-### Omarchy Theme Sync
+### Omarchy Integration
 
 [![Omarchy](omarchy/preview.png)](omarchy/README.md)
 
-[Omarchy Integration](omarchy/README.md) — Synchronize Noctalia Color Scheme with Omarchy themes.
+[Omarchy Integration](omarchy/README.md) syncs Noctalia colors from Omarchy themes and ships precomputed CIELAB-tuned palettes for fast, consistent theme changes.
 
 ---
 
@@ -40,7 +42,7 @@ Plugins are installed through the Noctalia plugin UI:
 
 [![SWWW Wallpaper Picker](swww-picker/preview.png)](swww-picker/README.md)
 
-[SWWW Wallpaper Picker](swww-picker/README.md) — Wallpaper management using `swww`.
+[SWWW Wallpaper Picker](swww-picker/README.md) manages wallpapers through `swww` with next/previous/random actions, auto-rotation, shuffle, history, and configurable transitions.
 
 ---
 
@@ -48,15 +50,12 @@ Plugins are installed through the Noctalia plugin UI:
 
 [![Workspace Overview](workspace-overview/preview.png)](workspace-overview/README.md)
 
-[Workspace Overview](workspace-overview/README.md) — Visual workspace overview with live window previews, drag-and-drop, and keyboard navigation for Hyprland. Supports special/scratchpad workspaces.
+[Workspace Overview](workspace-overview/README.md) gives Hyprland a live workspace overview with previews, drag-and-drop window moves, keyboard navigation, and an optional Noctalia bar widget. Adapted from [quickshell-overview](https://github.com/Shanu-Kumawat/quickshell-overview) by [Shanu-Kumawat](https://github.com/Shanu-Kumawat).
 
-Forked from [quickshell-overview](https://github.com/Shanu-Kumawat/quickshell-overview) by [Shanu-Kumawat](https://github.com/Shanu-Kumawat).
+## Utilities
 
+- [Waybar to Noctalia Converter](waybar-converter/README.md) converts Waybar custom modules into Noctalia widget configs or starter plugin scaffolds.
 
-## Validation
+## License
 
-Run repository checks before committing:
-
-```bash
-./scripts/validate-plugins.sh
-```
+MIT

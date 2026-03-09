@@ -6,7 +6,7 @@
   "author": "habibe",
   "license": "MIT",
   "repository": "https://github.com/anthonyhab/noctalia-plugins",
-  "description": "Polkit and GPG authentication agent for Noctalia.",
+  "description": "Polkit authentication agent with keyring unlock and GPG pinentry support.",
   "tags": [
     "Panel",
     "System",

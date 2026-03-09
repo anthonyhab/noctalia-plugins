@@ -2,7 +2,7 @@
 
 # SWWW Wallpaper Picker
 
-Wallpaper management plugin for Noctalia Shell using `swww`.
+Wallpaper management for Noctalia using `swww`, with quick controls in both the bar and panel.
 
 ## Features
 
@@ -25,7 +25,7 @@ Install and update through the Noctalia plugin directory:
 2. Click `Add custom repository`
 3. Add `https://github.com/anthonyhab/noctalia-plugins/`
 
-## Configuration
+## Quick Start
 
 Open **Settings -> Plugins -> SWWW Wallpaper Picker** and configure:
 
@@ -36,6 +36,16 @@ Open **Settings -> Plugins -> SWWW Wallpaper Picker** and configure:
 - Bar widget label visibility
 
 Default wallpaper directory is `~/Pictures/Wallpapers`.
+
+## Configuration
+
+The plugin supports:
+
+- Manual next, previous, and random actions
+- Auto-cycle with interval control
+- Transition tuning for type, duration, FPS, and step
+- Shuffle mode and history-aware browsing
+- Optional wallpaper name display in the bar
 
 ## Troubleshooting
 

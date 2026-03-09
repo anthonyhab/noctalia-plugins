@@ -1,8 +1,8 @@
 ![Omarchy](preview.png)
 
-# Omarchy Color Conversion
+# Omarchy Integration
 
-Fast color scheme conversion for QuickShell/Noctalia with CIELAB-optimized colors.
+Sync Noctalia colors from Omarchy themes with fast precomputed palettes and a runtime fallback when the cache is missing or stale.
 
 ## Availability
 
@@ -11,6 +11,20 @@ Install and update through the Noctalia plugin directory:
 1. Open `Settings -> Plugins -> Sources`
 2. Click `Add custom repository`
 3. Add `https://github.com/anthonyhab/noctalia-plugins/`
+
+## What It Does
+
+- Syncs Noctalia theme colors from Omarchy themes
+- Prefers precomputed palettes for instant theme switches
+- Falls back to live conversion when the cache is stale or missing
+- Exposes theme controls through Noctalia settings, panel, and optional bar widget
+
+## Quick Start
+
+1. Install the plugin from the custom repository source.
+2. Open **Noctalia Settings -> Plugins -> Omarchy Integration**.
+3. Enable the plugin and confirm your Omarchy config path if you do not use the default location.
+4. Optionally add the bar widget if you want quick theme access in the shell.
 
 ## Architecture
 
@@ -35,7 +49,7 @@ All cached themes use **CIELAB color space** for:
 
 **Runtime** prefers pre-computed schemes and only falls back to live conversion if the cache is missing or stale.
 
-## Workflow
+## Development Workflow
 
 ### Using Themes at Runtime (QuickShell)
 ```javascript

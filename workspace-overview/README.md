@@ -2,7 +2,7 @@
 
 # Workspace Overview
 
-A visual workspace overview plugin for **Noctalia Shell + Hyprland**, ported from [quickshell-overview](https://github.com/Shanu-Kumawat/quickshell-overview) by [Shanu-Kumawat](https://github.com/Shanu-Kumawat) (originally extracted from [illogical-impulse](https://github.com/end-4/dots-hyprland) by end-4).
+A visual workspace overview for **Noctalia Shell + Hyprland**, adapted from [quickshell-overview](https://github.com/Shanu-Kumawat/quickshell-overview) by [Shanu-Kumawat](https://github.com/Shanu-Kumawat) (originally extracted from [illogical-impulse](https://github.com/end-4/dots-hyprland) by end-4).
 
 This plugin brings the full quickshell-overview experience into Noctalia Shell as a first-class plugin, with native theming, settings integration, and an optional bar widget.
 
@@ -24,13 +24,35 @@ This plugin brings the full quickshell-overview experience into Noctalia Shell a
 
 - [Hyprland](https://hyprland.org/) compositor
 - [Quickshell](https://quickshell.outfoxxed.me/) with Wayland & Hyprland modules
-- [Noctalia Shell](https://github.com/anthropics/noctalia-shell)
+- [Noctalia Shell](https://github.com/noctalia-dev/noctalia-shell)
 
-## Setup
+## Availability
 
-### 1. Install the plugin
+Install and update through the Noctalia plugin directory:
 
-Copy or symlink the `workspace-overview` folder into your Noctalia plugins directory:
+1. Open `Settings -> Plugins -> Sources`
+2. Click `Add custom repository`
+3. Add `https://github.com/anthonyhab/noctalia-plugins/`
+
+## Quick Start
+
+1. Install the plugin from the custom repository source.
+2. Add a toggle keybind to your Hyprland config.
+3. Optionally add the `workspace-overview` bar widget in Noctalia.
+
+## Hyprland Keybind
+
+Add a toggle keybind to your Hyprland config (`~/.config/hypr/hyprland.conf`):
+
+```conf
+bind = SUPER, TAB, exec, qs ipc call plugin:workspace-overview toggle
+# Optional: Mouse bind (middle click)
+bind = SUPER, mouse:274, exec, qs ipc call plugin:workspace-overview toggle
+```
+
+## Development Install
+
+Copy or symlink the `workspace-overview` folder into your Noctalia plugins directory if you want to run it directly from a checkout:
 
 ```bash
 # Symlink (for development)
@@ -40,23 +62,11 @@ ln -s /path/to/workspace-overview ~/.config/noctalia/plugins/workspace-overview
 cp -r workspace-overview ~/.config/noctalia/plugins/
 ```
 
-### 2. Add a keybind
-
-Add a toggle keybind to your Hyprland config (`~/.config/hypr/hyprland.conf`):
-
-```
-bind = Super, TAB, exec, qs ipc call plugin:workspace-overview toggle
-# Optional: Mouse bind (middle click)
-bind = SUPER, mouse:274, exec, qs ipc call plugin:workspace-overview toggle
-```
-
-### 3. Reload
+Reload Hyprland after changing keybinds:
 
 ```bash
 hyprctl reload
 ```
-
-The overview should now appear when you press **Super+Tab**.
 
 ## Usage
 
