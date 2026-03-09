@@ -30,10 +30,36 @@ find_running_instances() {
       continue
     fi
     
-    # Get the working directory (where shell.qml should be)
-    local cwd=$(readlink "/proc/$pid/cwd" 2>/dev/null || true)
+    # Get the process's actual working directory
+    local proc_cwd=$(readlink "/proc/$pid/cwd" 2>/dev/null || true)
+    
+    # Get the shell path from cmdline (--path) or fall back to cwd
+    local cwd=""
+    if [ -r "/proc/$pid/cmdline" ]; then
+      local cmdline=$(tr '\0' ' ' < "/proc/$pid/cmdline" 2>/dev/null || true)
+      
+      # Parse --path argument (handles both --path /dir and --path=/dir)
+      if echo "$cmdline" | grep -qE -- '--path(=| )'; then
+        cwd=$(echo "$cmdline" | sed -E 's/.*--path[= ]+([^ ]+).*/\1/')
+      elif echo "$cmdline" | grep -qE -- '-p(=| )'; then
+        cwd=$(echo "$cmdline" | sed -E 's/.*-p[= ]+([^ ]+).*/\1/')
+      fi
+    fi
+    
+    # Resolve relative paths against process cwd, or fall back to proc_cwd
+    if [ -n "$cwd" ]; then
+      if [[ "$cwd" != /* ]]; then
+        cwd="$proc_cwd/$cwd"
+      fi
+    else
+      cwd="$proc_cwd"
+    fi
+    
+    # Normalize path (resolve . and ..)
+    cwd=$(cd "$cwd" 2>/dev/null && pwd || echo "$cwd")
+    
     if [ -z "$cwd" ]; then
-      log_debug "Cannot read cwd for PID $pid, skipping"
+      log_debug "Cannot determine shell directory for PID $pid, skipping"
       continue
     fi
     
@@ -131,6 +157,16 @@ main() {
   
   log_debug "Using instance: PID=$pid, CWD=$cwd, EXE=$exe"
   log_debug "Executing: ipc ${*:2}"
+  
+  # Ensure XDG_RUNTIME_DIR is set (required by quickshell)
+  if [ -z "$XDG_RUNTIME_DIR" ] && [ -r "/proc/$pid/status" ]; then
+    local uid=$(grep '^Uid:' "/proc/$pid/status" | awk '{print $2}')
+    if [ -n "$uid" ]; then
+      XDG_RUNTIME_DIR="/run/user/$uid"
+      export XDG_RUNTIME_DIR
+      log_debug "XDG_RUNTIME_DIR was unset, set to: $XDG_RUNTIME_DIR"
+    fi
+  fi
   
   # Execute the IPC command
   exec "$exe" --path "$cwd" ipc "${@:2}"
