@@ -1,5 +1,8 @@
 import "."
 import "../helpers"
+import "../helpers/LayoutStrategy.js" as LayoutStrategy
+import "../helpers/WorkspaceDragMapping.js" as WorkspaceDragMapping
+import "../helpers/WorkspaceGeometry.js" as WorkspaceGeometry
 import QtQuick
 import QtQuick.Effects
 import QtQuick.Layouts
@@ -125,6 +128,17 @@ Item {
     property int windowZ: 1
     property int windowDraggingZ: 99999
     property real workspaceSpacing: (hyprConfig && hyprConfig.gapsWorkspaces || 0) + (pluginMain.gridSpacing || 0)
+    readonly property real workspaceCellRadius: {
+        var screenScaledRadius = Style.screenRadius * root.cellScale;
+        var containerRadius = Style.radiusL;
+        // Snap tiny/fractional radii down to 0 so "square" settings stay visually crisp.
+        var combinedRadius = Math.min(screenScaledRadius, containerRadius);
+        var snappedRadius = Math.floor(combinedRadius);
+        if (containerRadius <= 0 || screenScaledRadius < 1 || snappedRadius <= 1)
+            return 0;
+
+        return snappedRadius;
+    }
     // Drag state
     property int draggingFromWorkspace: -1
     property int draggingTargetWorkspace: -1
@@ -154,6 +168,34 @@ Item {
     readonly property real floatingOverlapThresholdRatio: 0.32
     readonly property real floatingDropSnapBasePx: 42
     readonly property real floatingDropSnapRatio: 0.1
+    // === LAYOUT DATA (0.54+) ===
+    // Map of workspaceId → layout name ("dwindle", "master", "scroll", "monocle")
+    readonly property var workspaceLayouts: (pluginMain && pluginMain.workspaceLayouts) || ({})
+
+    function getWorkspaceLayout(wsId) {
+        return root.workspaceLayouts[wsId] || "dwindle";
+    }
+
+    // Scroll layout: sorted window order per workspace (delegated to LayoutStrategy).
+    readonly property var scrollWindowOrder: LayoutStrategy.get("scroll").computeWindowOrder(
+        root.windowByAddress, root.workspaceLayouts,
+        (pluginMain && pluginMain.workspaceScrollDirections) || ({}))
+
+    // Monocle layout: deck position per window (delegated to LayoutStrategy).
+    readonly property var monocleWindowOrder: LayoutStrategy.get("monocle").computeWindowOrder(
+        root.windowByAddress, root.workspaceLayouts, null)
+
+    // Reserve a minimum inset so window borders don't visually merge with workspace borders.
+    // Use half the indicator stroke, since the indicator border is drawn fully inside the workspace cell.
+    readonly property real workspaceFrameReserveInset: root.clamp(Math.max(Math.max(1, Style.borderS), Math.ceil(Math.max(2, root.selectionBorderWidth) * 0.5) + 1), 2, 8)
+    // Mirror Hyprland's gaps/border in preview pixels for physical-grid fidelity.
+    readonly property real workspaceExclusiveGap: WorkspaceGeometry.getHyprlandPreviewInset({
+        "hyprGapsIn": (hyprConfig && hyprConfig.gapsIn) || 0,
+        "hyprBorderSize": (hyprConfig && hyprConfig.borderSize) || 0,
+        "positionScaleX": root.cellScale,
+        "positionScaleY": root.cellScale,
+        "fallbackInset": root.workspaceFrameReserveInset
+    })
     // Rows that have windows or contain the active workspace slot.
     property var rowsWithContent: {
         if (!pluginMain || !pluginMain.hideEmptyRows)
@@ -374,6 +416,24 @@ Item {
         };
     }
 
+    function getScaledWindowFrameRect(win, winMonitor) {
+        if (!win || !winMonitor)
+            return null;
+
+        return WorkspaceGeometry.mapWindowToPreviewFrame({
+            "windowData": win,
+            "monitorData": winMonitor,
+            "workspaceWidth": root.workspaceImplicitWidth,
+            "workspaceHeight": root.workspaceImplicitHeight,
+            "centeringX": root.centeringXOffset,
+            "centeringY": root.centeringYOffset,
+            "hyprGapsIn": (hyprConfig && hyprConfig.gapsIn) || 0,
+            "hyprBorderSize": (hyprConfig && hyprConfig.borderSize) || 0,
+            "fallbackInset": root.workspaceExclusiveGap,
+            "useSimplifiedPreview": root.useSimplifiedPreview
+        });
+    }
+
     function getScaledWindowRectForWorkspace(win, workspaceId) {
         if (!win || !win.workspace || win.workspace.id !== workspaceId)
             return null;
@@ -385,167 +445,47 @@ Item {
         if (!winMonitor)
             return null;
 
-        var rawMonitorWidth = winMonitor.width / winMonitor.scale;
-        var rawMonitorHeight = winMonitor.height / winMonitor.scale;
-        var sourceMonitorWidth = (winMonitor.transform % 2 === 1) ? rawMonitorHeight : rawMonitorWidth;
-        var sourceMonitorHeight = (winMonitor.transform % 2 === 1) ? rawMonitorWidth : rawMonitorHeight;
-        var positionScaleX = root.workspaceImplicitWidth / sourceMonitorWidth;
-        var positionScaleY = root.workspaceImplicitHeight / sourceMonitorHeight;
-        var windowScale = Math.min(root.workspaceImplicitWidth / sourceMonitorWidth, root.workspaceImplicitHeight / sourceMonitorHeight);
-        var rawPosX = win.at[0] - winMonitor.x;
-        var rawPosY = win.at[1] - winMonitor.y;
-        var scaledPosX = (rawPosX + root.centeringXOffset) * positionScaleX;
-        var scaledPosY = (rawPosY + root.centeringYOffset) * positionScaleY;
-        var winW = Math.min(win.size[0] * windowScale, root.workspaceImplicitWidth);
-        var winH = Math.min(win.size[1] * windowScale, root.workspaceImplicitHeight);
-        scaledPosX = Math.max(0, Math.min(scaledPosX, root.workspaceImplicitWidth - winW));
-        scaledPosY = Math.max(0, Math.min(scaledPosY, root.workspaceImplicitHeight - winH));
-        return {
-            "x": scaledPosX,
-            "y": scaledPosY,
-            "w": winW,
-            "h": winH
-        };
-    }
-
-    function getMonitorLogicalSize(monitorObj) {
-        if (!monitorObj)
-            return {
-            "width": 1920,
-            "height": 1080
-        };
-
-        var rawWidth = ((monitorObj.width) || 1920) / ((monitorObj.scale) || 1);
-        var rawHeight = ((monitorObj.height) || 1080) / ((monitorObj.scale) || 1);
-        if ((monitorObj.transform || 0) % 2 === 1)
-            return {
-            "width": rawHeight,
-            "height": rawWidth
-        };
-
-        return {
-            "width": rawWidth,
-            "height": rawHeight
-        };
-    }
-
-    function hasFloatingOverlapAt(draggedAddress, workspaceId, monitorId, xPos, yPos, widthPx, heightPx) {
-        var minOverlapX = Math.max(16, Math.min(widthPx, 200) * root.floatingOverlapThresholdRatio);
-        var minOverlapY = Math.max(16, Math.min(heightPx, 200) * root.floatingOverlapThresholdRatio);
-        for (var addr in root.windowByAddress) {
-            if (addr === draggedAddress)
-                continue;
-
-            var win = root.windowByAddress[addr];
-            if (!win || !win.workspace || win.workspace.id !== workspaceId || !win.floating)
-                continue;
-
-            if (((win.monitor) || -1) !== monitorId)
-                continue;
-
-            var winX = ((win.at && win.at[0]) || 0);
-            var winY = ((win.at && win.at[1]) || 0);
-            var winW = ((win.size && win.size[0]) || 1);
-            var winH = ((win.size && win.size[1]) || 1);
-            var overlapX = Math.min(xPos + widthPx, winX + winW) - Math.max(xPos, winX);
-            var overlapY = Math.min(yPos + heightPx, winY + winH) - Math.max(yPos, winY);
-            if (overlapX >= minOverlapX && overlapY >= minOverlapY)
-                return true;
-
-        }
-        return false;
-    }
-
-    function snapToCandidates(value, candidates, minValue, maxValue, thresholdPx) {
-        if (!candidates || candidates.length === 0)
-            return value;
-
-        var bestValue = value;
-        var bestDistance = thresholdPx + 1;
-        for (var i = 0; i < candidates.length; i++) {
-            var candidate = Math.round(root.clamp(candidates[i], minValue, maxValue));
-            var distance = Math.abs(value - candidate);
-            if (distance < bestDistance) {
-                bestDistance = distance;
-                bestValue = candidate;
-            }
-        }
-        if (bestDistance <= thresholdPx)
-            return bestValue;
-
-        return value;
+        return root.getScaledWindowFrameRect(win, winMonitor);
     }
 
     function resolveFloatingDropPosition(delegateItem) {
         if (!delegateItem || !delegateItem.windowData || !delegateItem.windowData.workspace)
             return null;
 
+        var monitorObj = delegateItem.windowMonitor || null;
+        var logicalSize = WorkspaceGeometry.getMonitorLogicalSize(monitorObj);
         var localX = delegateItem.x - delegateItem.xOffset;
         var localY = delegateItem.y - delegateItem.yOffset;
-        var inset = delegateItem.workspaceInset || 0;
-        var frameMaxX = Math.max(inset, delegateItem.availableWorkspaceWidth - delegateItem.width - inset);
-        var frameMaxY = Math.max(inset, delegateItem.availableWorkspaceHeight - delegateItem.height - inset);
-        var clampedFrameX = root.clamp(localX, inset, frameMaxX);
-        var clampedFrameY = root.clamp(localY, inset, frameMaxY);
-        var scaleX = Math.max(0.0001, delegateItem.positionScaleX || 1);
-        var scaleY = Math.max(0.0001, delegateItem.positionScaleY || 1);
-        var rawX = ((clampedFrameX - inset) / scaleX) - (delegateItem.centeringX || 0);
-        var rawY = ((clampedFrameY + (delegateItem.externalTitlebarOffset || 0) - inset) / scaleY) - (delegateItem.centeringY || 0);
-        var monitorObj = delegateItem.windowMonitor || null;
-        var logicalSize = root.getMonitorLogicalSize(monitorObj);
-        var monitorX = (monitorObj && monitorObj.x) || 0;
-        var monitorY = (monitorObj && monitorObj.y) || 0;
-        var winW = ((delegateItem.windowData.size && delegateItem.windowData.size[0]) || 1);
-        var winH = ((delegateItem.windowData.size && delegateItem.windowData.size[1]) || 1);
-        var minX = monitorX;
-        var minY = monitorY;
-        var maxX = Math.max(minX, monitorX + logicalSize.width - winW);
-        var maxY = Math.max(minY, monitorY + logicalSize.height - winH);
-        var nextX = Math.round(root.clamp(rawX + monitorX, minX, maxX));
-        var nextY = Math.round(root.clamp(rawY + monitorY, minY, maxY));
-        var wsId = delegateItem.windowData.workspace.id;
-        var monitorId = ((delegateItem.windowData && delegateItem.windowData.monitor) || -1);
-        var snapThreshold = Math.max(root.floatingDropSnapBasePx, Math.round(Math.min(winW, winH) * root.floatingDropSnapRatio));
-        var xCandidates = [minX, maxX];
-        var yCandidates = [minY, maxY];
-        for (var addr in root.windowByAddress) {
-            if (addr === delegateItem.address)
-                continue;
-
-            var otherWin = root.windowByAddress[addr];
-            if (!otherWin || !otherWin.workspace || !otherWin.floating || otherWin.workspace.id !== wsId)
-                continue;
-
-            if (((otherWin.monitor) || -1) !== monitorId)
-                continue;
-
-            var otherX = ((otherWin.at && otherWin.at[0]) || 0);
-            var otherY = ((otherWin.at && otherWin.at[1]) || 0);
-            var otherW = ((otherWin.size && otherWin.size[0]) || 1);
-            var otherH = ((otherWin.size && otherWin.size[1]) || 1);
-            xCandidates.push(otherX);
-            xCandidates.push(otherX + otherW - winW);
-            xCandidates.push(otherX - winW);
-            xCandidates.push(otherX + otherW);
-            yCandidates.push(otherY);
-            yCandidates.push(otherY + otherH - winH);
-            yCandidates.push(otherY - winH);
-            yCandidates.push(otherY + otherH);
-        }
-        nextX = root.snapToCandidates(nextX, xCandidates, minX, maxX, snapThreshold);
-        nextY = root.snapToCandidates(nextY, yCandidates, minY, maxY, snapThreshold);
-        var step = Math.max(root.floatingDropMinStepPx, Math.round(Math.min(winW, winH) * 0.12));
-        for (var i = 0; i < root.floatingDropMaxOffsetSteps; i++) {
-            if (!root.hasFloatingOverlapAt(delegateItem.address, wsId, monitorId, nextX, nextY, winW, winH))
-                break;
-
-            nextX = Math.round(root.clamp(nextX + step, minX, maxX));
-            nextY = Math.round(root.clamp(nextY + step, minY, maxY));
-        }
-        return {
-            "x": nextX,
-            "y": nextY
-        };
+        return WorkspaceDragMapping.resolveFloatingDropPosition({
+            "frameX": localX,
+            "frameY": localY,
+            "frameWidth": delegateItem.width,
+            "frameHeight": delegateItem.height,
+            "workspaceWidth": delegateItem.availableWorkspaceWidth,
+            "workspaceHeight": delegateItem.availableWorkspaceHeight,
+            "inset": delegateItem.workspaceInset || 0,
+            "effectivePositionScaleX": delegateItem.effectivePositionScaleX,
+            "effectivePositionScaleY": delegateItem.effectivePositionScaleY,
+            "positionScaleX": delegateItem.positionScaleX,
+            "positionScaleY": delegateItem.positionScaleY,
+            "centeringX": delegateItem.centeringX,
+            "centeringY": delegateItem.centeringY,
+            "monitorX": (monitorObj && monitorObj.x) || 0,
+            "monitorY": (monitorObj && monitorObj.y) || 0,
+            "monitorLogicalWidth": logicalSize.width,
+            "monitorLogicalHeight": logicalSize.height,
+            "windowWidthRaw": ((delegateItem.windowData.size && delegateItem.windowData.size[0]) || 1),
+            "windowHeightRaw": ((delegateItem.windowData.size && delegateItem.windowData.size[1]) || 1),
+            "workspaceId": delegateItem.windowData.workspace.id,
+            "monitorId": ((delegateItem.windowData && delegateItem.windowData.monitor) || -1),
+            "draggedAddress": delegateItem.address,
+            "windowByAddress": root.windowByAddress,
+            "overlapThresholdRatio": root.floatingOverlapThresholdRatio,
+            "snapBasePx": root.floatingDropSnapBasePx,
+            "snapRatio": root.floatingDropSnapRatio,
+            "minStepPx": root.floatingDropMinStepPx,
+            "maxOffsetSteps": root.floatingDropMaxOffsetSteps
+        });
     }
 
     function rectNearlyEqual(a, b, epsilonPx) {
@@ -1041,11 +981,12 @@ Item {
             anchors.margins: 10
             implicitWidth: workspaceColumnLayout.implicitWidth + padding * 2
             implicitHeight: workspaceColumnLayout.implicitHeight + padding * 2
-            // UI Tightening via native components/properties
-            radius: Style.radiusL
+            // Keep outer container shape aligned with workspace/indicator corners.
+            radius: root.workspaceCellRadius
+            antialiasing: radius > 0
             color: Qt.alpha(Color.mSurface, Commons.Settings.data.ui.panelBackgroundOpacity || 0.8)
             border.width: root.containerBorderWidth
-            border.color: Color.mOutline
+            border.color: Qt.rgba(Color.mOutline.r, Color.mOutline.g, Color.mOutline.b, 0.52)
             layer.enabled: Commons.Settings.data.general.enableShadows && !PowerProfileService.noctaliaPerformanceMode
 
             // === WORKSPACE GRID ===
@@ -1091,9 +1032,10 @@ Item {
                                 color: hoveredWhileDragging ? Qt.lighter(Color.mSurfaceVariant, 1.05) : Color.mSurfaceVariant // Lighter "card" background
                                 opacity: baseOpacity
                                 // Use scaled screen radius for the workspace preview
-                                radius: Style.screenRadius * root.cellScale
-                                border.width: Math.max(1, Style.borderS)
-                                border.color: hoveredWhileDragging ? Qt.lighter(root.accentColor, 1.1) : (isActiveCell ? "transparent" : Qt.rgba(Color.mOutline.r, Color.mOutline.g, Color.mOutline.b, 0.15))
+                                radius: root.workspaceCellRadius
+                                antialiasing: radius > 0
+                                border.width: hoveredWhileDragging ? Math.max(1, Style.borderS) : (isActiveCell ? 0 : Math.max(1, Style.borderS))
+                                border.color: hoveredWhileDragging ? Qt.lighter(root.accentColor, 1.1) : Qt.rgba(Color.mOutline.r, Color.mOutline.g, Color.mOutline.b, 0.15)
 
                                 Rectangle {
                                     visible: pluginMain.showRowColumnGuides
@@ -1167,12 +1109,50 @@ Item {
 
                                 }
 
+                                LayoutSwitcher {
+                                    id: layoutBadge
+
+                                    property string wsLayout: workspace.isSpecialSlot ? "dwindle" : root.getWorkspaceLayout(workspace.workspaceValue)
+
+                                    anchors.fill: parent
+                                    pluginMain: root.pluginMain
+                                    workspaceId: workspace.workspaceValue
+                                    currentLayout: wsLayout
+                                    showBadge: (pluginMain && pluginMain.showLayoutBadge) || false
+                                    isSpecialSlot: workspace.isSpecialSlot
+                                    isActiveCell: workspace.isActiveCell
+                                    accentColor: root.accentColor
+                                    z: 10
+
+                                    onBadgeClicked: (wsId, layout, gx, gy, bw, bh) => {
+                                        if (layoutSwitcherPopup.visible && layoutSwitcherPopup.targetWorkspaceId === wsId) {
+                                            layoutSwitcherPopup.visible = false;
+                                        } else {
+                                            var pos = layoutBadge.mapToItem(overviewBackground, gx, gy);
+                                            var px = Math.min(pos.x + bw - layoutSwitcherPopup.width,
+                                                              overviewBackground.width - layoutSwitcherPopup.width - 4);
+                                            var py = Math.min(pos.y, overviewBackground.height - layoutSwitcherPopup.height - 4);
+                                            layoutSwitcherPopup.x = Math.max(4, px);
+                                            layoutSwitcherPopup.y = Math.max(4, py);
+                                            layoutSwitcherPopup.targetWorkspaceId = wsId;
+                                            layoutSwitcherPopup.currentLayout = layout;
+                                            layoutSwitcherPopup.targetSwitcher = layoutBadge;
+                                            layoutSwitcherPopup.visible = true;
+                                        }
+                                    }
+                                }
+
                                 MouseArea {
                                     anchors.fill: parent
                                     acceptedButtons: Qt.LeftButton
                                     onClicked: {
                                         if (root.draggingTargetWorkspace !== -1 || root.draggingTargetSpecial)
                                             return ;
+
+                                        if (layoutSwitcherPopup.visible) {
+                                            layoutSwitcherPopup.visible = false;
+                                            return;
+                                        }
 
                                         pluginMain.close();
                                         if (workspace.isSpecialSlot && workspace.specialWorkspace)
@@ -1229,6 +1209,13 @@ Item {
                                             root.resetRetileState();
                                             return ;
                                         }
+                                        // Only show retile preview for layouts that support it (dwindle)
+                                        var wsLayout = root.getWorkspaceLayout(workspace.workspaceValue);
+                                        var strategy = LayoutStrategy.get(wsLayout);
+                                        if (!strategy.supportsRetilePreview) {
+                                            root.resetRetileState();
+                                            return ;
+                                        }
                                         var dragSource = drag.source;
                                         if (dragSource) {
                                             var candidate = root.calculateRetileTarget(workspace.workspaceValue, dragSource.x, dragSource.y, dragSource.width, dragSource.height);
@@ -1254,6 +1241,11 @@ Item {
                 anchors.centerIn: parent
                 implicitWidth: workspaceColumnLayout.implicitWidth
                 implicitHeight: workspaceColumnLayout.implicitHeight
+                width: implicitWidth
+                height: implicitHeight
+                // Keep indicator stroke geometry identical to workspace cells (no edge clipping).
+                // Window previews remain clipped per-item in WindowPreview.qml.
+                clip: false
 
                 // Window repeater
                 Repeater {
@@ -1295,7 +1287,10 @@ Item {
 
                         required property var modelData
                         required property int index
-                        property int monitorId: ((windowData && windowData.monitor) || -1)
+                        // rawWindowData: the true Hyprland window data, used for monitor/workspace detection.
+                        // windowData (WindowPreview property) is bound to effectiveWindowData which may be synthetic.
+                        property var rawWindowData: root.windowByAddress["0x" + modelData.HyprlandToplevel.address]
+                        property int monitorId: ((rawWindowData && rawWindowData.monitor) || -1)
                         property var windowMonitor: pluginMain.monitors.find(function(m) {
                             return m.id === monitorId;
                         })
@@ -1310,15 +1305,42 @@ Item {
                         property real availableMonitorWidth: sourceMonitorWidth - ((windowMonitor && windowMonitor.reserved && windowMonitor.reserved[0]) || 0) - ((windowMonitor && windowMonitor.reserved && windowMonitor.reserved[2]) || 0)
                         property real availableMonitorHeight: sourceMonitorHeight - ((windowMonitor && windowMonitor.reserved && windowMonitor.reserved[1]) || 0) - ((windowMonitor && windowMonitor.reserved && windowMonitor.reserved[3]) || 0)
                         property bool atInitPosition: (initX == x && initY == y)
-                        property int rawWorkspaceId: (windowData && windowData.workspace && windowData.workspace.id) || 1
-                        property int effectiveWorkspaceValue: root.getEffectiveWorkspaceValueForWindow(windowData) || root.groupFirstWorkspaceId
+                        property int rawWorkspaceId: (rawWindowData && rawWindowData.workspace && rawWindowData.workspace.id) || 1
+                        property int effectiveWorkspaceValue: root.getEffectiveWorkspaceValueForWindow(rawWindowData) || root.groupFirstWorkspaceId
                         property int workspaceInGroup: effectiveWorkspaceValue - (root.workspaceGroup * root.workspacesShown)
                         // Position calculation
                         property int workspaceColIndex: Math.max(0, (workspaceInGroup - 1) % pluginMain.gridColumns)
                         property int workspaceRowIndex: Math.max(0, Math.floor((workspaceInGroup - 1) / pluginMain.gridColumns))
+                        // === LAYOUT-SPECIFIC RENDERING (0.54+) ===
+                        // Layout of the workspace this window belongs to
+                        property string wsLayout: root.getWorkspaceLayout(rawWorkspaceId)
+                        // Scroll layout: sorted position info (index in tape, total windows, direction)
+                        property var scrollInfo: (wsLayout === "scroll" && rawWindowData && !rawWindowData.floating) ? root.scrollWindowOrder[rawWindowData.address] : null
+                        // Monocle layout: deck position (0=active/top, 1+=behind)
+                        property var monocleInfo: (wsLayout === "monocle" && rawWindowData && !rawWindowData.floating) ? root.monocleWindowOrder[rawWindowData.address] : null
+                        // Monitor origin in global space (used for synthetic scroll coordinates)
+                        property real monX: (windowMonitor && windowMonitor.x) || 0
+                        property real monY: (windowMonitor && windowMonitor.y) || 0
+                        // Layout-aware effective window data (strategy pattern).
+                        // Scroll layout synthesizes tape-strip coordinates; others pass through.
+                        property var effectiveWindowData: {
+                            if (!rawWindowData)
+                                return rawWindowData;
+
+                            var strategy = LayoutStrategy.get(wsLayout);
+                            var transformed = strategy.transformWindowData(rawWindowData, {
+                                scrollInfo: scrollInfo,
+                                sourceMonitorWidth: sourceMonitorWidth,
+                                sourceMonitorHeight: sourceMonitorHeight,
+                                monX: monX,
+                                monY: monY
+                            });
+                            return transformed || rawWindowData;
+                        }
 
                         pluginMain: root.pluginMain
-                        windowData: root.windowByAddress[address]
+                        // Bind WindowPreview's windowData to effective data (synthetic for scroll layout)
+                        windowData: effectiveWindowData
                         toplevel: modelData
                         monitorData: windowMonitor
                         windowScale: Math.min(root.workspaceImplicitWidth / sourceMonitorWidth, root.workspaceImplicitHeight / sourceMonitorHeight)
@@ -1326,6 +1348,7 @@ Item {
                         positionScaleY: root.workspaceImplicitHeight / sourceMonitorHeight
                         availableWorkspaceWidth: root.workspaceImplicitWidth
                         availableWorkspaceHeight: root.workspaceImplicitHeight
+                        workspaceExclusiveGap: root.workspaceExclusiveGap
                         centeringX: root.centeringXOffset
                         centeringY: root.centeringYOffset
                         widgetMonitorId: root.monitor ? root.monitor.id : 0
@@ -1338,11 +1361,13 @@ Item {
                         simplifiedColorDepth: root.simplifiedColorDepth
                         simplifiedSaturation: root.simplifiedSaturation
                         simplifiedContrast: root.simplifiedContrast
+                        hyprGapsIn: (hyprConfig && hyprConfig.gapsIn) || 0
+                        hyprBorderSize: (hyprConfig && hyprConfig.borderSize) || 2
                         windowBorderSize: (hyprConfig && hyprConfig.borderSize) || 2
                         activeBorderColor: (hyprConfig && hyprConfig.activeBorderColor) || Color.mPrimary
                         inactiveBorderColor: (hyprConfig && hyprConfig.inactiveBorderColor) || Qt.rgba(Color.mOutline.r, Color.mOutline.g, Color.mOutline.b, 1)
-                        isActiveWorkspaceWindow: root.isWindowInActiveWorkspace(windowData)
-                        isFocusedWindow: root.isWindowFocused(address, windowData)
+                        isActiveWorkspaceWindow: root.isWindowInActiveWorkspace(rawWindowData)
+                        isFocusedWindow: root.isWindowFocused(address, rawWindowData)
                         showWindowIcons: root.pluginMain.showWindowIcons
                         colorizeWindowIcons: root.pluginMain.colorizeWindowIcons
                         windowIconPlacement: root.pluginMain.windowIconPlacement
@@ -1364,9 +1389,12 @@ Item {
                         titleStripMeta: root.pluginMain.titleStripMeta
                         animationProfile: root.pluginMain.animationProfile
                         animationDurationMs: root.pluginMain.animationDurationMs
-                        // Position within the grid slot
-                        xOffset: (root.workspaceImplicitWidth + root.workspaceSpacing) * workspaceColIndex
-                        yOffset: root.getVisualYOffset(workspaceRowIndex)
+                        // Position within the grid slot.
+                        // Monocle: non-active cards are shifted slightly (deck effect behind the active card).
+                        xOffset: (root.workspaceImplicitWidth + root.workspaceSpacing) * workspaceColIndex + (monocleInfo ? monocleInfo.deckPos * -2 : 0)
+                        yOffset: root.getVisualYOffset(workspaceRowIndex) + (monocleInfo ? monocleInfo.deckPos * 3 : 0)
+                        // Monocle: only show top 4 cards (deckPos 0–3); hide deeper cards to keep it clean
+                        visible: !monocleInfo || monocleInfo.deckPos <= 3
                         z: windowDelegate.isDragging ? root.windowDraggingZ : (windowDelegate.hovered ? (root.windowDraggingZ - 1) : (atInitPosition ? (root.windowZ + index) : (root.windowDraggingZ - 2)))
                         windowRounding: (hyprConfig && hyprConfig.rounding) || 0
                         Drag.hotSpot.x: targetWindowWidth / 2
@@ -1384,13 +1412,11 @@ Item {
                             repeat: false
                             running: false
                             onTriggered: {
-                                var rawX = ((windowDelegate.windowData && windowDelegate.windowData.at[0]) || 0) - ((windowDelegate.windowMonitor && windowDelegate.windowMonitor.x) || 0);
-                                var rawY = ((windowDelegate.windowData && windowDelegate.windowData.at[1]) || 0) - ((windowDelegate.windowMonitor && windowDelegate.windowMonitor.y) || 0);
-                                var scaledX = (rawX + windowDelegate.centeringX) * windowDelegate.positionScaleX;
-                                var scaledY = (rawY + windowDelegate.centeringY) * windowDelegate.positionScaleY;
                                 windowDelegate.suppressPositionAnimation = true;
-                                windowDelegate.x = Math.round(Math.max(0, Math.min(scaledX, windowDelegate.availableWorkspaceWidth - windowDelegate.width)) + windowDelegate.xOffset);
-                                windowDelegate.y = Math.round(Math.max(0, Math.min(scaledY, windowDelegate.availableWorkspaceHeight - windowDelegate.height)) + windowDelegate.yOffset);
+                                // Keep post-dispatch reconciliation aligned with WindowPreview's
+                                // decoration-aware frame math (title strip/border/inset/fullscreen gap).
+                                windowDelegate.x = Math.round(windowDelegate.initX);
+                                windowDelegate.y = Math.round(windowDelegate.initY);
                                 releasePositionAnimation.restart();
                             }
                         }
@@ -1494,20 +1520,45 @@ Item {
                                     Hyprland.dispatch("movetoworkspacesilent " + targetWorkspace + ", address:" + windowAddress);
                                     updateWindowPosition.restart();
                                 } else if (targetWorkspace !== -1 && targetWorkspace === currentWsId && !isFloating && (pluginMain.dragPreviewMode || "smart") !== "off") {
-                                    if (retilingInfo && retilingInfo.targetAddress) {
+                                    // Layout-aware intra-workspace drag via strategy pattern
+                                    var wsLayout = root.getWorkspaceLayout(currentWsId);
+                                    var strategy = LayoutStrategy.get(wsLayout);
+
+                                    if (strategy.supportsRetilePreview && retilingInfo && retilingInfo.targetAddress) {
+                                        // Dwindle: directional split / swap (uses retile preview data)
                                         if (retilingInfo.isNoop) {
+                                            // no-op
                                         } else if (retilingInfo.direction === "swap") {
                                             if (root.isValidSwapTarget(retilingInfo, windowAddress, currentWsId))
-                                                root.runHyprBatch(["focuswindow address:" + windowAddress, "swapwindow address:" + retilingInfo.targetAddress]);
-
+                                                root.runHyprBatch(strategy.getDropAction({
+                                                    sourceAddress: windowAddress,
+                                                    retilingInfo: { targetAddress: retilingInfo.targetAddress, direction: "swap", isNoop: false },
+                                                    wsId: currentWsId
+                                                }).commands);
                                         } else if (root.isValidSplitTarget(retilingInfo, currentWsId)) {
-                                            root.runHyprBatch(["focuswindow address:" + retilingInfo.targetAddress, "layoutmsg preselect " + retilingInfo.direction, "movetoworkspacesilent 9999, address:" + windowAddress, "movetoworkspacesilent " + currentWsId + ", address:" + windowAddress, "layoutmsg preselect 0"]);
+                                            root.runHyprBatch(strategy.getDropAction({
+                                                sourceAddress: windowAddress,
+                                                retilingInfo: retilingInfo,
+                                                wsId: currentWsId
+                                            }).commands);
                                         }
+                                    } else if (!strategy.supportsRetilePreview) {
+                                        // Non-dwindle layouts: use strategy drop action based on drag delta
+                                        var action = strategy.getDropAction({
+                                            sourceAddress: windowAddress,
+                                            retilingInfo: retilingInfo,
+                                            wsId: currentWsId,
+                                            dragDeltaX: windowDelegate.x - windowDelegate.initX,
+                                            dragDeltaY: windowDelegate.y - windowDelegate.initY,
+                                            scrollDirection: (pluginMain && pluginMain.workspaceScrollDirections && pluginMain.workspaceScrollDirections[currentWsId]) || "right"
+                                        });
+                                        if (action.type !== "noop" && action.commands.length > 0)
+                                            root.runHyprBatch(action.commands);
                                     }
+
                                     windowDelegate.x = windowDelegate.initX;
                                     windowDelegate.y = windowDelegate.initY;
                                     updateWindowPosition.restart();
-                                    // Force window data refresh after retiling
                                     if (pluginMain && pluginMain.refreshWindows)
                                         pluginMain.refreshWindows();
 
@@ -1611,6 +1662,7 @@ Item {
                     property int activeWorkspaceInGroup: indicatorVisible ? (activeWorkspaceValue - (root.workspaceGroup * root.workspacesShown)) : 1
                     property int activeWorkspaceRowIndex: Math.floor((activeWorkspaceInGroup - 1) / pluginMain.gridColumns)
                     property int activeWorkspaceColIndex: (activeWorkspaceInGroup - 1) % pluginMain.gridColumns
+                    readonly property real indicatorStroke: Math.max(2, Math.round(root.selectionBorderWidth))
 
                     visible: indicatorVisible
                     x: (root.workspaceImplicitWidth + root.workspaceSpacing) * activeWorkspaceColIndex
@@ -1618,10 +1670,11 @@ Item {
                     z: root.windowZ
                     width: root.workspaceImplicitWidth
                     height: root.workspaceImplicitHeight
-                    color: Qt.rgba(root.accentColor.r, root.accentColor.g, root.accentColor.b, 0.08)
-                    radius: Style.screenRadius * root.cellScale
-                    border.width: Math.max(3, root.selectionBorderWidth)
-                    border.color: root.accentColor
+                    color: Qt.rgba(root.accentColor.r, root.accentColor.g, root.accentColor.b, 0.025)
+                    radius: root.workspaceCellRadius
+                    antialiasing: radius > 0
+                    border.width: indicatorStroke
+                    border.color: Qt.rgba(root.accentColor.r, root.accentColor.g, root.accentColor.b, 0.95)
 
                     Behavior on x {
                         enabled: !pluginMain.getAnimationDuration || pluginMain.getAnimationDuration("normal") > 0
@@ -1639,6 +1692,126 @@ Item {
                         NumberAnimation {
                             duration: pluginMain.getAnimationDuration ? pluginMain.getAnimationDuration("normal") : 200
                             easing.type: Easing.OutCubic
+                        }
+
+                    }
+
+                }
+
+            }
+
+            // === LAYOUT SWITCHER POPUP (shared, floats above all window previews and workspace cells) ===
+            MouseArea {
+                id: layoutPopupDismiss
+
+                anchors.fill: parent
+                visible: layoutSwitcherPopup.visible
+                z: layoutSwitcherPopup.z - 1
+                onClicked: layoutSwitcherPopup.visible = false
+            }
+
+            Rectangle {
+                id: layoutSwitcherPopup
+
+                property int targetWorkspaceId: -1
+                property string currentLayout: "dwindle"
+                // Reference to the LayoutSwitcher component for the target workspace.
+                // Set by the badge click handler so the popup can delegate switching.
+                property var targetSwitcher: null
+
+                visible: false
+                z: root.windowDraggingZ + 10
+                width: 110
+                height: optionColumn.implicitHeight + 12
+                radius: Style.radiusM
+                color: Qt.rgba(Color.mSurface.r, Color.mSurface.g, Color.mSurface.b, 0.97)
+                border.width: 1
+                border.color: Qt.rgba(Color.mOutline.r, Color.mOutline.g, Color.mOutline.b, 0.35)
+
+                // Consume background clicks — prevents dismiss backdrop from firing on margin/border clicks
+                MouseArea {
+                    anchors.fill: parent
+                    onClicked: {}
+                }
+
+                Column {
+                    id: optionColumn
+
+                    anchors {
+                        top: parent.top
+                        left: parent.left
+                        right: parent.right
+                        margins: 6
+                    }
+                    spacing: 3
+
+                    Repeater {
+                        model: LayoutStrategy.allLayouts
+
+                        delegate: Rectangle {
+                            required property string modelData
+                            required property int index
+
+                            readonly property bool isCurrent: layoutSwitcherPopup.currentLayout === modelData
+
+                            width: parent.width
+                            height: 22
+                            radius: Style.radiusS
+                            color: isCurrent
+                                ? Qt.rgba(root.accentColor.r, root.accentColor.g, root.accentColor.b, 0.25)
+                                : Qt.rgba(Color.mOnSurface.r, Color.mOnSurface.g, Color.mOnSurface.b, 0.0)
+
+                            Row {
+                                anchors {
+                                    left: parent.left
+                                    leftMargin: 6
+                                    verticalCenter: parent.verticalCenter
+                                }
+                                spacing: 5
+
+                                Rectangle {
+                                    width: 14
+                                    height: 14
+                                    radius: 3
+                                    color: isCurrent
+                                        ? Qt.rgba(root.accentColor.r, root.accentColor.g, root.accentColor.b, 0.35)
+                                        : Qt.rgba(Color.mOnSurface.r, Color.mOnSurface.g, Color.mOnSurface.b, 0.08)
+
+                                    Text {
+                                        anchors.centerIn: parent
+                                        text: LayoutStrategy.allBadgeLabels[modelData] || "?"
+                                        font.family: Settings.data.ui.fontDefault
+                                        font.pixelSize: 8
+                                        color: isCurrent ? root.accentColor : Color.mOnSurfaceVariant
+                                    }
+
+                                }
+
+                                Text {
+                                    text: LayoutStrategy.allDisplayNames[modelData] || modelData
+                                    font.family: Settings.data.ui.fontDefault
+                                    font.pixelSize: 10
+                                    font.weight: isCurrent ? Style.fontWeightSemiBold : Style.fontWeightRegular
+                                    color: isCurrent ? Color.mOnSurface : Color.mOnSurfaceVariant
+                                    anchors.verticalCenter: parent.verticalCenter
+                                }
+
+                            }
+
+                            MouseArea {
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                onEntered: parent.color = Qt.rgba(Color.mOnSurface.r, Color.mOnSurface.g, Color.mOnSurface.b, 0.08)
+                                onExited: parent.color = isCurrent
+                                    ? Qt.rgba(root.accentColor.r, root.accentColor.g, root.accentColor.b, 0.25)
+                                    : Qt.rgba(Color.mOnSurface.r, Color.mOnSurface.g, Color.mOnSurface.b, 0.0)
+                                onClicked: {
+                                    if (layoutSwitcherPopup.targetSwitcher)
+                                        layoutSwitcherPopup.targetSwitcher.switchLayout(layoutSwitcherPopup.targetWorkspaceId, modelData);
+                                    layoutSwitcherPopup.visible = false;
+                                }
+                            }
+
                         }
 
                     }
