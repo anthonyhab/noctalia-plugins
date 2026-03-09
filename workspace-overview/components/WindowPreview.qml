@@ -1,3 +1,5 @@
+import "../helpers/Utils.js" as Utils
+import "../helpers/WorkspaceGeometry.js" as WorkspaceGeometry
 import QtQuick
 import QtQuick.Effects
 import QtQuick.Layouts
@@ -25,6 +27,7 @@ Item {
     property real centeringY: 0
     property real xOffset: 0
     property real yOffset: 0
+    property real workspaceExclusiveGap: 0
     property bool useSimplifiedPreview: false
     property string visualMode: "live"
     property string shaderPreset: "classic"
@@ -34,6 +37,8 @@ Item {
     property real simplifiedSaturation: 1.1
     property real simplifiedContrast: 1.1
     property int windowBorderSize: 1
+    property int hyprGapsIn: 0
+    property int hyprBorderSize: 1
     property color activeBorderColor: Color.mPrimary
     property color inactiveBorderColor: Qt.rgba(Color.mOutline.r, Color.mOutline.g, Color.mOutline.b, 0.85)
     property bool isActiveWorkspaceWindow: false
@@ -56,6 +61,7 @@ Item {
     property int titleStripHeight: 20
     property string titleStripMode: "auto"
     property string titleStripPosition: "overlay-top"
+    readonly property string stripPosition: titleStripPosition === "overlay-bottom" ? "overlay-bottom" : "overlay-top"
     property string titleStripMeta: "class"
     property string animationProfile: "hyprlike"
     property int animationDurationMs: 200
@@ -72,34 +78,33 @@ Item {
     property real proximityShiftY: 0
     property string retilingDirection: ""
     property bool isRetileTarget: false
-    // Calculate window position within the workspace cell
-    // Win pos is global. Monitor pos is global.
-    // We want pos relative to monitor (0,0), then scaled, then centered.
-    readonly property real rawPosX: ((windowData && windowData.at[0]) || 0) - ((monitorData && monitorData.x) || 0)
-    readonly property real rawPosY: ((windowData && windowData.at[1]) || 0) - ((monitorData && monitorData.y) || 0)
-    // Scale position
-    readonly property real scaledPosX: (rawPosX + centeringX) * positionScaleX
-    readonly property real scaledPosY: (rawPosY + centeringY) * positionScaleY
-    readonly property real fullscreenGap: useSimplifiedPreview ? 4 : 8
-    readonly property real workspaceWindowGap: isTreatedAsFullscreen ? 0 : Math.max(1, Math.min(6, windowScale * 5.5))
-    readonly property real workspaceInset: isTreatedAsFullscreen ? fullscreenGap : (workspaceWindowGap * 0.5)
-    readonly property real outerBorderAlphaIdle: 0.26
-    // Derived layout constants for external titlebars
-    readonly property real externalTitlebarHeight: (titleStripPosition === "external" && canShowTitleStrip) ? Math.round(Math.max(12, Math.min(30, titleStripHeight * windowScale * ((monitorData && monitorData.scale) || 1) * 1.2))) : 0
-    readonly property real externalTitlebarOffset: (titleStripPosition === "external" && canShowTitleStrip) ? externalTitlebarHeight : 0
-    readonly property real maxFrameWidth: Math.max(1, Math.round(availableWorkspaceWidth - (workspaceInset * 2)))
-    readonly property real maxFrameHeight: Math.max(1, Math.round(availableWorkspaceHeight - (workspaceInset * 2)))
-    readonly property real maxContentWidth: maxFrameWidth
-    readonly property real maxContentHeight: Math.max(1, Math.round(maxFrameHeight - externalTitlebarOffset))
-    readonly property real contentWidth: isTreatedAsFullscreen ? maxContentWidth : Math.max(1, Math.round(Math.min(((windowData && windowData.size[0]) || 100) * windowScale, maxContentWidth)))
-    readonly property real contentHeight: isTreatedAsFullscreen ? maxContentHeight : Math.max(1, Math.round(Math.min(((windowData && windowData.size[1]) || 100) * windowScale, maxContentHeight)))
-    readonly property color externalTitlebarFillColor: Qt.rgba(Color.mSurface.r, Color.mSurface.g, Color.mSurface.b, root.isDragging ? 1 : 0.95)
-    readonly property real frameTargetX: scaledPosX + workspaceInset
-    readonly property real frameTargetY: (scaledPosY + workspaceInset) - externalTitlebarOffset
-    readonly property real frameMaxX: Math.max(workspaceInset, availableWorkspaceWidth - width - workspaceInset)
-    readonly property real frameMaxY: Math.max(workspaceInset, availableWorkspaceHeight - height - workspaceInset)
-    property real initX: isTreatedAsFullscreen ? (xOffset + fullscreenGap) : (Math.max(workspaceInset, Math.min(frameTargetX, frameMaxX)) + xOffset)
-    property real initY: isTreatedAsFullscreen ? (yOffset + fullscreenGap) : (Math.max(workspaceInset, Math.min(frameTargetY, frameMaxY)) + yOffset)
+    // Shared monitor-space -> preview-space geometry model used by layout and drag inverse mapping.
+    readonly property var geometryModel: WorkspaceGeometry.mapWindowToPreviewFrame({
+        "windowData": windowData,
+        "monitorData": monitorData,
+        "workspaceWidth": availableWorkspaceWidth,
+        "workspaceHeight": availableWorkspaceHeight,
+        "positionScaleX": positionScaleX,
+        "positionScaleY": positionScaleY,
+        "windowScale": windowScale,
+        "centeringX": centeringX,
+        "centeringY": centeringY,
+        "hyprGapsIn": hyprGapsIn,
+        "hyprBorderSize": hyprBorderSize,
+        "fallbackInset": workspaceExclusiveGap,
+        "useSimplifiedPreview": useSimplifiedPreview
+    })
+    readonly property real workspaceInset: (geometryModel && geometryModel.inset) || 0
+    readonly property real safeWorkspaceWidth: (geometryModel && geometryModel.safeWorkspaceWidth) || Math.max(1, availableWorkspaceWidth)
+    readonly property real safeWorkspaceHeight: (geometryModel && geometryModel.safeWorkspaceHeight) || Math.max(1, availableWorkspaceHeight)
+    readonly property real effectivePositionScaleX: (geometryModel && geometryModel.effectivePositionScaleX) || Math.max(0.0001, positionScaleX)
+    readonly property real effectivePositionScaleY: (geometryModel && geometryModel.effectivePositionScaleY) || Math.max(0.0001, positionScaleY)
+    readonly property real effectiveWindowScale: (geometryModel && geometryModel.effectiveWindowScale) || Math.max(0.0001, windowScale)
+    readonly property real outerBorderAlphaIdle: 0.34
+    readonly property real contentWidth: (geometryModel && geometryModel.w) || 1
+    readonly property real contentHeight: (geometryModel && geometryModel.h) || 1
+    property real initX: ((geometryModel && geometryModel.x) || workspaceInset) + xOffset
+    property real initY: ((geometryModel && geometryModel.y) || workspaceInset) + yOffset
     property int widgetMonitorId: 0
     property var targetWindowWidth: width
     property var targetWindowHeight: contentHeight
@@ -119,9 +124,20 @@ Item {
     readonly property real workspaceOpacityFactor: isActiveWorkspaceWindow ? 1 : (1 - inactiveDimClamped)
     readonly property real monitorOpacityFactor: ((windowData && windowData.monitor) || -1) == widgetMonitorId ? 1 : 0.4
     readonly property real inactiveDesaturationAlpha: isActiveWorkspaceWindow ? 0 : clamp(1 - clamp(inactiveWorkspaceSaturation, 0.3, 1), 0, 0.65)
-    readonly property real materialSurfaceAlpha: root.isDragging ? 0.14 : (root.hovered ? 0.09 : 0.06)
-    property real hoverYOffset: (!isDragging && hovered) ? (-Math.max(0, hoverLiftAmount) * windowScale) : 0
-    readonly property real effectiveCornerRadius: previewCornerMode === "fixed" ? Math.max(0, previewFixedCornerRadius * windowScale) : Math.max(0, windowRounding * windowScale)
+    readonly property real hoverEmphasisFactor: clamp(Math.max(0, hoverLiftAmount) / 12, 0, 1)
+    readonly property real unfocusedIdleOpacityCut: (!root.isDragging && !root.isFocusedWindow && !root.hovered && !root.pressed) ? (0.05 + hoverEmphasisFactor * 0.08) : 0
+    readonly property real hoverOpacityBoost: (!root.isDragging && (root.hovered || root.pressed)) ? (0.05 + hoverEmphasisFactor * 0.08) : 0
+    readonly property real hoverSheenAlpha: (!root.isDragging && root.hovered) ? (0.03 + hoverEmphasisFactor * 0.06) : 0
+    readonly property real materialSurfaceAlpha: root.isDragging ? 0.14 : (root.hovered ? Math.max(0.02, 0.05 - hoverEmphasisFactor * 0.02) : 0.07)
+    readonly property real effectiveCornerRadius: {
+        var sourceRadius = previewCornerMode === "fixed" ? previewFixedCornerRadius * windowScale : windowRounding * windowScale;
+        var normalizedRadius = Math.max(0, sourceRadius);
+        var snappedRadius = Math.floor(normalizedRadius);
+        if (snappedRadius <= 1)
+            return 0;
+
+        return snappedRadius;
+    }
     readonly property color baseBorderColor: isFocusedWindow ? activeBorderColor : inactiveBorderColor
     readonly property color workspaceAdjustedBorderColor: {
         if (!isFocusedWindow && isActiveWorkspaceWindow)
@@ -141,8 +157,11 @@ Item {
 
         return workspaceAdjustedBorderColor;
     }
+    readonly property color focusedBorderColor: Qt.rgba(root.activeBorderColor.r, root.activeBorderColor.g, root.activeBorderColor.b, 1)
+    readonly property color hoverBorderColor: Qt.rgba(root.activeBorderColor.r, root.activeBorderColor.g, root.activeBorderColor.b, 0.66 + hoverEmphasisFactor * 0.22)
     readonly property real scaledBorderWidth: windowBorderSize <= 0 ? 0 : Math.max(1, windowBorderSize * windowScale)
-    readonly property real titleStripTargetHeight: titleStripPosition === "external" ? externalTitlebarHeight : Math.max(10, Math.min(28, titleStripHeight * windowScale * ((monitorData && monitorData.scale) || 1)))
+    readonly property real titleStripTargetHeight: Math.max(12, Math.min(28, titleStripHeight * windowScale * ((monitorData && monitorData.scale) || 1)))
+    readonly property real titleStripDrawHeight: Math.max(0, Math.min(height, titleStripTargetHeight))
     readonly property bool titleStripEnabled: {
         if (titleStripMode === "off")
             return false;
@@ -152,8 +171,7 @@ Item {
 
         return showTitleStrip;
     }
-    // We remove height constraint checking if titleStripPosition is external so the pseudo titlebar can draw outside the actual window bounds
-    readonly property bool canShowTitleStrip: titleStripEnabled && !isTreatedAsFullscreen && (titleStripMode === "always" || (titleStripPosition === "external" ? true : height >= (titleStripTargetHeight + 10)))
+    readonly property bool canShowTitleStrip: titleStripEnabled && !isTreatedAsFullscreen && titleStripDrawHeight >= 8 && (titleStripMode === "always" || height >= (titleStripTargetHeight + 10))
     readonly property string displayTitle: {
         var value = (windowData && windowData.title) || "";
         if (value !== "")
@@ -235,12 +253,8 @@ Item {
     // For regular windows, we preserve aspect ratio
     readonly property bool isFullscreen: !!(windowData && windowData.fullscreen)
     readonly property bool isMaximized: !!(windowData && windowData.maximized)
-    readonly property bool isEffectivelyFullscreen: {
-        var w = ((windowData && windowData.size[0]) || 0) * windowScale;
-        var h = ((windowData && windowData.size[1]) || 0) * windowScale;
-        return (w >= availableWorkspaceWidth * 0.95 && h >= availableWorkspaceHeight * 0.95);
-    }
-    readonly property bool isTreatedAsFullscreen: isFullscreen || isMaximized || isEffectivelyFullscreen
+    readonly property bool isEffectivelyFullscreen: !!(geometryModel && geometryModel.isEffectivelyFullscreen)
+    readonly property bool isTreatedAsFullscreen: !!(geometryModel && geometryModel.isTreatedAsFullscreen)
     // Calculate shift when this window is the retiling target
     // The target shifts AWAY from where the dragged window will land
     // Shift is proportional to the size change (50% split = 25% shift to show movement)
@@ -277,13 +291,7 @@ Item {
     }
 
     function clamp(value, minValue, maxValue) {
-        if (value < minValue)
-            return minValue;
-
-        if (value > maxValue)
-            return maxValue;
-
-        return value;
+        return Utils.clamp(value, minValue, maxValue);
     }
 
     function animationDuration(kind) {
@@ -304,10 +312,12 @@ Item {
 
     x: initX + calculatedShiftX
     y: initY + calculatedShiftY
-    opacity: monitorOpacityFactor * workspaceOpacityFactor
-    clip: false
+    opacity: clamp(monitorOpacityFactor * workspaceOpacityFactor * (1 - unfocusedIdleOpacityCut) + hoverOpacityBoost, 0, 1)
+    // Keep each preview fully contained to its computed frame to avoid spilling
+    // beyond workspace bounds when effects (shadow/blur) are active.
+    clip: true
     width: contentWidth
-    height: contentHeight + externalTitlebarOffset
+    height: contentHeight
     // Trigger Steam icon search when we have a steamAppId and the window is visible
     onOverviewOpenChanged: {
         if (overviewOpen && root.steamAppId !== "" && !steamIconFinder.hasRun) {
@@ -332,7 +342,7 @@ Item {
             origin.y: root.height / 2
         },
         Translate {
-            y: root.dragYOffset + root.hoverYOffset
+            y: root.dragYOffset
         }
     ]
 
@@ -340,9 +350,9 @@ Item {
         id: shadowCaster
 
         x: innerWindowContent.x
-        y: (root.canShowTitleStrip && root.titleStripPosition === "external") ? 0 : innerWindowContent.y
+        y: innerWindowContent.y
         width: innerWindowContent.width
-        height: (root.canShowTitleStrip && root.titleStripPosition === "external") ? (root.titleStripTargetHeight + innerWindowContent.height) : innerWindowContent.height
+        height: innerWindowContent.height
         radius: root.effectiveCornerRadius
         color: Qt.rgba(1, 1, 1, 0.02)
         layer.enabled: true
@@ -350,8 +360,8 @@ Item {
         layer.effect: MultiEffect {
             shadowEnabled: true
             blurMax: Style.shadowBlurMax
-            shadowBlur: Style.shadowBlur * (root.isFocusedWindow ? 1.55 : (root.hovered ? 1.42 : 1.32))
-            shadowOpacity: Style.shadowOpacity * (root.isFocusedWindow ? 1.15 : (root.hovered ? 1.06 : 0.95))
+            shadowBlur: Style.shadowBlur * (root.isFocusedWindow ? 1.55 : (root.hovered ? (1.36 + hoverEmphasisFactor * 0.24) : 1.32))
+            shadowOpacity: Style.shadowOpacity * (root.isFocusedWindow ? 1.15 : (root.hovered ? (1 + hoverEmphasisFactor * 0.1) : 0.95))
             shadowColor: "black"
             shadowHorizontalOffset: Settings.data.general.shadowOffsetX
             shadowVerticalOffset: Settings.data.general.shadowOffsetY
@@ -362,8 +372,7 @@ Item {
     Item {
         id: innerWindowContent
 
-        // When external titlebar is used, the main window content is pushed down
-        y: (root.titleStripPosition === "external" && root.canShowTitleStrip) ? root.externalTitlebarHeight : 0
+        y: 0
         width: root.targetWindowWidth
         height: root.targetWindowHeight
 
@@ -425,13 +434,20 @@ Item {
                         return Qt.rgba(Color.mSurfaceVariant.r, Color.mSurfaceVariant.g, Color.mSurfaceVariant.b, 0.38);
 
                     if (root.pressed)
-                        return Qt.rgba(Color.mSurfaceVariant.r, Color.mSurfaceVariant.g, Color.mSurfaceVariant.b, 0.46);
+                        return Qt.rgba(Color.mSurfaceVariant.r, Color.mSurfaceVariant.g, Color.mSurfaceVariant.b, 0.34);
 
                     if (root.hovered)
-                        return Qt.rgba(Color.mSurfaceVariant.r, Color.mSurfaceVariant.g, Color.mSurfaceVariant.b, 0.24);
+                        return Qt.rgba(Color.mSurfaceVariant.r, Color.mSurfaceVariant.g, Color.mSurfaceVariant.b, 0.12);
 
                     return "transparent";
                 }
+            }
+
+            Rectangle {
+                anchors.fill: parent
+                radius: parent.radius
+                color: Qt.rgba(1, 1, 1, root.hoverSheenAlpha)
+                visible: root.hoverSheenAlpha > 0.001
             }
 
             Rectangle {
@@ -448,35 +464,21 @@ Item {
             anchors.fill: parent
 
             Item {
-                // Dynamic positioning based on user setting (center vs corner vs external)
+                // Dynamic positioning based on user setting (center vs corner).
 
                 id: iconContainer
 
-                property bool isExternalTitlebar: root.titleStripPosition === "external" && root.canShowTitleStrip
-
-                // X positioning:
-                // - external: stick to the left edge of the top bar
-                // - center: center horizontally
-                // - corner: stick to bottom right corner
-                x: isExternalTitlebar ? Math.max(8, parent.width * 0.05) : (root.windowIconPlacement === "center" ? (parent.width - width) / 2 : (parent.width - width - Math.max(8, parent.width * 0.05)))
-                // Y positioning:
-                // - external: push UP into the external titlebar (negative Y relative to innerWindowContent)
-                // - center: center vertically, bumped down if overlay titlebar is visible
-                // - corner: stick to bottom right corner
-                y: isExternalTitlebar ? (-root.externalTitlebarHeight + (root.externalTitlebarHeight - height) / 2) : (root.windowIconPlacement === "center" ? ((parent.height - height) / 2 + (root.canShowTitleStrip ? root.titleStripTargetHeight * 0.35 : 0)) : (parent.height - height - Math.max(8, parent.height * 0.05)))
+                x: root.windowIconPlacement === "center" ? (parent.width - width) / 2 : (parent.width - width - Math.max(8, parent.width * 0.05))
+                y: root.windowIconPlacement === "center" ? ((parent.height - height) / 2 + (root.canShowTitleStrip ? root.titleStripDrawHeight * 0.35 : 0)) : (parent.height - height - Math.max(8, parent.height * 0.05))
                 width: windowIcon.width
                 height: windowIcon.height
 
                 Image {
                     id: windowIcon
 
-                    // Calculate max icon dimensions based on workspace size and placement mode
-                    property real maxIconScale: root.windowIconPlacement === "corner" ? 0.35 : (iconContainer.isExternalTitlebar ? 0.3 : 1)
+                    // Calculate max icon dimensions based on workspace size and placement mode.
+                    property real maxIconScale: root.windowIconPlacement === "corner" ? 0.35 : 1
                     property real maxIconSize: {
-                        if (iconContainer.isExternalTitlebar)
-                            return root.externalTitlebarHeight * 0.6;
-
-                        // Lock icon height inside external titlebar
                         return Math.min(root.targetWindowWidth, root.targetWindowHeight) * (root.compactMode ? root.iconToWindowRatioCompact : root.iconToWindowRatio) * maxIconScale / ((root.monitorData && root.monitorData.scale) || 1);
                     }
                     // Detect if this is a Steam logo (wide image) vs a normal icon (square)
@@ -498,7 +500,7 @@ Item {
 
                     Behavior on width {
                         NumberAnimation {
-                            duration: root.isDragging ? 140 : 220
+                            duration: root.isDragging ? Style.animationFast : Style.animationNormal
                             easing.type: Easing.OutCubic
                         }
 
@@ -506,7 +508,7 @@ Item {
 
                     Behavior on height {
                         NumberAnimation {
-                            duration: root.isDragging ? 140 : 220
+                            duration: root.isDragging ? Style.animationFast : Style.animationNormal
                             easing.type: Easing.OutCubic
                         }
 
@@ -516,7 +518,7 @@ Item {
 
                 Behavior on x {
                     NumberAnimation {
-                        duration: 300
+                        duration: Style.animationNormal
                         easing.type: Easing.OutCubic
                     }
 
@@ -524,7 +526,7 @@ Item {
 
                 Behavior on y {
                     NumberAnimation {
-                        duration: 300
+                        duration: Style.animationNormal
                         easing.type: Easing.OutCubic
                     }
 
@@ -548,7 +550,7 @@ Item {
                 id: urgencyBadge
 
                 visible: root.showUrgencyBadge && root.isUrgentWindow
-                color: Qt.rgba(0.96, 0.25, 0.2, 0.92)
+                color: Qt.alpha(Color.mError, 0.92)
                 radius: 6
                 width: urgencyLabel.implicitWidth + 8
                 height: urgencyLabel.implicitHeight + 4
@@ -648,10 +650,16 @@ Item {
         height: root.height
         radius: root.effectiveCornerRadius
         color: "transparent"
-        border.width: root.scaledBorderWidth > 0 ? (root.showFocusedGlow && root.isFocusedWindow ? Math.max(2, root.scaledBorderWidth) : Math.max(1, root.scaledBorderWidth)) : 0
+        border.width: root.scaledBorderWidth > 0 ? (root.isFocusedWindow ? Math.max(2, root.scaledBorderWidth + (root.showFocusedGlow ? 1 : 0)) : Math.max(1, root.scaledBorderWidth)) : 0
         border.color: {
-            if (root.isDragging || (root.showFocusedGlow && root.isFocusedWindow))
-                return root.activeBorderColor;
+            if (root.isDragging)
+                return root.focusedBorderColor;
+
+            if (root.isFocusedWindow)
+                return root.focusedBorderColor;
+
+            if (root.hovered || root.pressed)
+                return root.hoverBorderColor;
 
             return Qt.rgba(root.effectiveBorderColor.r, root.effectiveBorderColor.g, root.effectiveBorderColor.b, root.outerBorderAlphaIdle);
         }
@@ -661,52 +669,44 @@ Item {
     Rectangle {
         id: titleStrip
 
-        // Keep the title strip radius aligned with the outer border
-        property real effectiveRadius: root.effectiveCornerRadius
+        // Cap strip corner radius so thin strips don't collapse into pill-like corners.
+        property real effectiveRadius: Math.min(root.effectiveCornerRadius, height * 0.5)
 
         visible: root.canShowTitleStrip
         // Positioning logic based on user setting
         anchors.left: innerWindowContent.left
         anchors.right: innerWindowContent.right
-        anchors.top: root.titleStripPosition === "overlay-bottom" ? undefined : parent.top
-        anchors.bottom: root.titleStripPosition === "overlay-bottom" ? innerWindowContent.bottom : undefined
-        height: root.titleStripTargetHeight
-        // To only round the top corners for external, we use an item mask trick, or we can just draw a rounded rect and have the inner window clip over its bottom edge
+        anchors.top: root.stripPosition === "overlay-bottom" ? undefined : parent.top
+        anchors.bottom: root.stripPosition === "overlay-bottom" ? innerWindowContent.bottom : undefined
+        anchors.leftMargin: Math.max(0, Math.ceil(root.scaledBorderWidth * 0.5))
+        anchors.rightMargin: Math.max(0, Math.ceil(root.scaledBorderWidth * 0.5))
+        anchors.topMargin: root.stripPosition === "overlay-bottom" ? 0 : Math.max(0, Math.ceil(root.scaledBorderWidth * 0.5))
+        anchors.bottomMargin: root.stripPosition === "overlay-bottom" ? Math.max(0, Math.ceil(root.scaledBorderWidth * 0.5)) : 0
+        height: root.titleStripDrawHeight
         radius: effectiveRadius
         border.width: 0
-        // External bars get a solid backing, overlays stay understated
-        color: root.titleStripPosition === "external" ? root.externalTitlebarFillColor : Qt.rgba(Color.mSurface.r, Color.mSurface.g, Color.mSurface.b, root.isDragging ? 0.72 : 0.6)
+        color: "transparent"
 
-        Rectangle {
-            // Hide the bottom corner rounding so only the top corners look rounded in external mode
-            anchors.left: parent.left
-            anchors.right: parent.right
-            anchors.bottom: parent.bottom
-            height: Math.max(1, Math.ceil(parent.radius))
-            color: root.externalTitlebarFillColor
-            visible: root.titleStripPosition === "external"
-        }
-
-        // Fading gradient (ONLY for overlay modes)
+        // Strong legibility gradient behind strip text without changing frame geometry.
         Rectangle {
             anchors.fill: parent
             radius: parent.radius
-            visible: root.titleStripPosition !== "external"
+            visible: true
 
             gradient: Gradient {
                 GradientStop {
-                    position: root.titleStripPosition === "overlay-top" ? 0 : 1
-                    color: root.isDragging ? Qt.rgba(Color.mSurface.r, Color.mSurface.g, Color.mSurface.b, 0.74) : Qt.rgba(Color.mSurface.r, Color.mSurface.g, Color.mSurface.b, 0.64)
+                    position: root.stripPosition === "overlay-top" ? 0 : 1
+                    color: root.isDragging ? Qt.rgba(0, 0, 0, 0.9) : Qt.rgba(0, 0, 0, 0.84)
                 }
 
                 GradientStop {
-                    position: root.titleStripPosition === "overlay-top" ? 0.85 : 0.15
-                    color: root.isDragging ? Qt.rgba(Color.mSurface.r, Color.mSurface.g, Color.mSurface.b, 0.42) : Qt.rgba(Color.mSurface.r, Color.mSurface.g, Color.mSurface.b, 0.3)
+                    position: root.stripPosition === "overlay-top" ? 0.8 : 0.2
+                    color: root.isDragging ? Qt.rgba(0, 0, 0, 0.54) : Qt.rgba(0, 0, 0, 0.4)
                 }
 
                 GradientStop {
-                    position: root.titleStripPosition === "overlay-top" ? 1 : 0
-                    color: Qt.rgba(Color.mSurface.r, Color.mSurface.g, Color.mSurface.b, 0.02)
+                    position: root.stripPosition === "overlay-top" ? 1 : 0
+                    color: Qt.rgba(0, 0, 0, 0.14)
                 }
 
             }
@@ -715,34 +715,38 @@ Item {
 
         RowLayout {
             anchors.fill: parent
-            // If external mode and icon is shown, yield space on the left so we don't draw over the icon
-            anchors.leftMargin: (root.titleStripPosition === "external" && root.showWindowIcons) ? (Math.max(8, parent.width * 0.05) + (parent.height * 0.6) + 10) : Math.max(6, parent.height * 0.45)
+            anchors.leftMargin: Math.max(6, parent.height * 0.45)
             anchors.rightMargin: Math.max(6, parent.height * 0.45)
+            anchors.topMargin: Math.max(1, parent.height * 0.12)
+            anchors.bottomMargin: Math.max(1, parent.height * 0.12)
             spacing: Math.max(6, parent.height * 0.34)
 
             Text {
                 Layout.fillWidth: true
                 text: root.displayTitle
-                color: Color.mOnSurface
+                color: Qt.rgba(1, 1, 1, 0.98)
                 elide: Text.ElideRight
                 font.family: Settings.data.ui.fontDefault
-                font.pixelSize: Math.max(9, Math.min(14, titleStrip.height * 0.65))
+                font.pixelSize: Math.max(8, Math.min(14, titleStrip.height * 0.56))
                 font.weight: Style.fontWeightSemiBold
                 verticalAlignment: Text.AlignVCenter
-                // Left-align text for external bars to mimic native OS feel, center-align for overlays
                 horizontalAlignment: Text.AlignLeft
+                style: Text.Raised
+                styleColor: Qt.rgba(0, 0, 0, 0.94)
             }
 
             Text {
                 visible: root.titleStripMetaText !== "" && root.width > 120
                 text: root.titleStripMetaText
-                color: Qt.rgba(Color.mOnSurfaceVariant.r, Color.mOnSurfaceVariant.g, Color.mOnSurfaceVariant.b, 0.95)
+                color: Qt.rgba(0.9, 0.93, 1, 0.97)
                 elide: Text.ElideRight
                 font.family: Settings.data.ui.fontDefault
-                font.pixelSize: Math.max(6, Math.min(11, titleStrip.height * 0.5))
+                font.pixelSize: Math.max(7, Math.min(11, titleStrip.height * 0.44))
                 verticalAlignment: Text.AlignVCenter
                 horizontalAlignment: Text.AlignRight
                 Layout.maximumWidth: root.width * 0.34
+                style: Text.Raised
+                styleColor: Qt.rgba(0, 0, 0, 0.86)
             }
 
         }
@@ -820,16 +824,6 @@ Item {
     }
 
     Behavior on dragTilt {
-        enabled: root.animationDuration("fast") > 0
-
-        NumberAnimation {
-            duration: root.animationDuration("fast")
-            easing.type: Easing.OutCubic
-        }
-
-    }
-
-    Behavior on hoverYOffset {
         enabled: root.animationDuration("fast") > 0
 
         NumberAnimation {

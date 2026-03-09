@@ -1,12 +1,12 @@
 import QtQuick
-import QtQuick.Layouts
 import QtQuick.Controls
-
+import QtQuick.Layouts
 import Quickshell
 import Quickshell.Wayland
-
 import qs.Commons
 import qs.Commons as Commons
+import qs.Widgets
+
 PanelWindow {
     id: root
 
@@ -19,15 +19,14 @@ PanelWindow {
     property int previewMonitorId: 0
     property real previewCenteringX: 0
     property real previewCenteringY: 0
-    
     // Extracted settings
     property string visualMode: "live"
     property string shaderPreset: "classic"
-    property real shaderPresetStrength: 1.0
-    property real simplifiedPixelDensity: 1.0
-    property real simplifiedColorDepth: 8.0
-    property real simplifiedSaturation: 1.0
-    property real simplifiedContrast: 1.0
+    property real shaderPresetStrength: 1
+    property real simplifiedPixelDensity: 1
+    property real simplifiedColorDepth: 8
+    property real simplifiedSaturation: 1
+    property real simplifiedContrast: 1
     property string accentColorType: "secondary"
     property bool showWindowIcons: true
     property bool colorizeWindowIcons: false
@@ -53,101 +52,193 @@ PanelWindow {
     property bool showWorkspaceLabels: true
     property string specialWorkspaceStyle: "pill"
     property string previewWorkspaceWatermark: ""
-    
     // Animation settings
     property string animationProfile: "standard"
     property int animationDurationMs: 250
-    property var previewHyprConfig: ({})
-
+    property var previewHyprConfig: ({
+    })
     // Private selected option
     property var selectedPreviewWorkspaceOption: {
         for (var i = 0; i < root.previewWorkspaceOptions.length; i++) {
-            if (root.previewWorkspaceOptions[i].key === root.previewWorkspaceKey) {
+            if (root.previewWorkspaceOptions[i].key === root.previewWorkspaceKey)
                 return root.previewWorkspaceOptions[i];
-            }
+
         }
         return null;
+    }
+    property string monitorKey: "__default__"
+    property var targetScreen: null
+    readonly property var fallbackScreen: Quickshell.screens.length > 0 ? Quickshell.screens[0] : null
+    property string barPosition: Settings.data.bar.position || "bottom"
+    property real windowX: Style.marginM
+    property real windowY: Style.marginM
+    property real pluginWindowX: -1
+    property real pluginWindowY: -1
+    property real persistedWindowX: -1
+    property real persistedWindowY: -1
+    property string persistedMonitorKey: ""
+    readonly property real titleBarHeight: Math.max(36, Math.round(34 * Style.uiScaleRatio))
+    readonly property bool isDragging: dragHandler.active
+    property real dragLiftScale: 1.0
+
+    Behavior on dragLiftScale {
+        enabled: !root.isDragging
+        NumberAnimation {
+            duration: Style.animationNormal
+            easing.type: Easing.OutBack
+            easing.overshoot: 2.0
+        }
+    }
+
+    Behavior on windowX {
+        enabled: !root.isDragging
+        NumberAnimation {
+            duration: Style.animationFast
+            easing.type: Easing.OutBack
+            easing.overshoot: 1.2
+        }
+    }
+
+    Behavior on windowY {
+        enabled: !root.isDragging
+        NumberAnimation {
+            duration: Style.animationFast
+            easing.type: Easing.OutBack
+            easing.overshoot: 1.2
+        }
+    }
+
+    signal positionSaved(string monitorKey, real xPos, real yPos)
+
+    function isValidSavedPosition(xPos, yPos) {
+        return isFinite(xPos) && isFinite(yPos) && xPos >= 0 && yPos >= 0;
+    }
+
+    function screenWidth() {
+        return (root.screen && root.screen.width) || 1920;
+    }
+
+    function screenHeight() {
+        return (root.screen && root.screen.height) || 1080;
+    }
+
+    function clampToScreen(xPos, yPos) {
+        var frameWidth = root.width > 0 ? root.width : root.implicitWidth;
+        var frameHeight = root.height > 0 ? root.height : root.implicitHeight;
+        var minX = Style.marginL;
+        var minY = Style.marginL;
+        var maxX = Math.max(minX, screenWidth() - frameWidth - Style.marginL);
+        var maxY = Math.max(minY, screenHeight() - frameHeight - Style.marginL);
+        var clampedX = Math.max(minX, Math.min(maxX, xPos));
+        var clampedY = Math.max(minY, Math.min(maxY, yPos));
+        return {
+            "x": clampedX,
+            "y": clampedY
+        };
+    }
+
+    function resolveDefaultPosition() {
+        var defaultX = Style.marginM;
+        var defaultY = Style.marginM;
+        if (barPosition === "left")
+            defaultX = Style.barHeight + Style.marginL;
+        else if (barPosition === "top")
+            defaultY = Style.barHeight + Style.marginL;
+        else if (barPosition === "bottom")
+            defaultY = screenHeight() - root.implicitHeight - Style.barHeight - Style.marginL;
+        return {
+            "x": defaultX,
+            "y": defaultY
+        };
+    }
+
+    function applyInitialPosition() {
+        var hasSavedPosition = isValidSavedPosition(root.pluginWindowX, root.pluginWindowY);
+        var seed = hasSavedPosition ? {
+            "x": root.pluginWindowX,
+            "y": root.pluginWindowY
+        } : resolveDefaultPosition();
+        var clamped = clampToScreen(seed.x, seed.y);
+        root.windowX = clamped.x;
+        root.windowY = clamped.y;
+        if (hasSavedPosition) {
+            root.persistedWindowX = clamped.x;
+            root.persistedWindowY = clamped.y;
+        } else {
+            root.persistedWindowX = -1;
+            root.persistedWindowY = -1;
+        }
+        root.persistedMonitorKey = root.monitorKey;
+    }
+
+    function syncWithPersistedInput() {
+        if (dragHandler.active)
+            return ;
+
+        if (!isValidSavedPosition(root.pluginWindowX, root.pluginWindowY))
+            return ;
+
+        var clamped = clampToScreen(root.pluginWindowX, root.pluginWindowY);
+        if (Math.abs(clamped.x - root.windowX) > 0.5 || Math.abs(clamped.y - root.windowY) > 0.5) {
+            root.windowX = clamped.x;
+            root.windowY = clamped.y;
+        }
+        root.persistedWindowX = clamped.x;
+        root.persistedWindowY = clamped.y;
+        root.persistedMonitorKey = root.monitorKey;
+    }
+
+    function clampCurrentPosition() {
+        if (dragHandler.active)
+            return ;
+
+        var clamped = clampToScreen(root.windowX, root.windowY);
+        if (Math.abs(clamped.x - root.windowX) > 0.5 || Math.abs(clamped.y - root.windowY) > 0.5) {
+            root.windowX = clamped.x;
+            root.windowY = clamped.y;
+        }
+    }
+
+    function shouldPersistPosition(xPos, yPos) {
+        if (root.persistedMonitorKey !== root.monitorKey)
+            return true;
+
+        if (!isValidSavedPosition(root.persistedWindowX, root.persistedWindowY))
+            return true;
+
+        return Math.abs(root.persistedWindowX - xPos) > 0.5 || Math.abs(root.persistedWindowY - yPos) > 0.5;
     }
 
     // Window logic
     WlrLayershell.namespace: "plugin-workspace-preview"
-    property string barPosition: Settings.data.bar.position || "bottom"
-
-    property real windowX: Style.marginM
-    property real windowY: Style.marginM
-    
-    property real pluginWindowX: -1
-    property real pluginWindowY: -1
-    
-    signal positionSaved(real xPos, real yPos)
-
-    Component.onCompleted: {
-        var defaultX = 0;
-        var defaultY = 0;
-        
-        if (root.pluginWindowX >= 0 && root.pluginWindowY >= 0) {
-            defaultX = root.pluginWindowX;
-            defaultY = root.pluginWindowY;
-        } else {
-            // Try to position near the bar, but detached
-            if (barPosition === "left") {
-                defaultX = Style.barHeight + Style.marginL;
-                defaultY = Style.marginM;
-            } else if (barPosition === "right") {
-                defaultX = Style.marginM; 
-                defaultY = Style.marginM;
-            } else if (barPosition === "top") {
-                defaultX = Style.marginM;
-                defaultY = Style.barHeight + Style.marginL;
-            } else {
-                defaultX = Style.marginM;
-                defaultY = 1080 - Style.barHeight - implicitHeight - Style.marginL; // Rough guess for bottom
-            }
-        }
-        
-        windowX = defaultX;
-        windowY = defaultY;
-    }
-    
-    // Smooth movement for bouncing effect
-    Behavior on windowX {
-        enabled: !dragHandler.active
-        SpringAnimation {
-            spring: 3
-            damping: 0.2
-            mass: 1.0
-        }
-    }
-    Behavior on windowY {
-        enabled: !dragHandler.active
-        SpringAnimation {
-            spring: 3
-            damping: 0.2
-            mass: 1.0
-        }
-    }
-
+    screen: root.targetScreen || root.fallbackScreen
+    Component.onCompleted: applyInitialPosition()
+    onMonitorKeyChanged: applyInitialPosition()
+    onTargetScreenChanged: applyInitialPosition()
+    onPluginWindowXChanged: syncWithPersistedInput()
+    onPluginWindowYChanged: syncWithPersistedInput()
+    onWidthChanged: clampCurrentPosition()
+    onHeightChanged: clampCurrentPosition()
+    onScreenChanged: clampCurrentPosition()
     WlrLayershell.layer: WlrLayer.Overlay
     WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
+    color: "transparent"
+    // Only show if we actually have options to preview and the window is meant to be visible
+    visible: root.previewWorkspaceOptions.length > 0
+    // Size logic
+    implicitWidth: Math.round(340 * Style.uiScaleRatio)
+    implicitHeight: Math.round(200 * Style.uiScaleRatio)
 
     // Use margins for absolute-like positioning in LayerShell
     anchors {
         top: true
         left: true
     }
-    margins {
-        top: Math.round(root.windowY) | 0
-        left: Math.round(root.windowX) | 0
-    }
-    
-    color: "transparent"
 
-    // Only show if we actually have options to preview and the window is meant to be visible
-    visible: root.previewWorkspaceOptions.length > 0
-    
-    // Size logic
-    implicitWidth: Math.round(340 * Style.uiScaleRatio)
-    implicitHeight: Math.round(200 * Style.uiScaleRatio)
+    margins {
+        top: root.windowY
+        left: root.windowX
+    }
 
     Rectangle {
         id: windowFrame
@@ -157,80 +248,210 @@ PanelWindow {
         color: Qt.rgba(Color.mSurface.r, Color.mSurface.g, Color.mSurface.b, 0.95)
         border.width: Style.borderS
         border.color: Qt.rgba(Color.mOutline.r, Color.mOutline.g, Color.mOutline.b, 0.45)
+        transform: Scale {
+            xScale: root.dragLiftScale
+            yScale: root.dragLiftScale
+            origin.x: windowFrame.width / 2
+            origin.y: windowFrame.height / 2
+        }
 
         // Dimming effect since this isn't the primary focus
         Rectangle {
             anchors.fill: parent
             radius: parent.radius
             color: "black"
-            opacity: 0.3
+            opacity: root.isDragging ? 0.45 : 0.3
             z: -1
-        }
-        
-        MouseArea {
-            id: dragArea
-            anchors.fill: parent
-            cursorShape: dragHandler.active ? Qt.ClosedHandCursor : Qt.OpenHandCursor
+
+            Behavior on opacity {
+                NumberAnimation {
+                    duration: Style.animationFast
+                    easing.type: Easing.OutCubic
+                }
+            }
         }
 
-        Item {
-            id: dragTargetProxy
-            anchors.fill: parent
+        Rectangle {
+            id: titleBar
+
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.top: parent.top
+            height: root.titleBarHeight
+            radius: Style.radiusL
+            color: Qt.rgba(Color.mSurfaceVariant.r, Color.mSurfaceVariant.g, Color.mSurfaceVariant.b, root.isDragging ? 0.7 : 0.5)
+            border.width: 1
+            border.color: Qt.rgba(Color.mOutline.r, Color.mOutline.g, Color.mOutline.b, root.isDragging ? 0.7 : 0.4)
+
+            Behavior on color {
+                ColorAnimation {
+                    duration: Style.animationFast
+                    easing.type: Easing.OutCubic
+                }
+            }
+
+            Behavior on border.color {
+                ColorAnimation {
+                    duration: Style.animationFast
+                    easing.type: Easing.OutCubic
+                }
+            }
+
+            Rectangle {
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.bottom: parent.bottom
+                height: 1
+                color: Qt.rgba(Color.mOutline.r, Color.mOutline.g, Color.mOutline.b, 0.45)
+            }
+
+            RowLayout {
+                anchors.fill: parent
+                anchors.leftMargin: Style.marginM
+                anchors.rightMargin: Style.marginM
+                spacing: Style.marginS
+
+                Rectangle {
+                    width: 9
+                    height: 9
+                    radius: width / 2
+                    color: root.accentColorType === "primary" ? Color.mPrimary : Color.mSecondary
+                }
+
+                NText {
+                    text: "Live Preview"
+                    color: Color.mOnSurface
+                    pointSize: Style.fontSizeS
+                    font.weight: Style.fontWeightSemiBold
+                }
+
+                Item {
+                    Layout.fillWidth: true
+                }
+
+                Rectangle {
+                    visible: root.previewMonitorData && root.previewMonitorData.name
+                    radius: 6
+                    color: Qt.rgba(Color.mSurface.r, Color.mSurface.g, Color.mSurface.b, 0.7)
+                    border.width: 1
+                    border.color: Qt.rgba(Color.mOutline.r, Color.mOutline.g, Color.mOutline.b, 0.4)
+                    implicitWidth: monitorChipText.implicitWidth + 10
+                    implicitHeight: monitorChipText.implicitHeight + 4
+
+                    NText {
+                        id: monitorChipText
+
+                        anchors.centerIn: parent
+                        text: root.previewMonitorData && root.previewMonitorData.name ? root.previewMonitorData.name : ""
+                        color: Color.mOnSurfaceVariant
+                        pointSize: Style.fontSizeXS
+                    }
+
+                }
+
+                Rectangle {
+                    radius: 6
+                    color: Qt.rgba(Color.mSurface.r, Color.mSurface.g, Color.mSurface.b, 0.7)
+                    border.width: 1
+                    border.color: Qt.rgba(Color.mOutline.r, Color.mOutline.g, Color.mOutline.b, 0.4)
+                    implicitWidth: workspaceChipText.implicitWidth + 10
+                    implicitHeight: workspaceChipText.implicitHeight + 4
+
+                    NText {
+                        id: workspaceChipText
+
+                        anchors.centerIn: parent
+                        text: root.previewWorkspaceWatermark ? ("WS " + root.previewWorkspaceWatermark) : "WS"
+                        color: Color.mOnSurfaceVariant
+                        pointSize: Style.fontSizeXS
+                    }
+
+                }
+
+            }
+
+            Rectangle {
+                anchors.horizontalCenter: parent.horizontalCenter
+                anchors.bottom: parent.bottom
+                anchors.bottomMargin: 6
+                width: 52
+                height: 4
+                radius: 3
+                color: Qt.rgba(Color.mOnSurfaceVariant.r, Color.mOnSurfaceVariant.g, Color.mOnSurfaceVariant.b, root.isDragging ? 0.75 : 0.45)
+
+                Behavior on color {
+                    ColorAnimation {
+                        duration: Style.animationFast
+                        easing.type: Easing.OutCubic
+                    }
+                }
+            }
+
+            MouseArea {
+                id: dragArea
+
+                anchors.fill: parent
+                acceptedButtons: Qt.LeftButton
+                cursorShape: dragHandler.active ? Qt.ClosedHandCursor : Qt.OpenHandCursor
+            }
 
             DragHandler {
                 id: dragHandler
-                target: null // Disable auto-translate so we can pipe it into Wayland margins
-                
+
                 property real startWindowX: 0
                 property real startWindowY: 0
-                
+                property point startCursorScene: Qt.point(0, 0)
+
+                acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
+                grabPermissions: PointerHandler.CanTakeOverFromAnything
+                target: null
+                dragThreshold: 0
                 onActiveChanged: {
                     if (active) {
                         startWindowX = root.windowX;
                         startWindowY = root.windowY;
+                        startCursorScene = centroid.scenePosition;
+                        root.dragLiftScale = 1.018;
                     } else {
-                        // Release momentum projection
-                        var velocityX = centroid.velocity.x;
-                        var velocityY = centroid.velocity.y;
-                        
-                        // Prevent explosive throws if held still before drop
-                        if (Math.abs(velocityX) < 50 && Math.abs(velocityY) < 50) {
-                            velocityX = 0;
-                            velocityY = 0;
+                        root.dragLiftScale = 1.0;
+                        var clamped = root.clampToScreen(root.windowX, root.windowY);
+                        var snapDist = Math.round(28 * Style.uiScaleRatio);
+                        if (clamped.x <= Style.marginL + snapDist)
+                            clamped.x = Style.marginL;
+                        else if (clamped.x + root.width >= root.screenWidth() - Style.marginL - snapDist)
+                            clamped.x = root.screenWidth() - root.width - Style.marginL;
+                        if (clamped.y <= Style.marginL + snapDist)
+                            clamped.y = Style.marginL;
+                        root.windowX = clamped.x;
+                        root.windowY = clamped.y;
+                        if (root.shouldPersistPosition(clamped.x, clamped.y)) {
+                            root.persistedWindowX = clamped.x;
+                            root.persistedWindowY = clamped.y;
+                            root.persistedMonitorKey = root.monitorKey;
+                            root.positionSaved(root.monitorKey, clamped.x, clamped.y);
                         }
-                        
-                        var projectedX = root.windowX + (velocityX * 0.2);
-                        var projectedY = root.windowY + (velocityY * 0.2);
-                        
-                        var screenW = (root.screen && root.screen.width) || 1920;
-                        var screenH = (root.screen && root.screen.height) || 1080;
-                        
-                        var minX = Style.marginL;
-                        var minY = Style.marginL;
-                        var maxX = screenW - root.width - Style.marginL;
-                        var maxY = screenH - root.height - Style.marginL;
-                        
-                        if (projectedX < minX) projectedX = minX;
-                        if (projectedX > maxX) projectedX = maxX;
-                        if (projectedY < minY) projectedY = minY;
-                        if (projectedY > maxY) projectedY = maxY;
-        
-                        root.windowX = projectedX;
-                        root.windowY = projectedY;
-                        
-                        root.pluginWindowX = projectedX;
-                        root.pluginWindowY = projectedY;
-                        root.positionSaved(projectedX, projectedY);
                     }
                 }
-                
                 onTranslationChanged: {
                     if (active) {
-                        root.windowX = startWindowX + translation.x;
-                        root.windowY = startWindowY + translation.y;
+                        var dragX = startWindowX + (centroid.scenePosition.x - startCursorScene.x);
+                        var dragY = startWindowY + (centroid.scenePosition.y - startCursorScene.y);
+                        var clamped = root.clampToScreen(dragX, dragY);
+                        root.windowX = clamped.x;
+                        root.windowY = clamped.y;
                     }
                 }
             }
+
+        }
+
+        Item {
+            id: contentArea
+
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.top: titleBar.bottom
+            anchors.bottom: parent.bottom
         }
 
         Item {
@@ -242,8 +463,8 @@ PanelWindow {
             property real sourceMonitorHeight: (root.previewMonitorData && root.previewMonitorData.transform % 2 === 1) ? rawMonitorWidth : rawMonitorHeight
             property real aspectRatio: sourceMonitorWidth / Math.max(1, sourceMonitorHeight)
 
-            anchors.centerIn: parent
-            width: Math.min(parent.width - Style.marginL * 2, (parent.height - Style.marginL * 2) * aspectRatio)
+            anchors.centerIn: contentArea
+            width: Math.min(Math.max(1, contentArea.width - Style.marginL * 2), Math.max(1, (contentArea.height - Style.marginL * 2) * aspectRatio))
             height: width / Math.max(0.01, aspectRatio)
 
             Rectangle {
@@ -260,7 +481,7 @@ PanelWindow {
                     anchors.centerIn: parent
                     width: parent.width * 0.8
                     height: 1
-                    color: Qt.rgba((root.accentColorType === "primary" ? Color.mPrimary.r : Color.mSecondary.r), (root.accentColorType === "primary" ? Color.mPrimary.g : Color.mSecondary.g), (root.accentColorType === "primary" ? Color.mPrimary.b : Color.mSecondary.b), 0.2)
+                    color: Qt.alpha(root.accentColorType === "primary" ? Color.mPrimary : Color.mSecondary, Style.opacityLight)
                 }
 
                 Rectangle {
@@ -268,7 +489,7 @@ PanelWindow {
                     anchors.centerIn: parent
                     width: 1
                     height: parent.height * 0.8
-                    color: Qt.rgba((root.accentColorType === "primary" ? Color.mPrimary.r : Color.mSecondary.r), (root.accentColorType === "primary" ? Color.mPrimary.g : Color.mSecondary.g), (root.accentColorType === "primary" ? Color.mPrimary.b : Color.mSecondary.b), 0.2)
+                    color: Qt.alpha(root.accentColorType === "primary" ? Color.mPrimary : Color.mSecondary, Style.opacityLight)
                 }
 
                 Text {
@@ -352,6 +573,8 @@ PanelWindow {
                         simplifiedColorDepth: root.simplifiedColorDepth
                         simplifiedSaturation: root.simplifiedSaturation
                         simplifiedContrast: root.simplifiedContrast
+                        hyprGapsIn: (root.previewHyprConfig && root.previewHyprConfig.gapsIn !== undefined) ? root.previewHyprConfig.gapsIn : 5
+                        hyprBorderSize: (root.previewHyprConfig && root.previewHyprConfig.borderSize !== undefined) ? root.previewHyprConfig.borderSize : 1
                         windowBorderSize: (root.previewHyprConfig && root.previewHyprConfig.borderSize !== undefined) ? root.previewHyprConfig.borderSize : 1
                         activeBorderColor: (root.previewHyprConfig && root.previewHyprConfig.activeBorderColor) ? root.previewHyprConfig.activeBorderColor : Color.mPrimary
                         inactiveBorderColor: (root.previewHyprConfig && root.previewHyprConfig.inactiveBorderColor) ? root.previewHyprConfig.inactiveBorderColor : Qt.rgba(Color.mOutline.r, Color.mOutline.g, Color.mOutline.b, 0.85)
@@ -386,13 +609,12 @@ PanelWindow {
 
                 }
 
-                Text {
+                NText {
                     anchors.centerIn: parent
                     visible: (root.previewWorkspaceWindows || []).length === 0
                     text: "Open windows to preview styles"
                     color: Color.mOnSurfaceVariant
-                    font.family: Settings.data.ui.fontDefault
-                    font.pixelSize: Style.fontSizeS
+                    pointSize: Style.fontSizeS
                 }
 
             }
@@ -400,4 +622,5 @@ PanelWindow {
         }
 
     }
+
 }

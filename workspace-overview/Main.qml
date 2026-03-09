@@ -5,6 +5,7 @@ import Quickshell.Io
 import Quickshell.Wayland
 import "components"
 import "helpers"
+import "helpers/Utils.js" as Utils
 import qs.Commons
 import qs.Commons as Commons
 
@@ -42,7 +43,7 @@ Item {
     property bool showWindowTitleStrip: getSetting("showWindowTitleStrip", true)
     property int titleStripHeight: getSetting("titleStripHeight", 20)
     property string titleStripMode: getSetting("titleStripMode", "auto")
-    property string titleStripPosition: getSetting("titleStripPosition", "overlay-top")
+    property string titleStripPosition: normalizeTitleStripPosition(getSetting("titleStripPosition", "overlay-top"))
     property string titleStripMeta: getSetting("titleStripMeta", "class")
     property bool showWindowIcons: getSetting("showWindowIcons", true)
     property bool colorizeWindowIcons: getSetting("colorizeWindowIcons", false)
@@ -76,6 +77,20 @@ Item {
     property real simplifiedSaturation: getSetting("simplifiedSaturation", 1.1)
     property real simplifiedContrast: getSetting("simplifiedContrast", 1.1)
     property real overviewBackgroundOpacityRatio: getSetting("overviewBackgroundOpacityRatio", 1)
+    property bool showLayoutBadge: getSetting("showLayoutBadge", true)
+    // === LAYOUT DATA ===
+    property var workspaceLayouts: ({})
+    property var _pendingLayouts: ({})   // wsId → expected layoutName
+
+    function setPendingLayout(wsId, layoutName) {
+        var p = {};
+        var old = _pendingLayouts || {};
+        for (var k in old) p[k] = old[k];
+        p[wsId] = layoutName;
+        _pendingLayouts = p;
+    }
+
+    property var workspaceScrollDirections: (hyprConfig && hyprConfig.workspaceScrollDirections) || ({})
     // === OVERVIEW STATE ===
     property bool overviewOpen: false
     // Track the last navigated index for smooth keyboard/mouse navigation
@@ -162,26 +177,20 @@ Item {
 
     // === SETTINGS HELPERS ===
     function getSetting(key, fallback) {
-        if (!pluginApi)
-            return fallback;
-
-        try {
-            var val = pluginApi.pluginSettings[key];
-            if (val === undefined || val === null)
-                val = pluginApi.manifest && pluginApi.manifest.metadata && pluginApi.manifest.metadata.defaultSettings && pluginApi.manifest.metadata.defaultSettings[key];
-
-            return (val === undefined || val === null) ? fallback : val;
-        } catch (e) {
-            return fallback;
-        }
+        return Utils.getSetting(pluginApi, key, fallback);
     }
 
     function clamp(value, minValue, maxValue) {
-        if (value < minValue)
-            return minValue;
+        return Utils.clamp(value, minValue, maxValue);
+    }
 
-        if (value > maxValue)
-            return maxValue;
+    function normalizeTitleStripPosition(position) {
+        var value = (position || "overlay-top").toString();
+        if (value === "external")
+            return "overlay-top";
+
+        if (value !== "overlay-top" && value !== "overlay-bottom")
+            return "overlay-top";
 
         return value;
     }
@@ -250,7 +259,7 @@ Item {
         showWindowTitleStrip = getSetting("showWindowTitleStrip", true);
         titleStripHeight = getSetting("titleStripHeight", 20);
         titleStripMode = getSetting("titleStripMode", "auto");
-        titleStripPosition = getSetting("titleStripPosition", "overlay-top");
+        titleStripPosition = normalizeTitleStripPosition(getSetting("titleStripPosition", "overlay-top"));
         titleStripMeta = getSetting("titleStripMeta", "class");
         showWindowIcons = getSetting("showWindowIcons", true);
         colorizeWindowIcons = getSetting("colorizeWindowIcons", false);
@@ -281,6 +290,7 @@ Item {
         simplifiedSaturation = getSetting("simplifiedSaturation", 1.1);
         simplifiedContrast = getSetting("simplifiedContrast", 1.1);
         overviewBackgroundOpacityRatio = getSetting("overviewBackgroundOpacityRatio", 1);
+        showLayoutBadge = getSetting("showLayoutBadge", true);
     }
 
     function updateWindowList() {
@@ -305,6 +315,39 @@ Item {
         updateMonitors();
         updateWorkspaces();
         updateActiveWindow();
+    }
+
+    function updateWorkspaceLayouts() {
+        var map = {};
+        var workspaceList = workspaces || [];
+        for (var i = 0; i < workspaceList.length; i++) {
+            var ws = workspaceList[i];
+            if (ws && ws.id !== undefined) {
+                var layout = ws.tiledLayout || "dwindle";
+                if (layout === "scrolling")
+                    layout = "scroll";
+                map[ws.id] = layout;
+            }
+        }
+        // Preserve pending optimistic values until Hyprland confirms them.
+        var pending = _pendingLayouts || {};
+        var confirmed = {};
+        for (var wsKey in pending) {
+            if (map[wsKey] === pending[wsKey]) {
+                // Hyprland now agrees — clear this pending entry
+                confirmed[wsKey] = true;
+            } else if (map[wsKey] !== undefined) {
+                // Hyprland disagrees (still stale) — keep optimistic value
+                map[wsKey] = pending[wsKey];
+            }
+        }
+        // Remove confirmed pending entries
+        var remaining = {};
+        for (var k in pending) {
+            if (!confirmed[k]) remaining[k] = pending[k];
+        }
+        _pendingLayouts = remaining;
+        workspaceLayouts = map;
     }
 
     function copyObject(source) {
@@ -504,6 +547,22 @@ Item {
         }
     }
 
+    Timer {
+        // Hyprland does not always emit resize-oriented events for every geometry change.
+        // Keep preview geometry in sync while overview is visible.
+        id: geometrySyncRefresh
+
+        interval: 500
+        repeat: true
+        running: root.overviewOpen
+        onTriggered: {
+            if (!root.overviewOpen || getClients.running)
+                return ;
+
+            root.updateWindowList();
+        }
+    }
+
     Connections {
         function onRawEvent(event) {
             if (!root.overviewOpen)
@@ -608,6 +667,7 @@ Item {
             onStreamFinished: {
                 try {
                     root.workspaces = JSON.parse(workspacesCollector.text);
+                    root.updateWorkspaceLayouts();
                 } catch (e) {
                     Logger.e("WorkspaceOverview", "Failed to parse workspaces: " + e);
                 }
