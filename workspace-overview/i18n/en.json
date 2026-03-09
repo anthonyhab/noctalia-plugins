@@ -35,6 +35,19 @@
                 "label": "Grid Spacing",
                 "description": "Gap between workspace thumbnails"
             },
+            "animationProfile": {
+                "label": "Animation profile",
+                "description": "How quickly workspace cards and windows animate",
+                "none": "No animation",
+                "fast": "Fast",
+                "hyprlike": "Hyprlike",
+                "slow": "Slow",
+                "custom": "Custom"
+            },
+            "animationDuration": {
+                "label": "Animation duration",
+                "description": "Custom animation duration used by workspace and window transitions"
+            },
             "scale-warning": "Current settings exceed screen size. Overview is being scaled down to fit.",
             "total-workspaces": "{count} total workspaces"
         },
@@ -47,7 +60,25 @@
             "show-scratchpad": {
                 "label": "Show scratchpad windows",
                 "description": "Include special/scratchpad workspace windows in the overview"
+            },
+            "dragPreviewMode": {
+                "label": "Drag preview mode",
+                "description": "Controls retile/split guidance while dragging a window",
+                "off": "Off",
+                "basic": "Basic",
+                "smart": "Smart"
+            },
+            "dragSnapThreshold": {
+                "label": "Drag snap threshold",
+                "description": "How close to an edge the pointer must be before split zones commit"
+            },
+            "retilePreviewOpacity": {
+                "label": "Retile preview opacity",
+                "description": "Opacity multiplier for split/swap guidance overlays"
             }
+        },
+        "common": {
+            "default": "Default"
         },
         "layout": {
             "title": "Layout",
@@ -91,6 +122,12 @@
             "rowColumnGuides": {
                 "label": "Row/column guides",
                 "description": "Show subtle center guides in each workspace cell"
+            },
+            "layoutBadge": {
+                "label": "Layout badge",
+                "description": "Show a clickable layout badge (D/M/S) on each workspace to switch Hyprland tiling layout",
+                "setupHint": "To persist layouts across restarts, add this line to your hyprland.conf:",
+                "copy": "Copy"
             }
         },
         "appearance": {
@@ -156,10 +193,9 @@
             },
             "titleStripPosition": {
                 "label": "Title strip position",
-                "description": "Where the window title and controls are rendered",
+                "description": "Where the title overlay is rendered",
                 "overlay-top": "Overlay (Top)",
-                "overlay-bottom": "Overlay (Bottom)",
-                "external": "External Titlebar"
+                "overlay-bottom": "Overlay (Bottom)"
             },
             "titleStripMode": {
                 "label": "Title strip mode",
@@ -208,8 +244,8 @@
                 "description": "Keep non-focused workspaces colorful or push them toward monochrome"
             },
             "hoverLift": {
-                "label": "Hover lift",
-                "description": "How much a hovered window card lifts upward"
+                "label": "Hover emphasis",
+                "description": "How strong the hovered window preview is emphasized"
             },
             "cornerMode": {
                 "label": "Corner mode",
