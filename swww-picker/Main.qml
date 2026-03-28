@@ -279,22 +279,9 @@ Item {
     running: !!wallpapersDir
     onTriggered: checkResolvedWallpapersDir()
   }
-
-  // Theme change wallpaper applier (delayed for filesystem to settle)
-  Timer {
-    id: themeApplyTimer
-    interval: 500
-    repeat: false
-    running: false
-    property string targetPath: ""
-    onTriggered: {
-      if (targetPath) {
-        Logger.i("SwwwPicker", "Applying theme wallpaper after 500ms delay: " + targetPath);
-        setWallpaper(targetPath);
-        targetPath = "";
-      }
-    }
-  }
+  
+  // NOTE: themeApplyTimer removed - theme-bg-next applies wallpaper directly now
+  // Plugin only needs to track state for UI updates
 
   // Process: Check awww availability
   Process {
@@ -361,13 +348,9 @@ Item {
         currentIndex = 0;
         const firstWallpaper = wallpaperList[0];
         currentWallpaper = firstWallpaper;
-        // Theme changed - old wallpaper doesn't exist, apply first from new theme
-        // Wait 500ms for filesystem to settle (theme scripts may be copying files)
-        if (resolvedDirReady && available) {
-          Logger.i("SwwwPicker", "Theme change detected, will apply in 500ms: " + firstWallpaper);
-          themeApplyTimer.targetPath = firstWallpaper;
-          themeApplyTimer.restart();
-        }
+        // Theme changed - wallpaper was applied by theme-bg-next
+        // Just update our internal state, no delay needed
+        Logger.i("SwwwPicker", "Theme change detected, updated state: " + firstWallpaper);
       }
 
       if (rescanPending) {
@@ -437,8 +420,12 @@ Item {
     target: "plugin:swww-picker"
 
     function refresh() {
-      Logger.i("SwwwPicker", "IPC refresh triggered");
-      root.refresh();
+      Logger.i("SwwwPicker", "IPC refresh triggered (async)");
+      // Wallpaper was already applied by theme-bg-next
+      // Just refresh state asynchronously for UI updates
+      Qt.callLater(() => {
+        root.refresh();
+      });
     }
 
     function togglePanel() {
