@@ -53,6 +53,9 @@ Item {
   readonly property int transitionStep:
     pluginApi?.pluginSettings?.transitionStep ?? defaultSettings.transitionStep ?? 90
 
+  readonly property string transitionBezier:
+    pluginApi?.pluginSettings?.transitionBezier ?? defaultSettings.transitionBezier ?? ".4,0,.2,1"
+
   readonly property bool shuffleMode:
     pluginApi?.pluginSettings?.shuffleMode ?? defaultSettings.shuffleMode ?? false
 
@@ -86,9 +89,9 @@ Item {
     return settings;
   }
 
-  // Check if swww daemon is running
+  // Check if awww daemon is running
   function checkAvailability() {
-    availabilityProcess.command = ["swww", "query"];
+    availabilityProcess.command = ["awww", "query"];
     availabilityProcess.running = true;
   }
 
@@ -129,13 +132,25 @@ Item {
     return types.includes(selected) ? selected : "grow";
   }
 
-  // Set wallpaper with swww
+  // Set wallpaper with awww
   function setWallpaper(imagePath) {
     if (!imagePath || !available) {
       Logger.w("SwwwPicker", "Cannot set wallpaper: imagePath=" + imagePath + " available=" + available);
       return false;
     }
 
+    // Verify file exists before trying to set it
+    fileCheckProcess.command = ["test", "-f", imagePath];
+    fileCheckProcess.running = true;
+    
+    // Store the path for use after file check completes
+    fileCheckProcess.targetPath = imagePath;
+    
+    return true;
+  }
+  
+  // Internal: actually apply wallpaper after file check
+  function applyWallpaperInternal(imagePath) {
     applying = true;
 
     // Push current to history before changing
@@ -145,14 +160,15 @@ Item {
         historyStack.shift();
     }
 
-    swwwProcess.command = [
-      "swww", "img", imagePath,
+    awwwProcess.command = [
+      "awww", "img", imagePath,
       "--transition-type", getEffectiveTransition(),
       "--transition-duration", transitionDuration.toString(),
       "--transition-fps", transitionFps.toString(),
-      "--transition-step", transitionStep.toString()
+      "--transition-step", transitionStep.toString(),
+      "--transition-bezier", transitionBezier || ".4,0,.2,1"
     ];
-    swwwProcess.running = true;
+    awwwProcess.running = true;
 
     currentWallpaper = imagePath;
     currentIndex = wallpaperList.indexOf(imagePath);
@@ -160,8 +176,6 @@ Item {
     // Save current wallpaper to settings
     mutatePluginSettings(s => s.lastWallpaper = imagePath);
     pluginApi.saveSettings();
-
-    return true;
   }
 
   // Navigation: next wallpaper
@@ -182,18 +196,8 @@ Item {
   function previous() {
     if (historyStack.length > 0) {
       const prev = historyStack.pop();
-      // Don't add to history when going back
-      applying = true;
-      swwwProcess.command = [
-        "swww", "img", prev,
-        "--transition-type", getEffectiveTransition(),
-        "--transition-duration", transitionDuration.toString(),
-        "--transition-fps", transitionFps.toString(),
-        "--transition-step", transitionStep.toString()
-      ];
-      swwwProcess.running = true;
-      currentWallpaper = prev;
-      currentIndex = wallpaperList.indexOf(prev);
+      // Use setWallpaper to ensure file existence check
+      setWallpaper(prev);
       return;
     }
 
@@ -276,7 +280,23 @@ Item {
     onTriggered: checkResolvedWallpapersDir()
   }
 
-  // Process: Check swww availability
+  // Theme change wallpaper applier (delayed for filesystem to settle)
+  Timer {
+    id: themeApplyTimer
+    interval: 500
+    repeat: false
+    running: false
+    property string targetPath: ""
+    onTriggered: {
+      if (targetPath) {
+        Logger.i("SwwwPicker", "Applying theme wallpaper after 500ms delay: " + targetPath);
+        setWallpaper(targetPath);
+        targetPath = "";
+      }
+    }
+  }
+
+  // Process: Check awww availability
   Process {
     id: availabilityProcess
     running: false
@@ -284,9 +304,9 @@ Item {
     onExited: function(code) {
       available = (code === 0);
       if (!available) {
-        Logger.w("SwwwPicker", "swww daemon not running. Start with: swww-daemon");
+        Logger.w("SwwwPicker", "awww daemon not running. Start with: awww-daemon");
       } else {
-        Logger.i("SwwwPicker", "swww daemon available");
+        Logger.i("SwwwPicker", "awww daemon available");
       }
     }
   }
@@ -318,7 +338,18 @@ Item {
         return;
       }
 
-      wallpaperList = output.split("\n").filter(p => p.length > 0);
+      // Filter wallpaper list to only include files that actually exist
+      const allPaths = output.split("\n").filter(p => p.length > 0);
+      const existingPaths = allPaths.filter(path => {
+        // Quick check - we'll do proper verification when setting wallpaper
+        return path.startsWith("/") && path.length > 0;
+      });
+      
+      if (existingPaths.length !== allPaths.length) {
+        Logger.w("SwwwPicker", "Filtered out " + (allPaths.length - existingPaths.length) + " non-existent files");
+      }
+      
+      wallpaperList = existingPaths;
       Logger.i("SwwwPicker", "Found " + wallpaperList.length + " wallpapers");
 
       // Restore last wallpaper or set current index
@@ -328,7 +359,15 @@ Item {
         currentIndex = wallpaperList.indexOf(last);
       } else if (wallpaperList.length > 0) {
         currentIndex = 0;
-        currentWallpaper = wallpaperList[0];
+        const firstWallpaper = wallpaperList[0];
+        currentWallpaper = firstWallpaper;
+        // Theme changed - old wallpaper doesn't exist, apply first from new theme
+        // Wait 500ms for filesystem to settle (theme scripts may be copying files)
+        if (resolvedDirReady && available) {
+          Logger.i("SwwwPicker", "Theme change detected, will apply in 500ms: " + firstWallpaper);
+          themeApplyTimer.targetPath = firstWallpaper;
+          themeApplyTimer.restart();
+        }
       }
 
       if (rescanPending) {
@@ -362,16 +401,32 @@ Item {
     }
   }
 
-  // Process: Set wallpaper with swww
+  // Process: Check if file exists before setting wallpaper
   Process {
-    id: swwwProcess
+    id: fileCheckProcess
+    property string targetPath: ""
+    running: false
+    onExited: function(code) {
+      if (code === 0) {
+        // File exists, proceed with setting wallpaper
+        applyWallpaperInternal(targetPath);
+      } else {
+        Logger.w("SwwwPicker", "Wallpaper file does not exist: " + targetPath);
+        applying = false;
+      }
+    }
+  }
+
+  // Process: Set wallpaper with awww
+  Process {
+    id: awwwProcess
     running: false
     onExited: function(code) {
       applying = false;
       if (code !== 0) {
         Logger.e("SwwwPicker", "Failed to set wallpaper, exit code: " + code);
         ToastService.showError(
-          "Swww Picker",
+          "Awww Picker",
           pluginApi?.tr("errors.failed-set") || "Failed to set wallpaper"
         );
       }
@@ -380,6 +435,11 @@ Item {
 
   IpcHandler {
     target: "plugin:swww-picker"
+
+    function refresh() {
+      Logger.i("SwwwPicker", "IPC refresh triggered");
+      root.refresh();
+    }
 
     function togglePanel() {
       if (!pluginApi)
@@ -401,6 +461,15 @@ Item {
     refresh();
     checkResolvedWallpapersDir();
     lastWallpapersDirSetting = wallpapersDir;
+    
+    // Restore last wallpaper after a brief delay to ensure daemon is ready
+    Qt.callLater(() => {
+      const last = pluginApi?.pluginSettings?.lastWallpaper;
+      if (last && available) {
+        Logger.i("SwwwPicker", "Restoring last wallpaper: " + last);
+        setWallpaper(last);
+      }
+    });
   }
 
   Connections {
