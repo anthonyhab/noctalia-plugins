@@ -22,10 +22,11 @@ ColumnLayout {
   property string wallpapersDir: ""
   property bool autoCycleEnabled: false
   property string autoCycleInterval: "30"
-  property string transitionType: "grow"
-  property string transitionDuration: "1"
-  property string transitionFps: "60"
-  property string transitionStep: "90"
+  property string transitionType: "fade"
+  property string transitionDuration: "0.8"
+  property string transitionFps: "80"
+  property string transitionStep: "28"
+  property string transitionBezier: ".4,0,.2,1"
   property bool shuffleMode: false
   property bool showWallpaperName: true
 
@@ -45,10 +46,11 @@ ColumnLayout {
     wallpapersDir = getSetting("wallpapersDir", "~/Pictures/Wallpapers") || "";
     autoCycleEnabled = !!getSetting("autoCycleEnabled", false);
     autoCycleInterval = (getSetting("autoCycleInterval", 30) || 30).toString();
-    transitionType = getSetting("transitionType", "grow") || "grow";
-    transitionDuration = (getSetting("transitionDuration", 1) || 1).toString();
-    transitionFps = (getSetting("transitionFps", 60) || 60).toString();
-    transitionStep = (getSetting("transitionStep", 90) || 90).toString();
+    transitionType = getSetting("transitionType", "fade") || "fade";
+    transitionDuration = (getSetting("transitionDuration", 0.8) || 0.8).toString();
+    transitionFps = (getSetting("transitionFps", 80) || 80).toString();
+    transitionStep = (getSetting("transitionStep", 28) || 28).toString();
+    transitionBezier = getSetting("transitionBezier", ".4,0,.2,1") || ".4,0,.2,1";
     shuffleMode = !!getSetting("shuffleMode", false);
     showWallpaperName = getSetting("showWallpaperName", true) !== false;
   }
@@ -66,9 +68,10 @@ ColumnLayout {
     settings.autoCycleEnabled = autoCycleEnabled;
     settings.autoCycleInterval = parseInt(autoCycleInterval, 10) || 30;
     settings.transitionType = transitionType;
-    settings.transitionDuration = parseFloat(transitionDuration) || 1;
-    settings.transitionFps = parseInt(transitionFps, 10) || 60;
-    settings.transitionStep = parseInt(transitionStep, 10) || 90;
+    settings.transitionDuration = parseFloat(transitionDuration) || 0.8;
+    settings.transitionFps = parseInt(transitionFps, 10) || 80;
+    settings.transitionStep = parseInt(transitionStep, 10) || 28;
+    settings.transitionBezier = transitionBezier.trim() || ".4,0,.2,1";
     settings.shuffleMode = shuffleMode;
     settings.showWallpaperName = showWallpaperName;
 
@@ -81,7 +84,7 @@ ColumnLayout {
 
   // Header
   NText {
-    text: pluginApi?.tr("settings.description") || "Configure wallpaper cycling with swww."
+    text: pluginApi?.tr("settings.description") || "Configure wallpaper cycling with awww."
     wrapMode: Text.WordWrap
     color: Color.mOnSurface
   }
@@ -200,6 +203,58 @@ ColumnLayout {
     Layout.fillWidth: true
   }
 
+  // Bezier curve settings
+  NText {
+    text: pluginApi?.tr("settings.bezier.title") || "Easing Curve"
+    pointSize: Style.fontSizeM
+    font.weight: Style.fontWeightMedium
+    color: Color.mOnSurface
+  }
+
+  NText {
+    text: pluginApi?.tr("settings.bezier.description") || "Controls animation acceleration. Format: f1,f2,f3,f4 (0-1)"
+    wrapMode: Text.WordWrap
+    color: Color.mOnSurfaceVariant
+    pointSize: Style.fontSizeS
+  }
+
+  // Preset buttons row
+  RowLayout {
+    Layout.fillWidth: true
+    spacing: Style.marginS
+
+    NButton {
+      text: pluginApi?.tr("settings.bezier.snappy") || "Snappy"
+      highlighted: transitionBezier === ".4,0,.2,1"
+      onClicked: transitionBezier = ".4,0,.2,1"
+    }
+
+    NButton {
+      text: pluginApi?.tr("settings.bezier.natural") || "Natural"
+      highlighted: transitionBezier === ".17,.67,.83,.67"
+      onClicked: transitionBezier = ".17,.67,.83,.67"
+    }
+
+    NButton {
+      text: pluginApi?.tr("settings.bezier.linear") || "Linear"
+      highlighted: transitionBezier === "0,0,1,1"
+      onClicked: transitionBezier = "0,0,1,1"
+    }
+  }
+
+  NTextInput {
+    Layout.fillWidth: true
+    label: pluginApi?.tr("settings.transitions.bezier") || "Custom bezier"
+    description: pluginApi?.tr("settings.transitions.bezier-desc") || "Animation easing curve in format f1,f2,f3,f4 (0-1)"
+    placeholderText: ".4,0,.2,1"
+    text: root.transitionBezier
+    onTextChanged: root.transitionBezier = text
+  }
+
+  NDivider {
+    Layout.fillWidth: true
+  }
+
   // Bar widget settings
   NText {
     text: pluginApi?.tr("settings.bar-widget.title") || "Bar widget"
@@ -237,8 +292,8 @@ ColumnLayout {
         const available = pluginMain?.available || false;
         const count = pluginMain?.wallpaperList?.length || 0;
         const status = available
-          ? (pluginApi?.tr("status.daemon-running") || "swww daemon running")
-          : (pluginApi?.tr("status.daemon-stopped") || "swww daemon not running");
+          ? (pluginApi?.tr("status.daemon-running") || "awww daemon running")
+          : (pluginApi?.tr("status.daemon-stopped") || "awww daemon not running");
         return status + " | " + count + " " + (pluginApi?.tr("status.wallpapers") || "wallpapers");
       }
       color: Color.mOnSurfaceVariant
