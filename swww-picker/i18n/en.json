@@ -17,28 +17,28 @@
     "gallery": "Gallery"
   },
   "tooltips": {
-    "unavailable": "swww daemon not available\nRun: swww-daemon",
+    "unavailable": "awww daemon not available\nRun: awww-daemon",
     "no-wallpaper": "No wallpaper set",
     "auto-cycle": "Auto-cycling every {interval} min",
     "shuffle-on": "Shuffle mode enabled"
   },
   "errors": {
     "failed-set": "Failed to set wallpaper",
-    "daemon-not-running": "swww daemon not running\nRun: swww-daemon"
+    "daemon-not-running": "awww daemon not running\nRun: awww-daemon"
   },
   "status": {
     "no-wallpapers": "No wallpapers found\nCheck your wallpapers directory in settings",
     "wallpapers": "wallpapers",
     "auto-cycle-on": "Auto-cycle on",
     "auto-cycle-off": "Auto-cycle off",
-    "daemon-running": "swww daemon running",
-    "daemon-stopped": "swww daemon not running",
+    "daemon-running": "awww daemon running",
+    "daemon-stopped": "awww daemon not running",
     "selected": "Selected",
     "none": "None",
     "shuffle-on": "Shuffle on"
   },
   "settings": {
-    "description": "Configure wallpaper cycling with swww.",
+    "description": "Configure wallpaper cycling with awww.",
     "wallpapers-dir": "Wallpapers directory",
     "wallpapers-dir-desc": "Path to the directory containing your wallpaper images.",
     "auto-cycle": {
@@ -55,7 +55,16 @@
       "type": "Transition type",
       "duration": "Duration (seconds)",
       "fps": "FPS",
-      "step": "Step"
+      "step": "Step",
+      "bezier": "Bezier curve",
+      "bezier-desc": "Animation easing curve in format f1,f2,f3,f4 (0-1)"
+    },
+    "bezier": {
+      "title": "Easing Curve",
+      "description": "Controls animation acceleration. Format: f1,f2,f3,f4 (0-1)",
+      "snappy": "Snappy",
+      "natural": "Natural",
+      "linear": "Linear"
     },
     "bar-widget": {
       "title": "Bar widget"
