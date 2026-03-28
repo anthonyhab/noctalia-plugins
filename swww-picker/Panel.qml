@@ -132,7 +132,7 @@ Item {
           NText {
             visible: !isAvailable
             Layout.fillWidth: true
-            text: trOrDefault("errors.daemon-not-running", "swww daemon not running")
+            text: trOrDefault("errors.daemon-not-running", "awww daemon not running")
             color: Color.mOnSurfaceVariant
             pointSize: Style.fontSizeS
             elide: Text.ElideRight
@@ -238,6 +238,27 @@ Item {
                     sourceSize.width: 400 * Style.uiScaleRatio
                     sourceSize.height: 240 * Style.uiScaleRatio
                     visible: status === Image.Ready
+                    
+                    onStatusChanged: {
+                      if (status === Image.Error) {
+                        Logger.w("SwwwPicker", "Failed to load thumbnail: " + modelData);
+                        // Retry after 500ms in case file is still being written
+                        retryTimer.start();
+                      }
+                    }
+                    
+                    Timer {
+                      id: retryTimer
+                      interval: 500
+                      repeat: false
+                      running: false
+                      onTriggered: {
+                        // Force reload by clearing and resetting source
+                        const currentSource = thumbImage.source;
+                        thumbImage.source = "";
+                        thumbImage.source = currentSource;
+                      }
+                    }
                   }
 
                   Rectangle {
@@ -314,7 +335,7 @@ Item {
         anchors.centerIn: parent
         visible: !isAvailable || !hasWallpapers
         text: !isAvailable
-          ? trOrDefault("errors.daemon-not-running", "swww daemon not running\nRun: swww-daemon")
+          ? trOrDefault("errors.daemon-not-running", "awww daemon not running\nRun: awww-daemon")
           : trOrDefault("status.no-wallpapers", "No wallpapers found\nCheck your wallpapers directory in settings")
         color: Color.mOnSurfaceVariant
         pointSize: Style.fontSizeS

@@ -1,0 +1,281 @@
+{
+    "plugin": {
+        "name": "Workspace Overview",
+        "description": "Visual workspace overview with live window previews for Hyprland"
+    },
+    "barWidget": {
+        "tooltip": "Workspace Overview"
+    },
+    "actions": {
+        "settings": "Settings"
+    },
+    "settings": {
+        "title": "Workspace Overview Settings",
+        "tabs": {
+            "grid": "Grid",
+            "behavior": "Behavior",
+            "layout": "Layout",
+            "appearance": "Appearance"
+        },
+        "grid": {
+            "title": "Workspace Grid",
+            "rows": {
+                "label": "Rows",
+                "description": "Number of workspace rows"
+            },
+            "columns": {
+                "label": "Columns",
+                "description": "Number of workspace columns"
+            },
+            "scale": {
+                "label": "Scale",
+                "description": "Overview scale factor (smaller = more compact)"
+            },
+            "spacing": {
+                "label": "Grid Spacing",
+                "description": "Gap between workspace thumbnails"
+            },
+            "animationProfile": {
+                "label": "Animation profile",
+                "description": "How quickly workspace cards and windows animate",
+                "none": "No animation",
+                "fast": "Fast",
+                "hyprlike": "Hyprlike",
+                "slow": "Slow",
+                "custom": "Custom"
+            },
+            "animationDuration": {
+                "label": "Animation duration",
+                "description": "Custom animation duration used by workspace and window transitions"
+            },
+            "scale-warning": "Current settings exceed screen size. Overview is being scaled down to fit.",
+            "total-workspaces": "{count} total workspaces"
+        },
+        "behavior": {
+            "title": "Behavior",
+            "hide-empty-rows": {
+                "label": "Hide empty rows",
+                "description": "Automatically hide workspace rows with no windows"
+            },
+            "show-scratchpad": {
+                "label": "Show scratchpad windows",
+                "description": "Include special/scratchpad workspace windows in the overview"
+            },
+            "dragPreviewMode": {
+                "label": "Drag preview mode",
+                "description": "Controls retile/split guidance while dragging a window",
+                "off": "Off",
+                "basic": "Basic",
+                "smart": "Smart"
+            },
+            "dragSnapThreshold": {
+                "label": "Drag snap threshold",
+                "description": "How close to an edge the pointer must be before split zones commit"
+            },
+            "retilePreviewOpacity": {
+                "label": "Retile preview opacity",
+                "description": "Opacity multiplier for split/swap guidance overlays"
+            }
+        },
+        "common": {
+            "default": "Default"
+        },
+        "layout": {
+            "title": "Layout",
+            "position": {
+                "label": "Position",
+                "description": "Where the overview appears on screen",
+                "top": "Top",
+                "center": "Center",
+                "bottom": "Bottom"
+            },
+            "barMargin": {
+                "label": "Bar Margin",
+                "description": "Additional margin between overview and bar (when positioned at same edge)"
+            },
+            "backgroundOpacity": {
+                "label": "Background opacity",
+                "description": "Adjust the transparency of the overview backdrop"
+            },
+            "slideAnimation": {
+                "label": "Slide animation",
+                "description": "Animate overview sliding in from the bar (disable for instant popup)"
+            },
+            "workspaceLabels": {
+                "label": "Workspace labels",
+                "description": "Show readable labels in each workspace thumbnail"
+            },
+            "workspaceLabelMode": {
+                "label": "Workspace label format",
+                "description": "Choose whether labels use workspace number, name, or both",
+                "number": "Number",
+                "name": "Name",
+                "number-name": "Number + Name"
+            },
+            "specialWorkspaceStyle": {
+                "label": "Special workspace style",
+                "description": "How scratchpad workspace labels are rendered",
+                "pill": "Pill",
+                "chip": "Chip",
+                "plain": "Plain"
+            },
+            "rowColumnGuides": {
+                "label": "Row/column guides",
+                "description": "Show subtle center guides in each workspace cell"
+            },
+            "layoutBadge": {
+                "label": "Layout badge",
+                "description": "Show a clickable layout badge (D/M/S) on each workspace to switch Hyprland tiling layout",
+                "setupHint": "To persist layouts across restarts, add this line to your hyprland.conf:",
+                "copy": "Copy"
+            }
+        },
+        "appearance": {
+            "title": "Appearance",
+            "previewWorkspace": {
+                "label": "Preview workspace",
+                "no-windows": "Open windows in this workspace to preview styles"
+            },
+            "visualMode": {
+                "label": "Visual mode",
+                "description": "Switch between faithful live previews and stylized shader presets",
+                "live": "Live",
+                "simplified": "Simplified",
+                "cinematic": "Cinematic"
+            },
+            "shaderPreset": {
+                "label": "Shader preset",
+                "description": "Fine tune how stylized modes process window previews",
+                "classic": "Classic",
+                "simplified": "Simplified",
+                "mac": "Mac OS Classic",
+                "cinematic": "Cinematic"
+            },
+            "shaderPresetStrength": {
+                "label": "Preset strength",
+                "description": "How strongly the selected shader preset is applied"
+            },
+            "pixelDensity": {
+                "label": "Pixel Density",
+                "description": "Controls pixelation level (higher = more detail)"
+            },
+            "colorDepth": {
+                "label": "Color Depth",
+                "description": "Bits per color channel (lower = posterized look)"
+            },
+            "saturation": {
+                "label": "Saturation",
+                "description": "Color intensity (1.0 = normal)"
+            },
+            "contrast": {
+                "label": "Contrast",
+                "description": "Contrast strength (1.0 = normal)"
+            },
+            "accentColor": {
+                "label": "Accent color",
+                "description": "Color used for selection indicator and special workspaces",
+                "secondary": "Secondary (default)",
+                "primary": "Primary"
+            },
+            "windowIcons": {
+                "label": "Window icons",
+                "description": "Show app icons inside each window preview card"
+            },
+            "colorizeIcons": {
+                "label": "Colorize icons",
+                "description": "Tint the app icons using the system accent color"
+            },
+            "iconPlacement": {
+                "label": "Icon placement",
+                "description": "Where to position the icon inside the window preview",
+                "center": "Center",
+                "corner": "Bottom Corner"
+            },
+            "titleStripPosition": {
+                "label": "Title strip position",
+                "description": "Where the title overlay is rendered",
+                "overlay-top": "Overlay (Top)",
+                "overlay-bottom": "Overlay (Bottom)"
+            },
+            "titleStripMode": {
+                "label": "Title strip mode",
+                "description": "Control when the bottom title strip is displayed",
+                "off": "Off",
+                "auto": "Auto",
+                "always": "Always"
+            },
+            "titleStripHeight": {
+                "label": "Title strip height",
+                "description": "Height of the window title strip before monitor scaling"
+            },
+            "titleStripMeta": {
+                "label": "Title strip metadata",
+                "description": "Choose what extra metadata appears on the right side of the title strip",
+                "none": "None",
+                "class": "Class",
+                "class-pid": "Class + PID"
+            },
+            "focusedGlow": {
+                "label": "Focused glow",
+                "description": "Add a subtle glow around the focused window preview"
+            },
+            "urgencyBadge": {
+                "label": "Urgency badge",
+                "description": "Show a red badge when a window requests urgent attention"
+            },
+            "floatingBadge": {
+                "label": "Floating badge",
+                "description": "Show a badge on windows currently floating in Hyprland"
+            },
+            "fullscreenBadge": {
+                "label": "Fullscreen badge",
+                "description": "Show a badge on fullscreen or maximized window previews"
+            },
+            "monitorBadge": {
+                "label": "Monitor badge",
+                "description": "Show monitor index badges on window previews"
+            },
+            "dimInactive": {
+                "label": "Inactive workspace dim",
+                "description": "How much previews are dimmed when not on the active workspace"
+            },
+            "inactiveSaturation": {
+                "label": "Inactive saturation",
+                "description": "Keep non-focused workspaces colorful or push them toward monochrome"
+            },
+            "hoverLift": {
+                "label": "Hover emphasis",
+                "description": "How strong the hovered window preview is emphasized"
+            },
+            "cornerMode": {
+                "label": "Corner mode",
+                "description": "Use Hyprland rounding or force a fixed radius for previews",
+                "hyprland": "Hyprland",
+                "fixed": "Fixed"
+            },
+            "fixedCornerRadius": {
+                "label": "Fixed corner radius",
+                "description": "Corner radius applied when corner mode is set to Fixed"
+            },
+            "borderGradient": {
+                "label": "Border gradient",
+                "description": "Blend active/inactive border tones for a richer border highlight"
+            },
+            "containerBorder": {
+                "label": "Container border",
+                "description": "Border thickness of the overview container (-1 for default)"
+            },
+            "selectionBorder": {
+                "label": "Selection border",
+                "description": "Border thickness of the active workspace indicator (-1 for default)"
+            }
+        }
+    },
+    "overview": {
+        "tooltip": {
+            "xwayland": "XWayland",
+            "unknown": "Unknown",
+            "unknown-class": "unknown"
+        }
+    }
+}

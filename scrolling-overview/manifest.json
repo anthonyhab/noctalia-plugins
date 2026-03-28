@@ -1,0 +1,36 @@
+{
+    "id": "scrolling-overview",
+    "name": "Scrolling Overview",
+    "version": "0.1.0",
+    "minNoctaliaVersion": "3.6.0",
+    "author": "habibe",
+    "license": "MIT",
+    "repository": "https://github.com/anthonyhab/noctalia-plugins",
+    "description": "Next-gen vertical workspace overview with live previews and drag window moves for Hyprland.",
+    "tags": [
+        "Desktop",
+        "System",
+        "Productivity"
+    ],
+    "entryPoints": {
+        "main": "Main.qml",
+        "barWidget": "BarWidget.qml",
+        "settings": "Settings.qml"
+    },
+    "dependencies": {
+        "plugins": []
+    },
+    "metadata": {
+        "defaultSettings": {
+            "rows": 10,
+            "columns": 1,
+            "scale": 0.16,
+            "workspaceSpacing": 10,
+            "dimOpacity": 0.72,
+            "showWorkspaceLabels": true,
+            "showAllMonitors": false,
+            "includeSpecialWorkspaces": false,
+            "useLivePreviews": true
+        }
+    }
+}

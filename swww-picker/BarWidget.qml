@@ -62,7 +62,7 @@ Item {
 
   readonly property string tooltipText: {
     if (!isAvailable)
-      return pluginApi?.tr("tooltips.unavailable") || "swww daemon not available\nRun: swww-daemon";
+      return pluginApi?.tr("tooltips.unavailable") || "awww daemon not available\nRun: awww-daemon";
 
     let text = currentWallpaperName || (pluginApi?.tr("tooltips.no-wallpaper") || "No wallpaper set");
 

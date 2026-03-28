@@ -1,8 +1,8 @@
-![SWWW Wallpaper Picker](preview.png)
+![AWWW Wallpaper Picker](preview.png)
 
-# SWWW Wallpaper Picker
+# AWWW Wallpaper Picker
 
-Wallpaper management for Noctalia using `swww`, with quick controls in both the bar and panel.
+Wallpaper management for Noctalia using `awww`, with quick controls in both the bar and panel.
 
 ## Features
 
@@ -14,8 +14,8 @@ Wallpaper management for Noctalia using `swww`, with quick controls in both the 
 
 ## Requirements
 
-- `swww` installed
-- `swww-daemon` running in your session
+- `awww` installed
+- `awww-daemon` running in your session
 
 ## Availability
 
@@ -27,7 +27,7 @@ Install and update through the Noctalia plugin directory:
 
 ## Quick Start
 
-Open **Settings -> Plugins -> SWWW Wallpaper Picker** and configure:
+Open **Settings -> Plugins -> AWWW Wallpaper Picker** and configure:
 
 - Wallpapers directory
 - Auto-cycle enabled/interval
@@ -52,7 +52,7 @@ The plugin supports:
 - If status shows daemon not running, start it manually:
 
 ```bash
-swww-daemon
+awww-daemon
 ```
 
 - If no wallpapers appear, verify your configured directory contains image files.
