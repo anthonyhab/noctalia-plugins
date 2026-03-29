@@ -721,7 +721,7 @@ Item {
             root.open();
         }
 
-        target: "plugin:workspace-overview"
+        target: "plugin:hypr-overview"
     }
     // === OVERLAY WINDOWS (one per screen) ===
 
@@ -739,7 +739,7 @@ Item {
 
             screen: modelData
             visible: root.overviewOpen
-            WlrLayershell.namespace: "noctalia:workspace-overview"
+            WlrLayershell.namespace: "noctalia:hypr-overview"
             WlrLayershell.layer: WlrLayer.Overlay
             WlrLayershell.keyboardFocus: WlrKeyboardFocus.Exclusive
             WlrLayershell.exclusiveZone: -1

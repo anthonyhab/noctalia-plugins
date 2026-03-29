@@ -46,8 +46,8 @@
       "lastUpdated": "2026-02-10T12:00:00Z"
     },
     {
-      "id": "workspace-overview",
-      "name": "Workspace Overview",
+      "id": "hypr-overview",
+      "name": "Hypr Overview",
       "version": "0.1.0",
       "author": "habibe",
       "description": "Visual workspace overview for Hyprland with live previews, drag-and-drop, keyboard navigation, and multi-layout support.",
