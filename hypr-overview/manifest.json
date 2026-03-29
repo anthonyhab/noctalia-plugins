@@ -1,17 +1,17 @@
 {
   "id": "hypr-overview",
-  "name": "Workspace Overview for Hyprland",
-  "version": "1.0.0",
+  "name": "Hypr Overview",
+  "version": "0.1.0",
   "minNoctaliaVersion": "3.6.0",
-  "author": "doughbran",
+  "author": "habibe",
   "license": "MIT",
-  "repository": "https://github.com/noctalia-dev/noctalia-plugins",
-  "description": "Workspace overview with live window previews and wallpaper backgrounds for Hyprland.",
+  "repository": "https://github.com/anthonyhab/noctalia-plugins",
+  "description": "Visual workspace overview for Hyprland with live previews, drag-and-drop, keyboard navigation, and multi-layout support.",
   "tags": [
     "Hyprland",
-    "Bar",
-    "Panel",
-    "Utility"
+    "workspace",
+    "overview",
+    "productivity"
   ],
   "entryPoints": {
     "panel": "Panel.qml",
