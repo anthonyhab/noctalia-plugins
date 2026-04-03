@@ -2,8 +2,9 @@
 
 > **Agent-specific reference for developing Noctalia shell plugins.** This document combines project conventions, Qt6/QML best practices, Quickshell patterns, and anti-patterns to avoid.
 > 
+> **⚠️ CRITICAL:** When working on QML/Noctalia plugins, **load the `noctalia-plugin` skill** (`~/.omp/skills/noctalia-plugin/SKILL.md`) for complete API reference including all N* widget properties, signals, and common mistakes.
+> 
 > **See also:** [docs/REFERENCE.md](docs/REFERENCE.md) for comprehensive API documentation.
-
 ---
 
 ## Table of Contents
