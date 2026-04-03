@@ -9,9 +9,7 @@
   "description": "Visual workspace overview for Hyprland with live previews, drag-and-drop, keyboard navigation, and multi-layout support.",
   "tags": [
     "Hyprland",
-    "workspace",
-    "overview",
-    "productivity"
+    "Productivity"
   ],
   "entryPoints": {
     "panel": "Panel.qml",

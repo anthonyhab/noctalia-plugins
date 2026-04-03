@@ -1,0 +1,28 @@
+pre-commit:
+  parallel: true
+  jobs:
+    - name: json-syntax
+      run: bash scripts/dev/check-json-syntax.sh {staged_files}
+      glob: "*.json"
+
+    - name: anti-patterns
+      run: bash scripts/dev/check-anti-patterns.sh {staged_files}
+      glob: "*.qml"
+
+    - name: qmllint
+      run: bash scripts/dev/run-qmllint.sh {staged_files}
+      glob: "*.qml"
+
+    - name: format qml
+      run: bash scripts/dev/qmlfmt.sh {staged_files} && git update-index --again
+      glob: "*.qml"
+
+    - name: manifests
+      run: node scripts/check-manifests.js
+      globs:
+        - "*/manifest.json"
+        - "manifest.json"
+
+    - name: i18n-keys
+      run: node scripts/check-i18n-keys.js
+      glob: "*/i18n/*.json"

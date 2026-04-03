@@ -31,7 +31,11 @@ const ALLOWED_TAGS = new Set([
   "Development",
   "Fun",
   "Gaming",
-  "Indicator"
+  "Indicator",
+  "Hyprland",
+  "Screenshot",
+  "Utility",
+  "SmartHome"
 ])
 
 function isObject(value) {
