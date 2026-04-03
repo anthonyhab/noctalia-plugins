@@ -17,6 +17,7 @@ Rectangle {
     property var recentSizes: []
     property bool popupOpen: false
     property real screenScale: 1.0
+    property var pluginApi: null
 
     // Computed region
     property var region: ({
@@ -439,7 +440,7 @@ Rectangle {
             spacing: 8
 
             NText {
-                text: "Presets"
+                text: pluginApi?.tr("selector.size-popup.presets")
                 pointSize: 8
                 color: Qt.alpha(Color.mOnSurface, 0.5)
             }
@@ -491,7 +492,7 @@ Rectangle {
                 spacing: 6
 
                 NText {
-                    text: "Recent"
+                    text: pluginApi?.tr("selector.size-popup.recent")
                     pointSize: 8
                     color: Qt.alpha(Color.mOnSurface, 0.5)
                 }
@@ -617,7 +618,7 @@ Rectangle {
 
                     NText {
                         id: applyLabel
-                        text: "Apply"
+                        text: pluginApi?.tr("selector.size-popup.apply")
                         color: Color.mOnPrimary
                         pointSize: 10
                         anchors.centerIn: parent
@@ -649,7 +650,7 @@ Rectangle {
             width: captureLabel.width + 24; height: 32
             color: captureArea.containsMouse ? Qt.alpha(Color.mPrimary, 0.8) : Color.mPrimary
             radius: 6
-            NText { id: captureLabel; text: "Capture"; color: Color.mOnPrimary; pointSize: 9; font.weight: Font.Bold; anchors.centerIn: parent }
+            NText { id: captureLabel; text: pluginApi?.tr("selector.actions.capture"); color: Color.mOnPrimary; pointSize: 9; font.weight: Font.Bold; anchors.centerIn: parent }
             MouseArea { id: captureArea; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: root.captureRequested() }
         }
 
@@ -658,7 +659,7 @@ Rectangle {
             width: clearLabel.width + 20; height: 32
             color: clearArea.containsMouse ? Qt.alpha(Color.mError, 0.8) : Qt.alpha(Color.mError, 0.6)
             radius: 6
-            NText { id: clearLabel; text: "Clear"; color: "#FFFFFF"; pointSize: 8; font.weight: Font.Bold; anchors.centerIn: parent }
+            NText { id: clearLabel; text: pluginApi?.tr("selector.actions.clear"); color: Color.mOnSurface; pointSize: 8; font.weight: Font.Bold; anchors.centerIn: parent }
             MouseArea { id: clearArea; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: root.clearRequested() }
         }
     }

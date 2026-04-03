@@ -6,7 +6,6 @@ import Quickshell.Hyprland
 import Quickshell.Wayland
 import "components"
 import "helpers"
-import "helpers/Utils.js" as Utils
 import qs.Commons
 import qs.Widgets
 
@@ -14,8 +13,8 @@ ColumnLayout {
     id: root
 
     property var pluginApi: null
-    readonly property var defaultSettings: (pluginApi && pluginApi.manifest && pluginApi.manifest.metadata && pluginApi.manifest.metadata.defaultSettings) || ({
-    })
+    property var cfg: pluginApi?.pluginSettings || ({})
+    property var defaults: pluginApi?.manifest?.metadata?.defaultSettings || ({})
     readonly property var pluginMain: pluginApi && pluginApi.mainInstance
     // Local state
     property int gridRows: 2
@@ -544,7 +543,11 @@ ColumnLayout {
     }
 
     function getSetting(key, fallback) {
-        return Utils.getSetting(pluginApi, key, fallback);
+        if (cfg[key] !== undefined)
+            return cfg[key];
+        if (defaults[key] !== undefined)
+            return defaults[key];
+        return fallback;
     }
 
     function tr(key, fallback) {
@@ -777,8 +780,12 @@ ColumnLayout {
         if (!pluginApi)
             return ;
 
-        var settings = pluginApi.pluginSettings || {
+        var previous = pluginApi.pluginSettings || {
         };
+        var settings = {
+        };
+        for (var key in previous)
+            settings[key] = previous[key];
         settings.rows = gridRows;
         settings.columns = gridColumns;
         settings.scale = gridScale;

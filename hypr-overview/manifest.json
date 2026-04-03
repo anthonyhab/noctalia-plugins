@@ -16,6 +16,7 @@
   "entryPoints": {
     "panel": "Panel.qml",
     "barWidget": "BarWidget.qml",
+    "controlCenterWidget": "ControlCenterWidget.qml",
     "main": "Main.qml",
     "settings": "Settings.qml"
   },

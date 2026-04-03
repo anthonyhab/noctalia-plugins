@@ -1,0 +1,69 @@
+{
+  "widget": {
+    "tooltip": "Take screenshot"
+  },
+  "log": {
+    "grim-failed": "grim capture failed",
+    "region": "region"
+  },
+  "notifications": {
+    "captured-title": "Screenshot captured"
+  },
+  "capture-modes": {
+    "region": "Region",
+    "window": "Window",
+    "fullscreen": "Fullscreen",
+    "last": "Last"
+  },
+  "selector": {
+    "fullscreen-hint": "Click anywhere to capture full screen",
+    "actions": {
+      "capture": "Capture",
+      "clear": "Clear"
+    },
+    "size-popup": {
+      "presets": "Presets",
+      "recent": "Recent",
+      "apply": "Apply"
+    }
+  },
+  "settings": {
+    "title": "Screenshot Compare Settings",
+    "description": "Configure screenshot capture behavior and keyboard shortcuts",
+    "visual": {
+      "title": "Visual Settings"
+    },
+    "show-grid": {
+      "label": "Show Grid Overlay",
+      "desc": "Display rule-of-thirds grid in selection area"
+    },
+    "snap-to-windows": {
+      "label": "Snap to Windows",
+      "desc": "Auto-snap selection to window boundaries"
+    },
+    "capture": {
+      "title": "Capture Behavior"
+    },
+    "copy-to-clipboard": {
+      "label": "Copy to Clipboard",
+      "desc": "Automatically copy screenshots to clipboard"
+    },
+    "open-after-capture": {
+      "label": "Open After Capture",
+      "desc": "Open screenshot in default image viewer"
+    },
+    "reset-timeout": {
+      "title": "Reset Timeout",
+      "desc": "Minutes before the previous capture expires",
+      "combo-label": "Timeout (minutes)",
+      "reset": "Reset"
+    },
+    "shortcuts": {
+      "title": "Keyboard Shortcuts",
+      "quick-capture": "SUPER + SHIFT + PRINT: Quick capture (uses script or saved region)",
+      "open-selector": "SUPER + SHIFT + ALT + PRINT: Open region selector (pixel-perfect adjustment)",
+      "capture-current": "Enter / Space: Capture at current region",
+      "cancel": "Escape: Cancel and close selector"
+    }
+  }
+}

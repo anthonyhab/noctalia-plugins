@@ -175,7 +175,7 @@ Item {
                     if (openAfterCapture) openFile(filename)
                     if (callback) callback(true, filename)
                 } else {
-                    console.error("[QuickshellScreenshot] grim failed:", exitCode, "region:", regionStr)
+                    Logger.e("QuickshellScreenshot", pluginApi?.tr("log.grim-failed"), exitCode, pluginApi?.tr("log.region"), regionStr)
                     if (callback) callback(false, null)
                 }
             })
@@ -207,7 +207,7 @@ Item {
         t.triggered.connect(function() {
             captureScreenshot(region, function(success, filename) {
                 if (success)
-                    showNotification("Screenshot captured", formatRegion(region), filename)
+                    showNotification(pluginApi?.tr("notifications.captured-title"), formatRegion(region), filename)
             })
         })
         t.running = true
@@ -217,7 +217,7 @@ Item {
         if (!savedRegion) { showSelector(); return }
         captureScreenshot(savedRegion, function(success, filename) {
             if (success)
-                showNotification("Screenshot captured", formatRegion(savedRegion), filename)
+                showNotification(pluginApi?.tr("notifications.captured-title"), formatRegion(savedRegion), filename)
         })
     }
 
@@ -421,10 +421,10 @@ Item {
 
                     Repeater {
                         model: [
-                            { id: "region",     label: "Region"     },
-                            { id: "window",     label: "Window"     },
-                            { id: "fullscreen", label: "Fullscreen" },
-                            { id: "last",       label: "Last"       }
+                            { id: "region",     labelKey: "capture-modes.region" },
+                            { id: "window",     labelKey: "capture-modes.window" },
+                            { id: "fullscreen", labelKey: "capture-modes.fullscreen" },
+                            { id: "last",       labelKey: "capture-modes.last" }
                         ]
 
                         Rectangle {
@@ -440,7 +440,7 @@ Item {
 
                             NText {
                                 id: modeBtnLabel
-                                text: modelData.label
+                                text: pluginApi?.tr(modelData.labelKey)
                                 color: isSelected ? Color.mOnPrimary : Color.mPrimary
                                 pointSize: 9
                                 font.weight: Font.Medium
@@ -472,7 +472,7 @@ Item {
         // Fullscreen hint (center of screen)
         NText {
             visible: root.captureMode === "fullscreen"
-            text: "Click anywhere to capture full screen"
+            text: pluginApi?.tr("selector.fullscreen-hint")
             color: Qt.alpha(Color.mOnSurface, 0.7)
             pointSize: 16
             font.weight: Font.Bold
@@ -556,6 +556,7 @@ Item {
             recentSizes: root.recentSizes
             screenScale: root.screenScale
             z: 6
+            pluginApi: root.pluginApi
 
             hasSavedRegion: root.savedRegion !== null
             onCaptureRequested: root.captureAtRegion(region)
@@ -581,10 +582,10 @@ Item {
             anchors.margins: 20
             z: 10
 
-            Text {
+            NText {
                 text: "×"
-                color: "#FFFFFF"
-                font.pixelSize: 24
+                color: Color.mOnSurface
+                pointSize: 24
                 font.weight: Font.Bold
                 anchors.centerIn: parent
             }

@@ -12,6 +12,8 @@
     "main": "Main.qml",
     "panel": "Panel.qml",
     "barWidget": "BarWidget.qml",
+    "controlCenterWidget": "ControlCenterWidget.qml",
+    "launcherProvider": "LauncherProvider.qml",
     "settings": "Settings.qml"
   },
   "dependencies": {

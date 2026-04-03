@@ -1,7 +1,6 @@
 import QtQuick
 import Quickshell
 import qs.Commons
-import qs.Modules.Bar.Extras
 import qs.Modules.Panels.Settings
 import qs.Services.UI
 import qs.Widgets
@@ -15,63 +14,47 @@ Item {
     property string section: ""
     property int sectionWidgetIndex: -1
     property int sectionWidgetsCount: 0
-    readonly property var pluginMain: pluginApi && pluginApi.mainInstance
-    readonly property bool isOpen: (pluginMain && pluginMain.overviewOpen) || false
 
-    function popupWindow() {
-        if (!screen)
-            return null;
+    property var cfg: pluginApi?.pluginSettings || ({})
+    property var defaults: pluginApi?.manifest?.metadata?.defaultSettings || ({})
 
-        return PanelService.getPopupMenuWindow(screen);
-    }
+    readonly property string barPosition: Settings.getBarPositionForScreen(screen?.name)
+    readonly property bool isVertical: barPosition === "left" || barPosition === "right"
+    readonly property real capsuleHeight: Style.getCapsuleHeightForScreen(screen?.name)
 
-    function openPluginSettings() {
-        if (!pluginApi || !screen)
-            return;
-
-        var popupMenuWindow = popupWindow();
-        if (popupMenuWindow)
-            popupMenuWindow.close();
-
-        BarService.openPluginSettings(screen, pluginApi.manifest);
-    }
-
-    implicitWidth: pill.width
-    implicitHeight: pill.height
+    implicitWidth: isVertical ? capsuleHeight : button.implicitWidth
+    implicitHeight: isVertical ? button.implicitHeight : capsuleHeight
 
     NPopupContextMenu {
         id: contextMenu
+        model: [
+            { "label": pluginApi?.tr("menu.settings"), "action": "settings", "icon": "settings" }
+        ]
 
-        model: [{
-            "label": (pluginApi && pluginApi.tr("actions.settings")) || "Settings",
-            "action": "settings",
-            "icon": "settings"
-        }]
-        onTriggered: function(action) {
+        onTriggered: action => {
+            contextMenu.close()
+            PanelService.closeContextMenu(screen)
             if (action === "settings")
-                openPluginSettings();
+                BarService.openPluginSettings(screen, pluginApi.manifest)
         }
     }
 
-    BarPill {
-        id: pill
+    NIconButton {
+        id: button
 
-        screen: root.screen
-        oppositeDirection: BarService.getPillDirection(root)
         icon: "layout-dashboard"
-        tooltipText: isOpen ? "Close Hypr Overview" : "Open Hypr Overview"
-        onClicked: {
-            TooltipService.hide();
-            if (pluginMain && pluginMain.toggle)
-                pluginMain.toggle();
-        }
-        onRightClicked: {
-            TooltipService.hide();
-            var popupMenuWindow = popupWindow();
-            if (popupMenuWindow) {
-                popupMenuWindow.showContextMenu(contextMenu);
-                contextMenu.openAtItem(pill, screen);
-            }
-        }
+        tooltipText: pluginApi?.tr("widget.tooltip")
+        tooltipDirection: BarService.getTooltipDirection(screen?.name)
+        baseSize: capsuleHeight
+        applyUiScale: false
+        customRadius: Style.radiusL
+        colorBg: Style.capsuleColor
+        colorFg: Color.mOnSurface
+
+        border.color: Style.capsuleBorderColor
+        border.width: Style.capsuleBorderWidth
+
+        onClicked: pluginApi?.togglePanel(screen, this)
+        onRightClicked: PanelService.showContextMenu(contextMenu, this, screen)
     }
 }

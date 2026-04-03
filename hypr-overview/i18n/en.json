@@ -3,6 +3,12 @@
         "name": "Hypr Overview",
         "description": "Visual Hyprland overview with live window previews"
     },
+    "widget": {
+        "tooltip": "Hypr Overview"
+    },
+    "menu": {
+        "settings": "Settings"
+    },
     "barWidget": {
         "tooltip": "Hypr Overview"
     },

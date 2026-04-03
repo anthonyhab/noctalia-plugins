@@ -71,5 +71,10 @@
     "sync-panel-mode-desc": "Automatically use the same panel mode as the main shell settings.",
     "success-animation-duration": "Success animation duration (ms)",
     "success-animation-duration-desc": "How long the success state is shown before closing."
+  },
+  "widget": {
+    "tooltip-ready": "Authentication agent ready",
+    "tooltip-unavailable": "Authentication agent unavailable",
+    "tooltip-standby": "Authentication handled by another interface"
   }
 }

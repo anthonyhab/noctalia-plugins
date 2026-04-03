@@ -1,9 +1,6 @@
 import QtQuick
-import QtQuick.Controls
-import QtQuick.Layouts
 import Quickshell
 import qs.Commons
-import qs.Modules.Bar.Extras
 import qs.Modules.Panels.Settings
 import qs.Services.UI
 import qs.Widgets
@@ -13,144 +10,113 @@ Item {
 
   property var pluginApi: null
   property ShellScreen screen
-
-  // Widget properties passed from Bar.qml for per-instance settings
   property string widgetId: ""
   property string section: ""
   property int sectionWidgetIndex: -1
   property int sectionWidgetsCount: 0
-  property real scaling: 1.0
-
-  readonly property string barPosition: Settings.data.bar.position
-  readonly property bool isBarVertical: barPosition === "left" || barPosition === "right"
 
   readonly property var pluginMain: pluginApi?.mainInstance
-  readonly property bool isActive: pluginApi?.pluginSettings?.active || false
-  readonly property bool isAvailable: pluginMain?.available || false
+  readonly property bool isActive: pluginApi?.pluginSettings?.active === true
+  readonly property bool isAvailable: pluginMain?.available === true
+  readonly property bool isLoading: pluginMain?.operationInProgress === true
 
-  readonly property string pluginTitle: pluginApi?.tr("title") || "Omarchy"
-  readonly property string unavailableLabel: pluginApi?.tr("status.not-available") || "Omarchy not found"
+  readonly property string barPosition: Settings.getBarPositionForScreen(screen?.name)
+  readonly property bool isBarVertical: barPosition === "left" || barPosition === "right"
+  readonly property real capsuleHeight: Style.getCapsuleHeightForScreen(screen?.name)
 
-  readonly property string labelText: {
-    if (!isActive)
-      return pluginTitle;
-    if (!isAvailable)
-      return unavailableLabel;
-    const name = pluginMain?.themeDisplayName || "";
-    return name !== "" ? name : pluginTitle;
-  }
-
-  readonly property bool showThemeName: pluginApi?.pluginSettings?.showThemeName !== false
-  readonly property string pillText: (isBarVertical || !showThemeName) ? "" : labelText
   readonly property string iconName: {
+    if (isLoading)
+      return "refresh"
     if (!isActive)
-      return "palette-off";
+      return "palette-off"
     if (!isAvailable)
-      return "alert-circle";
-    return "palette";
+      return "alert-circle"
+    return "palette"
   }
-  readonly property bool isLoading: pluginMain?.operationInProgress || false
 
   readonly property string tooltipText: {
     if (isLoading)
-      return "Applying theme...";
+      return pluginApi?.tr("status.applying")
     if (!isActive)
-      return pluginApi?.tr("tooltips.inactive") || "Omarchy (inactive)\nClick to open settings";
+      return pluginApi?.tr("tooltips.inactive")
     if (!isAvailable)
-      return pluginApi?.tr("tooltips.not-available") || "Omarchy not available\nInstall omarchy and configure themes";
-    const currentTheme = pluginMain?.themeDisplayName || "";
-    return pluginApi?.tr("tooltips.active", { "theme": currentTheme }) || ("Theme: " + currentTheme);
+      return pluginApi?.tr("tooltips.not-available")
+    return pluginApi?.tr("tooltips.active", { "theme": pluginMain?.themeDisplayName || "" })
   }
 
-  readonly property color pillBackgroundColor: {
-    if (!isActive)
-      return Color.mSurfaceVariant;
-    if (!isAvailable)
-      return Color.mSurfaceVariant;
-    return Qt.rgba(0, 0, 0, 0);
-  }
-  readonly property color pillTextIconColor: (!isActive || !isAvailable) ? Color.mOnSurface : Qt.rgba(0, 0, 0, 0)
-
-  implicitWidth: pill.width
-  implicitHeight: pill.height
-
-  function popupWindow() {
-    if (!screen)
-      return null;
-    return PanelService.getPopupMenuWindow(screen);
-  }
+  implicitWidth: isBarVertical ? capsuleHeight : button.implicitWidth
+  implicitHeight: capsuleHeight
 
   NPopupContextMenu {
     id: contextMenu
 
     model: [
       {
-        "label": pluginApi?.tr("tooltips.random-theme") || "Random theme",
+        "label": pluginApi?.tr("tooltips.random-theme"),
         "action": "random",
         "icon": "dice-3"
       },
       {
-        "label": pluginApi?.tr("tooltips.widget-settings") || "Widget settings",
+        "label": pluginApi?.tr("tooltips.widget-settings"),
         "action": "settings",
         "icon": "settings"
       }
     ]
 
     onTriggered: action => {
-                   var popupMenuWindow = popupWindow();
-                   if (popupMenuWindow) {
-                     popupMenuWindow.close();
-                   }
-                   if (action === "random") {
-                     selectRandomTheme();
-                   } else if (action === "settings") {
-                     openPluginSettings();
-                   }
-                 }
-  }
+      contextMenu.close()
+      PanelService.closeContextMenu(screen)
 
-  BarPill {
-    id: pill
-
-    screen: root.screen
-    oppositeDirection: BarService.getPillDirection(root)
-    icon: isLoading ? "refresh" : iconName
-    text: pillText
-    tooltipText: root.tooltipText
-    forceOpen: !isBarVertical && isActive && isAvailable && pillText !== ""
-    forceClose: !isActive || (!isAvailable && pillText === "")
-    customBackgroundColor: isLoading ? Color.mPrimary : pillBackgroundColor
-    customTextIconColor: pillTextIconColor
-
-    onClicked: {
-      TooltipService.hide();
-      pluginApi?.togglePanel(root.screen, pill);
-    }
-    onRightClicked: {
-      TooltipService.hide();
-      var popupMenuWindow = popupWindow();
-      if (popupMenuWindow) {
-        popupMenuWindow.showContextMenu(contextMenu);
-        contextMenu.openAtItem(pill, screen);
+      if (action === "random") {
+        selectRandomTheme()
+      } else if (action === "settings") {
+        openPluginSettings()
       }
     }
-    onMiddleClicked: {
-      TooltipService.hide();
-      if (!isLoading) {
-        selectRandomTheme();
+  }
+
+  NIconButton {
+    id: button
+
+    anchors.centerIn: parent
+    implicitWidth: capsuleHeight
+    implicitHeight: capsuleHeight
+    icon: iconName
+    iconColor: (!isActive || !isAvailable) ? Color.mOnSurface : Color.mPrimary
+    tooltipText: root.tooltipText
+
+    onClicked: {
+      TooltipService.hide()
+      pluginApi?.togglePanel(root.screen, button)
+    }
+
+  }
+
+  MouseArea {
+    anchors.fill: button
+    acceptedButtons: Qt.RightButton | Qt.MiddleButton
+    hoverEnabled: false
+    onClicked: mouse => {
+      TooltipService.hide()
+      if (mouse.button === Qt.RightButton) {
+        PanelService.showContextMenu(contextMenu, button, screen)
+      } else if (mouse.button === Qt.MiddleButton) {
+        selectRandomTheme()
       }
     }
   }
 
   function openPluginSettings() {
     if (!pluginApi || !root.screen)
-      return;
-    BarService.openPluginSettings(root.screen, pluginApi.manifest);
+      return
+
+    BarService.openPluginSettings(root.screen, pluginApi.manifest)
   }
 
   function selectRandomTheme() {
-    if (!pluginMain || !isAvailable || !isActive)
-      return;
-    pluginMain.randomTheme();
+    if (!pluginMain || !isAvailable || !isActive || isLoading)
+      return
+
+    pluginMain.randomTheme()
   }
 }
