@@ -82,7 +82,7 @@ Item {
     implicitWidth: capsuleHeight
     implicitHeight: capsuleHeight
     icon: iconName
-    iconColor: (!isActive || !isAvailable) ? Color.mOnSurface : Color.mPrimary
+    colorFg: (!isActive || !isAvailable) ? Color.mOnSurface : Color.mPrimary
     tooltipText: root.tooltipText
 
     onClicked: {

@@ -11,7 +11,7 @@ NIconButtonHot {
   readonly property bool isAvailable: pluginMain?.available === true
 
   icon: "palette"
-  iconColor: (!isActive || !isAvailable) ? Color.mOnSurface : Color.mPrimary
+  colorFg: (!isActive || !isAvailable) ? Color.mOnSurface : Color.mPrimary
   tooltipText: {
     if (!isActive)
       return pluginApi?.tr("tooltips.inactive")
