@@ -388,12 +388,12 @@ property real gridScale: getSetting("scale", 0.16)
 
 ### BarWidget Pattern
 
+Uses `NIconButton` (not `BarPill`) with required injected properties:
+
 ```qml
 import QtQuick
 import Quickshell
 import qs.Commons
-import qs.Modules.Bar.Extras
-import qs.Modules.Panels.Settings
 import qs.Services.UI
 import qs.Widgets
 
@@ -401,39 +401,56 @@ Item {
     property var pluginApi: null
     property ShellScreen screen
     property string widgetId: ""
+    property string section: ""
+    property int sectionWidgetIndex: -1
+    property int sectionWidgetsCount: 0
     
-    implicitWidth: pill.width
-    implicitHeight: pill.height
+    property var cfg: pluginApi?.pluginSettings || ({})
+    property var defaults: pluginApi?.manifest?.metadata?.defaultSettings || ({})
     
-    BarPill {
-        id: pill
-        screen: root.screen
-        oppositeDirection: BarService.getPillDirection(root)
+    readonly property string barPosition: Settings.getBarPositionForScreen(screen?.name)
+    readonly property bool isVertical: barPosition === "left" || barPosition === "right"
+    readonly property real capsuleHeight: Style.getCapsuleHeightForScreen(screen?.name)
+    
+    implicitWidth: isVertical ? capsuleHeight : button.implicitWidth
+    implicitHeight: isVertical ? contentHeight : capsuleHeight
+    
+    NIconButton {
+        id: button
+        anchors.centerIn: parent
+        implicitWidth: capsuleHeight
+        implicitHeight: capsuleHeight
         icon: "layout-dashboard"
-        tooltipText: isOpen ? "Close Overview" : "Open Overview"
-        
-        onClicked: {
-            TooltipService.hide()
-            pluginApi?.mainInstance?.toggle()
-        }
-        
-        onRightClicked: {
-            TooltipService.hide()
-            // Show context menu
-        }
-    }
-    
-    NPopupContextMenu {
-        id: contextMenu
-        model: [{
-            "label": pluginApi?.tr("actions.settings") ?? "Settings",
-            "action": "settings",
-            "icon": "settings"
-        }]
+        tooltipText: pluginApi?.tr("widget.tooltip")  // NO FALLBACK - use i18n/en.json
+        onClicked: pluginApi?.togglePanel(root.screen, button)
     }
 }
 ```
 
+#### NIconButton Properties (Common Pitfalls)
+
+| Property | Type | Purpose | Common Error |
+|----------|------|---------|--------------|
+| `icon` | string | Tabler icon name | - |
+| `tooltipText` | string | Hover tooltip | Using `??` fallback (DON'T) |
+| `colorFg` | color | Icon color | Using `iconColor` (WRONG - doesn't exist) |
+| `colorBg` | color | Background color | - |
+| `onClicked` | function | Click handler | - |
+| `onRightClicked` | function | Right-click handler | Use for context menu |
+
+**CRITICAL:** The property is `colorFg` NOT `iconColor`. Subagents often hallucinate `iconColor` which causes:
+```
+ERROR: Cannot assign to non-existent property "iconColor"
+```
+
+**CRITICAL:** Do NOT use fallbacks with `tr()`:
+```qml
+// WRONG - fallback defeats translation system
+tooltipText: pluginApi?.tr("widget.tooltip") ?? "Fallback"
+
+// CORRECT - translation system handles missing keys
+tooltipText: pluginApi?.tr("widget.tooltip")
+```
 ### Settings UI Pattern
 
 ```qml
@@ -920,6 +937,103 @@ ColumnLayout {
     property var pluginApi: null
     // ... settings controls
 }
+```
+
+---
+
+## Common AI Mistakes
+
+These are the most frequent issues in AI-generated plugin code:
+
+### 1. Hallucinated NIconButton Properties
+
+**WRONG:** Using `iconColor`
+```qml
+NIconButton {
+    iconColor: Color.mPrimary  // ERROR: property doesn't exist!
+}
+```
+
+**CORRECT:** Use `colorFg`
+```qml
+NIconButton {
+    colorFg: Color.mPrimary  // Correct property name
+}
+```
+
+### 2. Translation Fallback Anti-Pattern
+
+**WRONG:** Adding fallback after `tr()`
+```qml
+tooltipText: pluginApi?.tr("widget.tooltip") ?? "Fallback"
+```
+
+**CORRECT:** Let translation system handle it
+```qml
+tooltipText: pluginApi?.tr("widget.tooltip")  // System returns key if missing
+```
+
+### 3. Using Deprecated BarPill Component
+
+**WRONG:** Using custom BarPill
+```qml
+BarPill {  // Old custom component
+    icon: "..."
+}
+```
+
+**CORRECT:** Use NIconButton
+```qml
+NIconButton {  // Official widget
+    icon: "..."
+}
+```
+
+### 4. Missing BarWidget Properties
+
+**WRONG:** Incomplete property list
+```qml
+Item {
+    property var pluginApi: null
+    property ShellScreen screen
+    // Missing: widgetId, section, sectionWidgetIndex, sectionWidgetsCount!
+}
+```
+
+**CORRECT:** All required properties
+```qml
+Item {
+    property var pluginApi: null
+    property ShellScreen screen
+    property string widgetId: ""
+    property string section: ""
+    property int sectionWidgetIndex: -1
+    property int sectionWidgetsCount: 0
+}
+```
+
+### 5. Hardcoded Strings
+
+**WRONG:** Direct text in UI
+```qml
+tooltipText: "Close Overview"  // Not translatable!
+```
+
+**CORRECT:** Use translation keys
+```qml
+tooltipText: pluginApi?.tr("actions.close")
+```
+
+### 6. Console Instead of Logger
+
+**WRONG:** Using console.log
+```qml
+console.log("Debug message")  // Don't use!
+```
+
+**CORRECT:** Use Logger
+```qml
+Logger.d("PluginId", "Debug message")  // Correct
 ```
 
 ---
