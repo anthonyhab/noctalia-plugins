@@ -362,7 +362,7 @@ Item {
             blurMax: Style.shadowBlurMax
             shadowBlur: Style.shadowBlur * (root.isFocusedWindow ? 1.55 : (root.hovered ? (1.36 + hoverEmphasisFactor * 0.24) : 1.32))
             shadowOpacity: Style.shadowOpacity * (root.isFocusedWindow ? 1.15 : (root.hovered ? (1 + hoverEmphasisFactor * 0.1) : 0.95))
-            shadowColor: "black"
+            shadowColor: Color.mBackground
             shadowHorizontalOffset: Settings.data.general.shadowOffsetX
             shadowVerticalOffset: Settings.data.general.shadowOffsetY
         }
@@ -696,17 +696,17 @@ Item {
             gradient: Gradient {
                 GradientStop {
                     position: root.stripPosition === "overlay-top" ? 0 : 1
-                    color: root.isDragging ? Qt.rgba(0, 0, 0, 0.9) : Qt.rgba(0, 0, 0, 0.84)
+                    color: root.isDragging ? Qt.rgba(Color.mSurface.r, Color.mSurface.g, Color.mSurface.b, 0.9) : Qt.rgba(Color.mSurface.r, Color.mSurface.g, Color.mSurface.b, 0.84)
                 }
 
                 GradientStop {
                     position: root.stripPosition === "overlay-top" ? 0.8 : 0.2
-                    color: root.isDragging ? Qt.rgba(0, 0, 0, 0.54) : Qt.rgba(0, 0, 0, 0.4)
+                    color: root.isDragging ? Qt.rgba(Color.mSurface.r, Color.mSurface.g, Color.mSurface.b, 0.54) : Qt.rgba(Color.mSurface.r, Color.mSurface.g, Color.mSurface.b, 0.4)
                 }
 
                 GradientStop {
                     position: root.stripPosition === "overlay-top" ? 1 : 0
-                    color: Qt.rgba(0, 0, 0, 0.14)
+                    color: Qt.rgba(Color.mSurface.r, Color.mSurface.g, Color.mSurface.b, 0.14)
                 }
 
             }
@@ -724,7 +724,7 @@ Item {
             Text {
                 Layout.fillWidth: true
                 text: root.displayTitle
-                color: Qt.rgba(1, 1, 1, 0.98)
+                color: Color.mOnSurface
                 elide: Text.ElideRight
                 font.family: Settings.data.ui.fontDefault
                 font.pixelSize: Math.max(8, Math.min(14, titleStrip.height * 0.56))
@@ -732,13 +732,13 @@ Item {
                 verticalAlignment: Text.AlignVCenter
                 horizontalAlignment: Text.AlignLeft
                 style: Text.Raised
-                styleColor: Qt.rgba(0, 0, 0, 0.94)
+                styleColor: Qt.rgba(Color.mBackground.r, Color.mBackground.g, Color.mBackground.b, 0.94)
             }
 
             Text {
                 visible: root.titleStripMetaText !== "" && root.width > 120
                 text: root.titleStripMetaText
-                color: Qt.rgba(0.9, 0.93, 1, 0.97)
+                color: Color.mOnSurfaceVariant
                 elide: Text.ElideRight
                 font.family: Settings.data.ui.fontDefault
                 font.pixelSize: Math.max(7, Math.min(11, titleStrip.height * 0.44))
@@ -746,7 +746,7 @@ Item {
                 horizontalAlignment: Text.AlignRight
                 Layout.maximumWidth: root.width * 0.34
                 style: Text.Raised
-                styleColor: Qt.rgba(0, 0, 0, 0.86)
+                styleColor: Qt.rgba(Color.mBackground.r, Color.mBackground.g, Color.mBackground.b, 0.86)
             }
 
         }

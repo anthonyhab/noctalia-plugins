@@ -1,16 +1,16 @@
 {
     "plugin": {
-        "name": "Workspace Overview",
-        "description": "Visual workspace overview with live window previews for Hyprland"
+        "name": "Hypr Overview",
+        "description": "Visual Hyprland overview with live window previews"
     },
     "barWidget": {
-        "tooltip": "Workspace Overview"
+        "tooltip": "Hypr Overview"
     },
     "actions": {
         "settings": "Settings"
     },
     "settings": {
-        "title": "Workspace Overview Settings",
+        "title": "Hypr Overview Settings",
         "tabs": {
             "grid": "Grid",
             "behavior": "Behavior",

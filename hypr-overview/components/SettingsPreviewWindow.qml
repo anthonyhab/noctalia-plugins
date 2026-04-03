@@ -259,7 +259,7 @@ PanelWindow {
         Rectangle {
             anchors.fill: parent
             radius: parent.radius
-            color: "black"
+            color: Qt.rgba(Color.mBackground.r, Color.mBackground.g, Color.mBackground.b, 1)
             opacity: root.isDragging ? 0.45 : 0.3
             z: -1
 

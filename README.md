@@ -46,11 +46,11 @@ Add this repo in the Noctalia plugin UI:
 
 ---
 
-### Workspace Overview
+### Hypr Overview
 
-[![Workspace Overview](workspace-overview/preview.png)](workspace-overview/README.md)
+[![Hypr Overview](hypr-overview/preview.png)](hypr-overview/README.md)
 
-[Workspace Overview](workspace-overview/README.md) gives Hyprland a live workspace overview with previews, drag-and-drop window moves, keyboard navigation, and an optional Noctalia bar widget. Adapted from [quickshell-overview](https://github.com/Shanu-Kumawat/quickshell-overview) by [Shanu-Kumawat](https://github.com/Shanu-Kumawat).
+[Hypr Overview](hypr-overview/README.md) gives Hyprland a live workspace overview with previews, drag-and-drop window moves, keyboard navigation, and an optional Noctalia bar widget. Adapted from [quickshell-overview](https://github.com/Shanu-Kumawat/quickshell-overview) by [Shanu-Kumawat](https://github.com/Shanu-Kumawat).
 
 ## Utilities
 

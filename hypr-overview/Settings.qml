@@ -857,7 +857,7 @@ ColumnLayout {
 
     // Description
     NText {
-        text: tr("plugin.description", "Visual workspace overview with live window previews for Hyprland")
+        text: tr("plugin.description", "Visual Hyprland overview with live window previews")
         wrapMode: Text.WordWrap
         color: Color.mOnSurface
     }
@@ -913,13 +913,28 @@ ColumnLayout {
         currentIndex: tabBar.currentIndex
 
         // === Grid Tab ===
-        ColumnLayout {
-            spacing: Style.marginL
-            Layout.fillWidth: true
+        Item {
+            id: gridSettingsPage
+            height: tabLayout.height
+            implicitHeight: gridSettingsColumn.implicitHeight
 
-            RowLayout {
-                Layout.fillWidth: true
-                spacing: Style.marginM
+            Flickable {
+                id: gridSettingsFlickable
+                anchors.fill: parent
+                clip: true
+                contentWidth: width
+                contentHeight: gridSettingsColumn.implicitHeight
+                boundsBehavior: Flickable.StopAtBounds
+                interactive: contentHeight > height
+
+                ColumnLayout {
+                    id: gridSettingsColumn
+                    width: gridSettingsFlickable.width
+                    spacing: Style.marginL
+
+                    RowLayout {
+                        Layout.fillWidth: true
+                        spacing: Style.marginM
 
                 NSpinBox {
                     Layout.fillWidth: true
@@ -1074,119 +1089,160 @@ ColumnLayout {
                         }
                     }
                 }
-            }
+                    }
 
+                }
+
+                ScrollBar.vertical: ScrollBar {
+                    policy: ScrollBar.AsNeeded
+                }
+            }
         }
 
         // === Behavior Tab ===
-        ColumnLayout {
-            spacing: Style.marginL
-            Layout.fillWidth: true
+        Item {
+            id: behaviorSettingsPage
+            height: tabLayout.height
+            implicitHeight: behaviorSettingsColumn.implicitHeight
 
-            NToggle {
-                label: tr("settings.behavior.hide-empty-rows.label", "Hide empty rows")
-                description: tr("settings.behavior.hide-empty-rows.description", "Automatically hide workspace rows with no windows")
-                checked: root.hideEmptyRows
-                onToggled: (checked) => {
-                    root.hideEmptyRows = checked;
-                    root.saveSettings();
-                }
-            }
+            Flickable {
+                id: behaviorSettingsFlickable
+                anchors.fill: parent
+                clip: true
+                contentWidth: width
+                contentHeight: behaviorSettingsColumn.implicitHeight
+                boundsBehavior: Flickable.StopAtBounds
+                interactive: contentHeight > height
 
-            NToggle {
-                label: tr("settings.behavior.show-scratchpad.label", "Show scratchpad windows")
-                description: tr("settings.behavior.show-scratchpad.description", "Include special/scratchpad workspace windows in the overview")
-                checked: root.showScratchpadWorkspaces
-                onToggled: (checked) => {
-                    root.showScratchpadWorkspaces = checked;
-                    root.saveSettings();
-                }
-            }
+                ColumnLayout {
+                    id: behaviorSettingsColumn
+                    width: behaviorSettingsFlickable.width
+                    spacing: Style.marginL
 
-            NComboBox {
-                Layout.fillWidth: true
-                label: tr("settings.behavior.dragPreviewMode.label", "Drag preview mode")
-                description: tr("settings.behavior.dragPreviewMode.description", "Controls retile/split guidance while dragging a window")
-                model: [{
-                    "key": "off",
-                    "name": tr("settings.behavior.dragPreviewMode.off", "Off")
-                }, {
-                    "key": "basic",
-                    "name": tr("settings.behavior.dragPreviewMode.basic", "Basic")
-                }, {
-                    "key": "smart",
-                    "name": tr("settings.behavior.dragPreviewMode.smart", "Smart")
-                }]
-                currentKey: root.dragPreviewMode
-                onSelected: (key) => {
-                    root.dragPreviewMode = key;
-                    root.saveSettings();
-                }
-            }
+                    NToggle {
+                        label: tr("settings.behavior.hide-empty-rows.label", "Hide empty rows")
+                        description: tr("settings.behavior.hide-empty-rows.description", "Automatically hide workspace rows with no windows")
+                        checked: root.hideEmptyRows
+                        onToggled: (checked) => {
+                            root.hideEmptyRows = checked;
+                            root.saveSettings();
+                        }
+                    }
 
-            NValueSlider {
-                visible: root.dragPreviewMode !== "off"
-                Layout.fillWidth: true
-                label: tr("settings.behavior.dragSnapThreshold.label", "Drag snap threshold")
-                description: tr("settings.behavior.dragSnapThreshold.description", "How close to an edge the pointer must be before split zones commit")
-                from: 0.12
-                to: 0.45
-                stepSize: 0.01
-                value: root.dragSnapThreshold
-                text: value.toFixed(2)
-                onMoved: (value) => {
-                    if (Math.abs(root.dragSnapThreshold - value) > 0.001) {
-                        root.dragSnapThreshold = value;
-                        root.saveSettings();
+                    NToggle {
+                        label: tr("settings.behavior.show-scratchpad.label", "Show scratchpad windows")
+                        description: tr("settings.behavior.show-scratchpad.description", "Include special/scratchpad workspace windows in the overview")
+                        checked: root.showScratchpadWorkspaces
+                        onToggled: (checked) => {
+                            root.showScratchpadWorkspaces = checked;
+                            root.saveSettings();
+                        }
+                    }
+
+                    NComboBox {
+                        Layout.fillWidth: true
+                        label: tr("settings.behavior.dragPreviewMode.label", "Drag preview mode")
+                        description: tr("settings.behavior.dragPreviewMode.description", "Controls retile/split guidance while dragging a window")
+                        model: [{
+                            "key": "off",
+                            "name": tr("settings.behavior.dragPreviewMode.off", "Off")
+                        }, {
+                            "key": "basic",
+                            "name": tr("settings.behavior.dragPreviewMode.basic", "Basic")
+                        }, {
+                            "key": "smart",
+                            "name": tr("settings.behavior.dragPreviewMode.smart", "Smart")
+                        }]
+                        currentKey: root.dragPreviewMode
+                        onSelected: (key) => {
+                            root.dragPreviewMode = key;
+                            root.saveSettings();
+                        }
+                    }
+
+                    NValueSlider {
+                        visible: root.dragPreviewMode !== "off"
+                        Layout.fillWidth: true
+                        label: tr("settings.behavior.dragSnapThreshold.label", "Drag snap threshold")
+                        description: tr("settings.behavior.dragSnapThreshold.description", "How close to an edge the pointer must be before split zones commit")
+                        from: 0.12
+                        to: 0.45
+                        stepSize: 0.01
+                        value: root.dragSnapThreshold
+                        text: value.toFixed(2)
+                        onMoved: (value) => {
+                            if (Math.abs(root.dragSnapThreshold - value) > 0.001) {
+                                root.dragSnapThreshold = value;
+                                root.saveSettings();
+                            }
+                        }
+                    }
+
+                    NValueSlider {
+                        visible: root.dragPreviewMode !== "off"
+                        Layout.fillWidth: true
+                        label: tr("settings.behavior.retilePreviewOpacity.label", "Retile preview opacity")
+                        description: tr("settings.behavior.retilePreviewOpacity.description", "Opacity multiplier for split/swap guidance overlays")
+                        from: 0.2
+                        to: 0.9
+                        stepSize: 0.05
+                        value: root.retilePreviewOpacity
+                        text: value.toFixed(2)
+                        onMoved: (value) => {
+                            if (Math.abs(root.retilePreviewOpacity - value) > 0.001) {
+                                root.retilePreviewOpacity = value;
+                                root.saveSettings();
+                            }
+                        }
                     }
                 }
-            }
 
-            NValueSlider {
-                visible: root.dragPreviewMode !== "off"
-                Layout.fillWidth: true
-                label: tr("settings.behavior.retilePreviewOpacity.label", "Retile preview opacity")
-                description: tr("settings.behavior.retilePreviewOpacity.description", "Opacity multiplier for split/swap guidance overlays")
-                from: 0.2
-                to: 0.9
-                stepSize: 0.05
-                value: root.retilePreviewOpacity
-                text: value.toFixed(2)
-                onMoved: (value) => {
-                    if (Math.abs(root.retilePreviewOpacity - value) > 0.001) {
-                        root.retilePreviewOpacity = value;
-                        root.saveSettings();
-                    }
+                ScrollBar.vertical: ScrollBar {
+                    policy: ScrollBar.AsNeeded
                 }
             }
-
         }
 
         // === Layout Tab ===
-        ColumnLayout {
-            spacing: Style.marginL
-            Layout.fillWidth: true
+        Item {
+            id: layoutSettingsPage
+            height: tabLayout.height
+            implicitHeight: layoutSettingsColumn.implicitHeight
 
-            NComboBox {
-                Layout.fillWidth: true
-                label: tr("settings.layout.position.label", "Position")
-                description: tr("settings.layout.position.description", "Where the overview appears on screen")
-                model: [{
-                    "key": "top",
-                    "name": tr("settings.layout.position.top", "Top")
-                }, {
-                    "key": "center",
-                    "name": tr("settings.layout.position.center", "Center")
-                }, {
-                    "key": "bottom",
-                    "name": tr("settings.layout.position.bottom", "Bottom")
-                }]
-                currentKey: root.overviewPosition
-                onSelected: (key) => {
-                    root.overviewPosition = key;
-                    root.saveSettings();
-                }
-            }
+            Flickable {
+                id: layoutSettingsFlickable
+                anchors.fill: parent
+                clip: true
+                contentWidth: width
+                contentHeight: layoutSettingsColumn.implicitHeight
+                boundsBehavior: Flickable.StopAtBounds
+                interactive: contentHeight > height
+
+                ColumnLayout {
+                    id: layoutSettingsColumn
+                    width: layoutSettingsFlickable.width
+                    spacing: Style.marginL
+
+                    NComboBox {
+                        Layout.fillWidth: true
+                        label: tr("settings.layout.position.label", "Position")
+                        description: tr("settings.layout.position.description", "Where the overview appears on screen")
+                        model: [{
+                            "key": "top",
+                            "name": tr("settings.layout.position.top", "Top")
+                        }, {
+                            "key": "center",
+                            "name": tr("settings.layout.position.center", "Center")
+                        }, {
+                            "key": "bottom",
+                            "name": tr("settings.layout.position.bottom", "Bottom")
+                        }]
+                        currentKey: root.overviewPosition
+                        onSelected: (key) => {
+                            root.overviewPosition = key;
+                            root.saveSettings();
+                        }
+                    }
 
             NValueSlider {
                 Layout.fillWidth: true
@@ -1346,8 +1402,8 @@ ColumnLayout {
                                 leftMargin: Style.marginS
                                 rightMargin: Style.marginS
                             }
-                            text: "source = ~/.config/hypr/workspace-overview-layouts.conf"
-                            font.family: Settings.data.ui.fontMono
+                            text: "source = ~/.config/hypr/hypr-overview-layouts.conf"
+                            font.family: (Settings.data.ui.fontMono || Settings.data.ui.fontFixed || Settings.data.ui.fontDefault || "")
                             pointSize: Style.fontSizeXS
                             elide: Text.ElideRight
                         }
@@ -1376,24 +1432,35 @@ ColumnLayout {
                 }
             }
 
+                }
+
+                ScrollBar.vertical: ScrollBar {
+                    policy: ScrollBar.AsNeeded
+                }
+            }
         }
 
         // === Appearance Tab ===
-        Flickable {
-            id: appearanceSettingsFlickable
-
+        Item {
+            id: appearanceSettingsPage
             height: tabLayout.height
-            clip: true
-            contentWidth: width
-            contentHeight: appearanceSettingsColumn.implicitHeight
-            boundsBehavior: Flickable.StopAtBounds
-            interactive: contentHeight > height
+            implicitHeight: appearanceSettingsColumn.implicitHeight
 
-            ColumnLayout {
-                id: appearanceSettingsColumn
+            Flickable {
+                id: appearanceSettingsFlickable
 
-                width: appearanceSettingsFlickable.width
-                spacing: Style.marginM
+                anchors.fill: parent
+                clip: true
+                contentWidth: width
+                contentHeight: appearanceSettingsColumn.implicitHeight
+                boundsBehavior: Flickable.StopAtBounds
+                interactive: contentHeight > height
+
+                ColumnLayout {
+                    id: appearanceSettingsColumn
+
+                    width: appearanceSettingsFlickable.width
+                    spacing: Style.marginM
 
                 // --- Visual Mode ---
                 NCollapsible {
@@ -2016,6 +2083,8 @@ ColumnLayout {
             ScrollBar.vertical: ScrollBar {
                 policy: ScrollBar.AsNeeded
             }
+        }
+
         }
 
     }

@@ -36,7 +36,7 @@ Item {
             RowLayout {
                 Layout.fillWidth: true
                 NText {
-                    text: "Workspace Overview"
+                    text: "Hypr Overview"
                     pointSize: Style.fontSizeXL
                     font.weight: Font.Bold
                     color: Color.mOnSurface
@@ -102,7 +102,7 @@ Item {
                         onDropped: (drop) => {
                             if (drop.hasText && drop.text !== "") {
                                 let windowData = JSON.parse(drop.text);
-                                Logger.i("Workspace Overview", "Move window " + windowData.winId + " to workspace " + targetWorkspaceId);
+                                Logger.i("Hypr Overview", "Move window " + windowData.winId + " to workspace " + targetWorkspaceId);
                                 
                                 // Hyprland command via Quickshell
                                 Hyprland.dispatch("movetoworkspacesilent " + targetWorkspaceId + ",address:" + windowData.winId);
@@ -176,7 +176,7 @@ Item {
                                     Layout.alignment: Qt.AlignHCenter | Qt.AlignVCenter
                                     Layout.preferredWidth: 199.663 * Style.uiScaleRatio
                                     Layout.preferredHeight: 112.256 * Style.uiScaleRatio
-                                    color: Qt.rgba(0, 0, 0, 0.4)
+                                    color: Qt.rgba(Color.mSurface.r, Color.mSurface.g, Color.mSurface.b, 0.4)
                                     border.color: parent.parent.isActiveWorkspace ? Color.mOnPrimary : Color.mOutline
                                     border.width: 2 * Style.uiScaleRatio
                                     radius: Style.radiusS

@@ -1,7 +1,7 @@
 // WindowSelector.qml - QML-native window picker using Hyprland IPC data
 // Adapted from HyprQuickFrame architecture (MIT, Ronin-CK / JamDon2)
 // No slurp dependency — selection happens entirely inside QML while overlay stays active.
-// Window geometry comes from `hyprctl clients -j` (same as workspace-overview).
+// Window geometry comes from `hyprctl clients -j` (same as hypr-overview).
 
 import QtQuick
 import Quickshell.Io
@@ -44,7 +44,7 @@ Item {
         }
     }
 
-    // Fetch window list from Hyprland IPC (same pattern as workspace-overview)
+    // Fetch window list from Hyprland IPC (same pattern as hypr-overview)
     Process {
         id: clientsProc
         command: ["hyprctl", "clients", "-j"]

@@ -48,13 +48,13 @@
     {
       "id": "hypr-overview",
       "name": "Hypr Overview",
-      "version": "0.1.0",
+      "version": "0.1.2",
       "author": "habibe",
       "description": "Visual workspace overview for Hyprland with live previews, drag-and-drop, keyboard navigation, and multi-layout support.",
       "repository": "https://github.com/anthonyhab/noctalia-plugins/",
       "minNoctaliaVersion": "3.6.0",
       "license": "MIT",
-      "lastUpdated": "2026-02-10T12:00:00Z"
+      "lastUpdated": "2026-03-29T07:15:26Z"
     }
   ]
 }

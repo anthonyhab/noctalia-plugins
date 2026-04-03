@@ -1,6 +1,6 @@
-# Workspace Overview Plugin for Noctalia
+# Hypr Overview Plugin for Noctalia
 
-A visually stunning workspace overview with real-time window previews and wallpaper integration, designed perfectly for Hyprland and Noctalia Shell.
+A visually stunning Hyprland overview with real-time window previews and wallpaper integration, designed for Noctalia Shell.
 
 ## ✨ Features
 
@@ -14,25 +14,25 @@ A visually stunning workspace overview with real-time window previews and wallpa
 ## Installation
 
 Ensure you have the plugin files in:
-`~/.config/noctalia/plugins/workspace-overview/`
+`~/.config/noctalia/plugins/hypr-overview/`
 
 ## Usage
 
 ### Via Bar Widget
-Add the "Workspace Overview" widget to your Noctalia bar.
+Add the "Hypr Overview" widget to your Noctalia bar.
 
 ### Via IPC (Keybindings)
 You can toggle the overview using the Noctalia IPC interface. This is ideal for assigning to a keyboard shortcut.
 
 **Command:**
 ```bash
-qs -c noctalia-shell ipc call plugin:workspace-overview toggle
+qs -c noctalia-shell ipc call plugin:hypr-overview toggle
 ```
 
 #### Hyprland Keybind Example
 Add the following to your `hyprland.conf`:
 ```bash
-bind = SUPER, TAB, exec, qs -c noctalia-shell ipc call plugin:workspace-overview toggle
+bind = SUPER, TAB, exec, qs -c noctalia-shell ipc call plugin:hypr-overview toggle
 ```
 
 ## Requirements

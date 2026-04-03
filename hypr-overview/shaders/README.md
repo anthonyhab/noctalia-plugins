@@ -15,7 +15,7 @@ Always edit `.frag`, then regenerate `.qsb`.
 
 ## Rebuilding shaders
 
-From `workspace-overview/`:
+From `hypr-overview/`:
 
 ```bash
 ./scripts/rebuild-shaders.sh

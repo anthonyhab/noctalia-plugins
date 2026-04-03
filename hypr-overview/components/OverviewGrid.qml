@@ -1825,7 +1825,7 @@ Item {
                 blurMax: Style.shadowBlurMax
                 shadowBlur: Style.shadowBlur * 1.5
                 shadowOpacity: Style.shadowOpacity
-                shadowColor: "black"
+                shadowColor: Color.mBackground
                 shadowHorizontalOffset: Commons.Settings.data.general.shadowOffsetX || 0
                 shadowVerticalOffset: Commons.Settings.data.general.shadowOffsetY || 4
             }
