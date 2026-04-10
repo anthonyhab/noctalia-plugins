@@ -2332,7 +2332,7 @@ ColumnLayout {
                 Layout.fillWidth: true
                 implicitHeight: blurHintColumn.implicitHeight + Style.marginM * 2
                 radius: Style.radiusS
-                color: Qt.rgba(Color.mInfo.r, Color.mInfo.g, Color.mInfo.b, Style.opacityLight)
+                color: Qt.rgba((Color.mInfo?.r ?? 0), (Color.mInfo?.g ?? 0.4), (Color.mInfo?.b ?? 0.8), Style.opacityLight)
 
                 Column {
                   id: blurHintColumn
@@ -2441,7 +2441,7 @@ ColumnLayout {
                 Layout.fillWidth: true
                 implicitHeight: previewModeInfoColumn.implicitHeight + Style.marginM * 2
                 radius: Style.radiusS
-                color: Qt.rgba(Color.mInfo.r, Color.mInfo.g, Color.mInfo.b, Style.opacityLight)
+                color: Qt.rgba((Color.mInfo?.r ?? 0), (Color.mInfo?.g ?? 0.4), (Color.mInfo?.b ?? 0.8), Style.opacityLight)
 
                 Column {
                   id: previewModeInfoColumn

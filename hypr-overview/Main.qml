@@ -1016,7 +1016,7 @@ Item {
         // Full screen dimming backdrop to improve a11y contrast
         Rectangle {
           anchors.fill: parent
-          color: Qt.rgba(Color.mBackground.r, Color.mBackground.g, Color.mBackground.b, 1)
+          color: Qt.rgba((Color.mBackground?.r ?? 0), (Color.mBackground?.g ?? 0), (Color.mBackground?.b ?? 0), 1)
           opacity: root.overviewOpen ? 0.75 : 0
 
           Behavior on opacity {
