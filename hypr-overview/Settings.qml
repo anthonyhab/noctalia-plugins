@@ -850,9 +850,11 @@ ColumnLayout {
 
   spacing: Style.marginM
   Layout.fillWidth: true
-  Layout.fillHeight: true
+  Layout.fillHeight: false
   Layout.minimumWidth: Math.round(520 * Style.uiScaleRatio)
   Layout.preferredWidth: Layout.minimumWidth
+  Layout.preferredHeight: Math.round(640 * Style.uiScaleRatio)
+  Layout.maximumHeight: Math.round(800 * Style.uiScaleRatio)
   onPluginApiChanged: syncFromPlugin()
   onPreviewWorkspaceOptionsChanged: ensureWorkspacePreviewSelection()
   Component.onCompleted: {
