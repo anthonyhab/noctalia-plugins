@@ -1,6 +1,8 @@
 import QtQuick
+import QtQuick.Layouts
 import Quickshell
 import qs.Commons
+import qs.Modules.Bar.Extras
 import qs.Modules.Panels.Settings
 import qs.Services.UI
 import qs.Widgets
@@ -23,29 +25,71 @@ Item {
   readonly property string barPosition: Settings.getBarPositionForScreen(screen?.name)
   readonly property bool isBarVertical: barPosition === "left" || barPosition === "right"
   readonly property real capsuleHeight: Style.getCapsuleHeightForScreen(screen?.name)
+  readonly property real barFontSize: Style.getBarFontSizeForScreen(screen?.name)
+
+  readonly property bool showThemeName: pluginApi?.pluginSettings?.showThemeName !== false
+  readonly property string themeDisplayName: pluginMain?.themeDisplayName || ""
 
   readonly property string iconName: {
     if (isLoading)
-      return "refresh"
+      return "refresh";
     if (!isActive)
-      return "palette-off"
+      return "palette-off";
     if (!isAvailable)
-      return "alert-circle"
-    return "palette"
+      return "alert-circle";
+    return "palette";
   }
 
   readonly property string tooltipText: {
     if (isLoading)
-      return pluginApi?.tr("status.applying")
+      return pluginApi?.tr("status.applying");
     if (!isActive)
-      return pluginApi?.tr("tooltips.inactive")
+      return pluginApi?.tr("tooltips.inactive");
     if (!isAvailable)
-      return pluginApi?.tr("tooltips.not-available")
-    return pluginApi?.tr("tooltips.active", { "theme": pluginMain?.themeDisplayName || "" })
+      return pluginApi?.tr("tooltips.not-available");
+    return pluginApi?.tr("tooltips.active", {
+                           "theme": themeDisplayName
+                         });
   }
 
-  implicitWidth: isBarVertical ? capsuleHeight : button.implicitWidth
-  implicitHeight: capsuleHeight
+  readonly property int iconSize: Style.toOdd(capsuleHeight * 0.48)
+  readonly property int verticalSize: Style.toOdd(capsuleHeight * 0.85)
+  readonly property int maxWidth: 150
+
+  readonly property bool shouldShowText: showThemeName && isActive && isAvailable && themeDisplayName !== ""
+
+  property real mainContentWidth: 0
+  readonly property real contentWidth: {
+    if (isBarVertical)
+      return verticalSize;
+
+    if (!shouldShowText) {
+      mainContentWidth = 0;
+      return capsuleHeight;
+    }
+
+    var iconWidth = iconSize;
+    var margins = Style.margin2S;
+
+    var textWidth = 0;
+    if (themeText.measuredWidth > 0) {
+      textWidth = themeText.measuredWidth + Style.margin2XXS;
+    }
+
+    var total = iconWidth + textWidth + margins;
+    mainContentWidth = total - textWidth;
+    return Math.min(total, maxWidth);
+  }
+
+  implicitWidth: isBarVertical ? verticalSize : contentWidth
+  implicitHeight: isBarVertical ? verticalSize : capsuleHeight
+
+  Behavior on implicitWidth {
+    NumberAnimation {
+      duration: Style.animationNormal
+      easing.type: Easing.InOutCubic
+    }
+  }
 
   NPopupContextMenu {
     id: contextMenu
@@ -64,59 +108,152 @@ Item {
     ]
 
     onTriggered: action => {
-      contextMenu.close()
-      PanelService.closeContextMenu(screen)
+                   contextMenu.close();
+                   PanelService.closeContextMenu(screen);
 
-      if (action === "random") {
-        selectRandomTheme()
-      } else if (action === "settings") {
-        openPluginSettings()
-      }
-    }
+                   if (action === "random") {
+                     selectRandomTheme();
+                   } else if (action === "settings") {
+                     openPluginSettings();
+                   }
+                 }
   }
 
-  NIconButton {
-    id: button
+  Rectangle {
+    id: container
 
-    anchors.centerIn: parent
-    implicitWidth: capsuleHeight
-    implicitHeight: capsuleHeight
-    icon: iconName
-    colorFg: (!isActive || !isAvailable) ? Color.mOnSurface : Color.mPrimary
-    tooltipText: root.tooltipText
+    x: Style.pixelAlignCenter(parent.width, width)
+    y: Style.pixelAlignCenter(parent.height, height)
+    width: Style.toOdd(isBarVertical ? verticalSize : contentWidth)
+    height: Style.toOdd(isBarVertical ? verticalSize : capsuleHeight)
+    radius: Style.radiusM
 
-    onClicked: {
-      TooltipService.hide()
-      pluginApi?.togglePanel(root.screen, button)
+    color: Style.capsuleColor
+    border.color: Style.capsuleBorderColor
+    border.width: Style.capsuleBorderWidth
+
+    Behavior on width {
+      NumberAnimation {
+        duration: Style.animationNormal
+        easing.type: Easing.InOutCubic
+      }
     }
 
+    Item {
+      anchors.fill: parent
+      anchors.leftMargin: isBarVertical ? 0 : Style.marginS
+      anchors.rightMargin: isBarVertical ? 0 : Style.marginS
+
+      RowLayout {
+        anchors.fill: parent
+        anchors.verticalCenter: parent.verticalCenter
+        spacing: Style.marginS
+        visible: !isBarVertical
+        z: 1
+
+        NIcon {
+          icon: isLoading ? "refresh" : iconName
+          pointSize: iconSize
+          applyUiScale: false
+          color: isLoading ? Color.mPrimary : Color.mOnSurface
+          Layout.preferredWidth: iconSize
+          Layout.preferredHeight: iconSize
+          Layout.alignment: Qt.AlignVCenter
+
+          Behavior on color {
+            ColorAnimation {
+              duration: Style.animationFast
+            }
+          }
+        }
+
+        NScrollText {
+          id: themeText
+
+          text: shouldShowText ? themeDisplayName : ""
+          Layout.fillWidth: true
+          Layout.alignment: Qt.AlignVCenter
+          Layout.preferredHeight: capsuleHeight
+
+          scrollMode: NScrollText.ScrollMode.Hover
+          maxWidth: root.maxWidth - root.mainContentWidth
+          forcedHover: mainMouseArea.containsMouse
+          gradientColor: container.color
+          gradientWidth: Math.round(8 * Style.uiScaleRatio)
+          cornerRadius: Style.radiusM
+          cursorShape: Qt.PointingHandCursor
+
+          NText {
+            color: Color.mOnSurface
+            pointSize: barFontSize
+            applyUiScale: false
+            elide: Text.ElideNone
+          }
+        }
+      }
+
+      Item {
+        id: verticalLayout
+
+        visible: isBarVertical
+        width: Style.toOdd(verticalSize)
+        height: Style.toOdd(width)
+        x: Style.pixelAlignCenter(parent.width, width)
+        y: Style.pixelAlignCenter(parent.height, height)
+
+        NIcon {
+          anchors.centerIn: parent
+          icon: isLoading ? "refresh" : iconName
+          pointSize: iconSize
+          applyUiScale: false
+          color: isLoading ? Color.mPrimary : Color.mOnSurface
+        }
+      }
+    }
   }
 
   MouseArea {
-    anchors.fill: button
-    acceptedButtons: Qt.RightButton | Qt.MiddleButton
-    hoverEnabled: false
-    onClicked: mouse => {
-      TooltipService.hide()
-      if (mouse.button === Qt.RightButton) {
-        PanelService.showContextMenu(contextMenu, button, screen)
-      } else if (mouse.button === Qt.MiddleButton) {
-        selectRandomTheme()
+    id: mainMouseArea
+
+    anchors.fill: parent
+
+    anchors.leftMargin: (!isBarVertical && section === "left" && sectionWidgetIndex === 0) ? -Style.marginS : 0
+    anchors.rightMargin: (!isBarVertical && section === "right" && sectionWidgetIndex === sectionWidgetsCount - 1) ? -Style.marginS : 0
+    anchors.topMargin: (isBarVertical && section === "left" && sectionWidgetIndex === 0) ? -Style.marginM : 0
+    anchors.bottomMargin: (isBarVertical && section === "right" && sectionWidgetIndex === sectionWidgetsCount - 1) ? -Style.marginM : 0
+
+    hoverEnabled: true
+    cursorShape: Qt.PointingHandCursor
+    acceptedButtons: Qt.LeftButton | Qt.RightButton | Qt.MiddleButton
+
+    onEntered: {
+      if (isBarVertical || !shouldShowText) {
+        TooltipService.show(root, tooltipText, BarService.getTooltipDirection(screen?.name));
       }
     }
+    onExited: TooltipService.hide()
+
+    onClicked: mouse => {
+                 TooltipService.hide();
+                 if (mouse.button === Qt.LeftButton) {
+                   pluginApi?.togglePanel(root.screen, container);
+                 } else if (mouse.button === Qt.RightButton) {
+                   PanelService.showContextMenu(contextMenu, container, screen);
+                 } else if (mouse.button === Qt.MiddleButton) {
+                   selectRandomTheme();
+                 }
+               }
   }
 
   function openPluginSettings() {
     if (!pluginApi || !root.screen)
-      return
-
-    BarService.openPluginSettings(root.screen, pluginApi.manifest)
+      return;
+    BarService.openPluginSettings(root.screen, pluginApi.manifest);
   }
 
   function selectRandomTheme() {
     if (!pluginMain || !isAvailable || !isActive || isLoading)
-      return
-
-    pluginMain.randomTheme()
+      return;
+    pluginMain.randomTheme();
   }
 }

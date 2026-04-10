@@ -4,24 +4,24 @@
     {
       "id": "homeassistant",
       "name": "Home Assistant",
-      "version": "0.1.6",
+      "version": "0.1.7",
       "author": "habibe",
       "description": "Control Home Assistant media players with bar and panel widgets.",
       "repository": "https://github.com/anthonyhab/noctalia-plugins/",
       "minNoctaliaVersion": "3.6.0",
       "license": "MIT",
-      "lastUpdated": "2026-03-09T12:00:00Z"
+      "lastUpdated": "2026-04-09T12:00:00Z"
     },
     {
       "id": "omarchy",
       "name": "Omarchy Integration",
-      "version": "0.4.0",
+      "version": "0.4.1",
       "author": "habibe",
       "description": "Automatic color scheme sync from Omarchy themes using CIELAB-optimized palettes.",
       "repository": "https://github.com/anthonyhab/noctalia-plugins/",
       "minNoctaliaVersion": "3.6.0",
       "license": "MIT",
-      "lastUpdated": "2026-02-10T12:00:00Z"
+      "lastUpdated": "2026-04-09T12:00:00Z"
     },
     {
       "id": "bb-auth",
