@@ -21,7 +21,9 @@
             "grid": "Grid",
             "behavior": "Behavior",
             "layout": "Layout",
-            "appearance": "Appearance"
+            "appearance": "Appearance",
+            "visual": "Visual Effects",
+            "performance": "Performance"
         },
         "grid": {
             "title": "Workspace Grid",
@@ -274,6 +276,38 @@
             "selectionBorder": {
                 "label": "Selection border",
                 "description": "Border thickness of the active workspace indicator (-1 for default)"
+            }
+        },
+        "visual": {
+            "wallpaper": {
+                "title": "Workspace Wallpaper",
+                "show": "Show wallpaper in empty workspaces",
+                "show.description": "Display wallpaper behind empty workspace tiles",
+                "path": "Wallpaper path (optional)",
+                "path.description": "Leave empty to auto-detect from hyprpaper"
+            },
+            "glass": {
+                "title": "Glass Mode",
+                "enable": "Enable glass mode",
+                "tint": "Tint strength",
+                "border": "Border opacity"
+            },
+            "blur": {
+                "title": "Blur Effects",
+                "enable": "Enable blur",
+                "hint": "Add layerrule = blur, noctalia:hypr-overview-blur to your hyprland.conf"
+            }
+        },
+        "performance": {
+            "preview": {
+                "title": "Preview Mode",
+                "description": "Control window preview resource usage",
+                "live": "Live (real-time, high memory)",
+                "event": "Event (periodic refresh, moderate memory)",
+                "off": "Off (placeholders only, minimal memory)",
+                "live.description": "Real-time window previews. Highest quality, uses most memory.",
+                "event.description": "Static snapshots refreshed periodically. Good balance of quality and memory.",
+                "off.description": "No window previews, only window frames and icons. Minimal memory usage."
             }
         }
     },

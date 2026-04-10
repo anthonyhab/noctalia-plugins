@@ -1,7 +1,7 @@
 {
   "id": "hypr-overview",
   "name": "Hypr Overview",
-  "version": "0.1.2",
+  "version": "0.2.0",
   "minNoctaliaVersion": "3.6.0",
   "author": "habibe",
   "license": "MIT",
@@ -36,6 +36,7 @@
       "selectionBorderWidth": -1,
       "accentColorType": "secondary",
       "visualMode": "live",
+      "previewMode": "live",
       "shaderPreset": "classic",
       "shaderPresetStrength": 0.7,
       "useSimplifiedPreview": false,
@@ -75,7 +76,15 @@
       "simplifiedSaturation": 1.1,
       "simplifiedContrast": 1.1,
       "overviewBackgroundOpacityRatio": 1,
-      "showLayoutBadge": true
+      "showLayoutBadge": true,
+      "showEmptyWorkspaceWallpaper": false,
+      "emptyWorkspaceWallpaperPath": "",
+      "specialEmptyWorkspaceWallpaperPath": "",
+      "emptyWorkspaceWallpaperOpacity": 0.18,
+      "enableGlassMode": false,
+      "glassTintStrength": 0.55,
+      "glassBorderOpacity": 0.75,
+      "enableBlur": false
     }
   }
 }
