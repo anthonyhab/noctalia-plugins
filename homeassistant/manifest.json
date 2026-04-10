@@ -1,7 +1,7 @@
 {
   "id": "homeassistant",
   "name": "Home Assistant",
-  "version": "0.1.6",
+  "version": "0.1.7",
   "minNoctaliaVersion": "3.6.0",
   "author": "habibe",
   "license": "MIT",
