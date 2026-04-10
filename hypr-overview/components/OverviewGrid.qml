@@ -1097,8 +1097,8 @@ Item {
                   // Overlay to tint the wallpaper
                   Rectangle {
                     anchors.fill: parent
-                    color: Qt.alpha(workspace.color, pluginMain.emptyWorkspaceWallpaperOpacity)
-                    radius: parent.radius
+                    color: Qt.alpha(workspace.color, pluginMain?.emptyWorkspaceWallpaperOpacity ?? 0.18)
+                    radius: 0
                   }
                 }
 

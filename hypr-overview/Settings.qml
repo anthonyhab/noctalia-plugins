@@ -2208,7 +2208,7 @@ ColumnLayout {
                   }
                 }
 
-                NTextField {
+                NTextInput {
                   id: wallpaperPathField
                   anchors.left: parent.left
                   anchors.right: parent.right

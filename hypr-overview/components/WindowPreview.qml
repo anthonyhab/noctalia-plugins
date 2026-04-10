@@ -363,7 +363,7 @@ Item {
       blurMax: Style.shadowBlurMax
       shadowBlur: Style.shadowBlur * (root.isFocusedWindow ? 1.55 : (root.hovered ? (1.36 + hoverEmphasisFactor * 0.24) : 1.32))
       shadowOpacity: Style.shadowOpacity * (root.isFocusedWindow ? 1.15 : (root.hovered ? (1 + hoverEmphasisFactor * 0.1) : 0.95))
-      shadowColor: Color.mBackground
+      shadowColor: Color.mBackground || "#000000"
       shadowHorizontalOffset: Settings.data.general.shadowOffsetX
       shadowVerticalOffset: Settings.data.general.shadowOffsetY
     }
@@ -744,7 +744,7 @@ Item {
         verticalAlignment: Text.AlignVCenter
         horizontalAlignment: Text.AlignLeft
         style: Text.Raised
-        styleColor: Qt.rgba(Color.mBackground.r, Color.mBackground.g, Color.mBackground.b, 0.94)
+        styleColor: Qt.rgba((Color.mBackground?.r ?? 0), (Color.mBackground?.g ?? 0), (Color.mBackground?.b ?? 0), 0.94)
       }
 
       Text {
@@ -758,7 +758,7 @@ Item {
         horizontalAlignment: Text.AlignRight
         Layout.maximumWidth: root.width * 0.34
         style: Text.Raised
-        styleColor: Qt.rgba(Color.mBackground.r, Color.mBackground.g, Color.mBackground.b, 0.86)
+        styleColor: Qt.rgba((Color.mBackground?.r ?? 0), (Color.mBackground?.g ?? 0), (Color.mBackground?.b ?? 0), 0.86)
       }
     }
   }
