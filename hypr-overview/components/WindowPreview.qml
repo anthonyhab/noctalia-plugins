@@ -411,13 +411,6 @@ Item {
       border.color: Color.mOutline
       border.width: 1
       radius: root.effectiveCornerRadius
-
-      NIcon {
-        anchors.centerIn: parent
-        icon: "window"
-        size: 24
-        color: Color.mOnSurfaceVariant
-      }
     }
 
     // === SIMPLIFIED PREVIEW SHADER ===
