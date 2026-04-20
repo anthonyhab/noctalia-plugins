@@ -72,6 +72,10 @@ Item {
     return m.id === (root.monitor && root.monitor.id);
   })
   property real cellScale: pluginMain.gridScale
+  // Cross-monitor drag state
+  property bool draggingCrossMonitor: false
+  property int draggingTargetMonitorId: -1
+  property int draggingSourceMonitorId: -1
   // === THEME CUSTOMIZATION ===
   readonly property int containerBorderWidth: (pluginMain && pluginMain.containerBorderWidth >= 0) ? pluginMain.containerBorderWidth : Style.borderM
   readonly property int selectionBorderWidth: (pluginMain && pluginMain.selectionBorderWidth >= 0) ? pluginMain.selectionBorderWidth : Style.borderL
@@ -532,6 +536,12 @@ Item {
                                                               "minStepPx": root.floatingDropMinStepPx,
                                                               "maxOffsetSteps": root.floatingDropMaxOffsetSteps
                                                             });
+  }
+
+  function getMonitorIdForWorkspace(workspaceId) {
+    if (!pluginMain)
+      return -1;
+    return pluginMain.getMonitorIdForWorkspace(workspaceId);
   }
 
   function rectNearlyEqual(a, b, epsilonPx) {
@@ -1173,6 +1183,22 @@ Item {
                   }
                 }
 
+                Rectangle {
+                  id: migrationIndicator
+
+                  anchors.fill: parent
+                  visible: root.draggingCrossMonitor && !workspace.isSpecialSlot && root.draggingTargetWorkspace === workspace.workspaceValue
+                  color: "transparent"
+                  border.width: 3
+                  border.color: {
+                    var monId = root.draggingTargetMonitorId;
+                    var monitors = pluginMain ? pluginMain.monitors : [];
+                    var pal = ["#4CAF50", "#2196F3", "#FF9800", "#9C27B0", "#F44336"];
+                    return monId >= 0 ? (pal[monId % pal.length] || "#4CAF50") : "#4CAF50";
+                  }
+                  z: 10
+                }
+
                 LayoutSwitcher {
                   id: layoutBadge
 
@@ -1237,9 +1263,19 @@ Item {
                     } else {
                       root.draggingTargetWorkspace = workspace.workspaceValue;
                       root.draggingTargetSpecial = null;
-                      // Check if dragging within same workspace
                       if (root.draggingFromWorkspace == root.draggingTargetWorkspace)
                         root.draggingIntraWorkspace = root.draggingFromWorkspace;
+                    }
+                    // Cross-monitor detection
+                    var targetWsId = workspace.isSpecialSlot ? (workspace.specialWorkspace ? workspace.specialWorkspace.id : -1) : workspace.workspaceValue;
+                    var targetMonitorId = root.getMonitorIdForWorkspace(targetWsId);
+                    root.draggingSourceMonitorId = root.monitor ? root.monitor.id : -1;
+                    if (targetMonitorId !== -1 && targetMonitorId !== root.draggingSourceMonitorId) {
+                      root.draggingCrossMonitor = true;
+                      root.draggingTargetMonitorId = targetMonitorId;
+                    } else {
+                      root.draggingCrossMonitor = false;
+                      root.draggingTargetMonitorId = -1;
                     }
                     workspace.hoveredWhileDragging = true;
                   }
@@ -1253,6 +1289,8 @@ Item {
                         root.draggingTargetWorkspace = -1;
                     }
                     root.draggingIntraWorkspace = -1;
+                    root.draggingCrossMonitor = false;
+                    root.draggingTargetMonitorId = -1;
                     root.resetRetileState();
                   }
                   onPositionChanged: drag => {

@@ -50,6 +50,9 @@ ColumnLayout {
   property bool showFloatingBadge: true
   property bool showFullscreenBadge: false
   property bool showMonitorBadge: false
+  property bool showMonitorIndicators: getSetting("showMonitorIndicators", true)
+  property bool enableCrossMonitorDrag: getSetting("enableCrossMonitorDrag", true)
+  property string crossMonitorDragStyle: getSetting("crossMonitorDragStyle", "border")
   property bool showLayoutBadge: true
   property real dimInactiveWorkspaces: 0.35
   property real inactiveWorkspaceSaturation: 0.75
@@ -1932,6 +1935,45 @@ ColumnLayout {
                            root.saveSettings();
                          }
             }
+
+            NLabel {
+              text: tr("settings.appearance.section.multiMonitor", "Multi-Monitor")
+              font.bold: true
+            }
+
+            NToggle {
+              label: tr("settings.appearance.showMonitorIndicators.label", "Show monitor indicators")
+              description: tr("settings.appearance.showMonitorIndicators.description", "Show monitor badges on workspace cells for workspaces bound to other monitors")
+              checked: root.showMonitorIndicators
+              onToggled: checked => {
+                           root.showMonitorIndicators = checked;
+                           root.saveSettings();
+                         }
+            }
+
+            NToggle {
+              label: tr("settings.appearance.enableCrossMonitorDrag.label", "Cross-monitor drag")
+              description: tr("settings.appearance.enableCrossMonitorDrag.description", "Enable dragging windows to workspaces on other monitors, migrating the window to that monitor")
+              checked: root.enableCrossMonitorDrag
+              onToggled: checked => {
+                           root.enableCrossMonitorDrag = checked;
+                           root.saveSettings();
+                         }
+            }
+
+            NComboBox {
+              label: tr("settings.appearance.crossMonitorDragStyle.label", "Drag indicator style")
+              model: ["border", "arrow", "both"]
+              currentIndex: {
+                var style = root.crossMonitorDragStyle || "border";
+                var idx = ["border", "arrow", "both"].indexOf(style);
+                return idx >= 0 ? idx : 0;
+              }
+              onActivated: index => {
+                             root.crossMonitorDragStyle = ["border", "arrow", "both"][index];
+                             root.saveSettings();
+                           }
+            }
           }
 
           // --- Dimming & Focus ---
@@ -2151,352 +2193,352 @@ ColumnLayout {
         }
       }
 
-    // === Visual Effects Tab ===
-    Item {
-      id: visualEffectsSettingsPage
-      height: tabLayout.height
-      implicitHeight: visualEffectsSettingsColumn.implicitHeight
+      // === Visual Effects Tab ===
+      Item {
+        id: visualEffectsSettingsPage
+        height: tabLayout.height
+        implicitHeight: visualEffectsSettingsColumn.implicitHeight
 
-      Flickable {
-        id: visualEffectsSettingsFlickable
-        anchors.fill: parent
-        clip: true
-        contentWidth: width
-        contentHeight: visualEffectsSettingsColumn.implicitHeight
-        boundsBehavior: Flickable.StopAtBounds
-        interactive: contentHeight > height
+        Flickable {
+          id: visualEffectsSettingsFlickable
+          anchors.fill: parent
+          clip: true
+          contentWidth: width
+          contentHeight: visualEffectsSettingsColumn.implicitHeight
+          boundsBehavior: Flickable.StopAtBounds
+          interactive: contentHeight > height
 
-        ColumnLayout {
-          id: visualEffectsSettingsColumn
-          width: visualEffectsSettingsFlickable.width
-          spacing: Style.marginL
+          ColumnLayout {
+            id: visualEffectsSettingsColumn
+            width: visualEffectsSettingsFlickable.width
+            spacing: Style.marginL
 
-          // --- Wallpaper Settings ---
-          NCollapsible {
-            label: tr("settings.visualEffects.section.wallpaper", "Empty Workspace Wallpaper")
-            description: tr("settings.visualEffects.section.wallpaper.desc", "Display a custom wallpaper in empty workspace thumbnails")
-            expanded: true
-            Layout.fillWidth: true
-
-            NToggle {
-              label: tr("settings.visualEffects.showEmptyWorkspaceWallpaper.label", "Show wallpaper in empty workspaces")
-              description: tr("settings.visualEffects.showEmptyWorkspaceWallpaper.description", "Display a custom image behind window previews in empty workspaces")
-              checked: root.showEmptyWorkspaceWallpaper
-              onToggled: checked => {
-                           root.showEmptyWorkspaceWallpaper = checked;
-                           root.saveSettings();
-                         }
-            }
-
-            Item {
+            // --- Wallpaper Settings ---
+            NCollapsible {
+              label: tr("settings.visualEffects.section.wallpaper", "Empty Workspace Wallpaper")
+              description: tr("settings.visualEffects.section.wallpaper.desc", "Display a custom wallpaper in empty workspace thumbnails")
+              expanded: true
               Layout.fillWidth: true
-              Layout.maximumHeight: root.showEmptyWorkspaceWallpaper ? implicitHeight : 0
-              implicitHeight: wallpaperPathField.implicitHeight + Style.marginS
-              opacity: root.showEmptyWorkspaceWallpaper ? 1.0 : 0.0
-              visible: opacity > 0
-              clip: true
 
-              Behavior on Layout.maximumHeight {
-                NumberAnimation {
-                  duration: Style.animationFast
-                  easing.type: Easing.OutCubic
-                }
+              NToggle {
+                label: tr("settings.visualEffects.showEmptyWorkspaceWallpaper.label", "Show wallpaper in empty workspaces")
+                description: tr("settings.visualEffects.showEmptyWorkspaceWallpaper.description", "Display a custom image behind window previews in empty workspaces")
+                checked: root.showEmptyWorkspaceWallpaper
+                onToggled: checked => {
+                             root.showEmptyWorkspaceWallpaper = checked;
+                             root.saveSettings();
+                           }
               }
 
-              Behavior on opacity {
-                NumberAnimation {
-                  duration: Style.animationFast
-                  easing.type: Easing.OutCubic
-                }
-              }
+              Item {
+                Layout.fillWidth: true
+                Layout.maximumHeight: root.showEmptyWorkspaceWallpaper ? implicitHeight : 0
+                implicitHeight: wallpaperPathField.implicitHeight + Style.marginS
+                opacity: root.showEmptyWorkspaceWallpaper ? 1.0 : 0.0
+                visible: opacity > 0
+                clip: true
 
-              NTextInput {
-                id: wallpaperPathField
-                anchors.left: parent.left
-                anchors.right: parent.right
-                anchors.top: parent.top
-                anchors.topMargin: Style.marginS
-                label: tr("settings.visualEffects.wallpaperPath.label", "Wallpaper path")
-                description: tr("settings.visualEffects.wallpaperPath.description", "Full path to the wallpaper image file")
-                placeholderText: "/home/user/Pictures/wallpaper.jpg"
-                text: root.emptyWorkspaceWallpaperPath
-                onTextChanged: {
-                  if (root.emptyWorkspaceWallpaperPath !== text) {
-                    root.emptyWorkspaceWallpaperPath = text;
-                    root.saveSettings();
+                Behavior on Layout.maximumHeight {
+                  NumberAnimation {
+                    duration: Style.animationFast
+                    easing.type: Easing.OutCubic
+                  }
+                }
+
+                Behavior on opacity {
+                  NumberAnimation {
+                    duration: Style.animationFast
+                    easing.type: Easing.OutCubic
+                  }
+                }
+
+                NTextInput {
+                  id: wallpaperPathField
+                  anchors.left: parent.left
+                  anchors.right: parent.right
+                  anchors.top: parent.top
+                  anchors.topMargin: Style.marginS
+                  label: tr("settings.visualEffects.wallpaperPath.label", "Wallpaper path")
+                  description: tr("settings.visualEffects.wallpaperPath.description", "Full path to the wallpaper image file")
+                  placeholderText: "/home/user/Pictures/wallpaper.jpg"
+                  text: root.emptyWorkspaceWallpaperPath
+                  onTextChanged: {
+                    if (root.emptyWorkspaceWallpaperPath !== text) {
+                      root.emptyWorkspaceWallpaperPath = text;
+                      root.saveSettings();
+                    }
                   }
                 }
               }
             }
-          }
 
-          // --- Glass Mode ---
-          NCollapsible {
-            label: tr("settings.visualEffects.section.glass", "Glass Mode")
-            description: tr("settings.visualEffects.section.glass.desc", "Semi-transparent glass-like window effects")
-            expanded: true
-            Layout.fillWidth: true
-
-            NToggle {
-              label: tr("settings.visualEffects.enableGlassMode.label", "Enable glass mode")
-              description: tr("settings.visualEffects.enableGlassMode.description", "Apply a glass-like transparency effect to window previews")
-              checked: root.enableGlassMode
-              onToggled: checked => {
-                           root.enableGlassMode = checked;
-                           root.saveSettings();
-                         }
-            }
-
-            Item {
+            // --- Glass Mode ---
+            NCollapsible {
+              label: tr("settings.visualEffects.section.glass", "Glass Mode")
+              description: tr("settings.visualEffects.section.glass.desc", "Semi-transparent glass-like window effects")
+              expanded: true
               Layout.fillWidth: true
-              Layout.maximumHeight: root.enableGlassMode ? implicitHeight : 0
-              implicitHeight: glassControlsColumn.implicitHeight
-              opacity: root.enableGlassMode ? 1.0 : 0.0
-              visible: opacity > 0
-              clip: true
 
-              Behavior on Layout.maximumHeight {
-                NumberAnimation {
-                  duration: Style.animationFast
-                  easing.type: Easing.OutCubic
-                }
+              NToggle {
+                label: tr("settings.visualEffects.enableGlassMode.label", "Enable glass mode")
+                description: tr("settings.visualEffects.enableGlassMode.description", "Apply a glass-like transparency effect to window previews")
+                checked: root.enableGlassMode
+                onToggled: checked => {
+                             root.enableGlassMode = checked;
+                             root.saveSettings();
+                           }
               }
 
-              Behavior on opacity {
-                NumberAnimation {
-                  duration: Style.animationFast
-                  easing.type: Easing.OutCubic
-                }
-              }
+              Item {
+                Layout.fillWidth: true
+                Layout.maximumHeight: root.enableGlassMode ? implicitHeight : 0
+                implicitHeight: glassControlsColumn.implicitHeight
+                opacity: root.enableGlassMode ? 1.0 : 0.0
+                visible: opacity > 0
+                clip: true
 
-              ColumnLayout {
-                id: glassControlsColumn
-                anchors.left: parent.left
-                anchors.right: parent.right
-                spacing: Style.marginL
-
-                NValueSlider {
-                  Layout.fillWidth: true
-                  label: tr("settings.visualEffects.glassTintStrength.label", "Tint strength")
-                  description: tr("settings.visualEffects.glassTintStrength.description", "Intensity of the glass tint color")
-                  from: 0
-                  to: 1
-                  stepSize: 0.05
-                  value: root.glassTintStrength
-                  text: value.toFixed(2)
-                  onMoved: value => {
-                             if (Math.abs(root.glassTintStrength - value) > 0.001) {
-                               root.glassTintStrength = value;
-                               root.saveSettings();
-                             }
-                           }
+                Behavior on Layout.maximumHeight {
+                  NumberAnimation {
+                    duration: Style.animationFast
+                    easing.type: Easing.OutCubic
+                  }
                 }
 
-                NValueSlider {
-                  Layout.fillWidth: true
-                  label: tr("settings.visualEffects.glassBorderOpacity.label", "Border opacity")
-                  description: tr("settings.visualEffects.glassBorderOpacity.description", "Opacity of the glass border highlight")
-                  from: 0
-                  to: 1
-                  stepSize: 0.05
-                  value: root.glassBorderOpacity
-                  text: value.toFixed(2)
-                  onMoved: value => {
-                             if (Math.abs(root.glassBorderOpacity - value) > 0.001) {
-                               root.glassBorderOpacity = value;
-                               root.saveSettings();
+                Behavior on opacity {
+                  NumberAnimation {
+                    duration: Style.animationFast
+                    easing.type: Easing.OutCubic
+                  }
+                }
+
+                ColumnLayout {
+                  id: glassControlsColumn
+                  anchors.left: parent.left
+                  anchors.right: parent.right
+                  spacing: Style.marginL
+
+                  NValueSlider {
+                    Layout.fillWidth: true
+                    label: tr("settings.visualEffects.glassTintStrength.label", "Tint strength")
+                    description: tr("settings.visualEffects.glassTintStrength.description", "Intensity of the glass tint color")
+                    from: 0
+                    to: 1
+                    stepSize: 0.05
+                    value: root.glassTintStrength
+                    text: value.toFixed(2)
+                    onMoved: value => {
+                               if (Math.abs(root.glassTintStrength - value) > 0.001) {
+                                 root.glassTintStrength = value;
+                                 root.saveSettings();
+                               }
                              }
-                           }
+                  }
+
+                  NValueSlider {
+                    Layout.fillWidth: true
+                    label: tr("settings.visualEffects.glassBorderOpacity.label", "Border opacity")
+                    description: tr("settings.visualEffects.glassBorderOpacity.description", "Opacity of the glass border highlight")
+                    from: 0
+                    to: 1
+                    stepSize: 0.05
+                    value: root.glassBorderOpacity
+                    text: value.toFixed(2)
+                    onMoved: value => {
+                               if (Math.abs(root.glassBorderOpacity - value) > 0.001) {
+                                 root.glassBorderOpacity = value;
+                                 root.saveSettings();
+                               }
+                             }
+                  }
                 }
               }
             }
-          }
 
-          // --- Blur Settings ---
-          NCollapsible {
-            label: tr("settings.visualEffects.section.blur", "Blur Effects")
-            description: tr("settings.visualEffects.section.blur.desc", "Background blur for the overview panel")
-            expanded: true
-            Layout.fillWidth: true
-
-            NToggle {
-              label: tr("settings.visualEffects.enableBlur.label", "Enable blur")
-              description: tr("settings.visualEffects.enableBlur.description", "Apply blur effect to the overview background")
-              checked: root.enableBlur
-              onToggled: checked => {
-                           root.enableBlur = checked;
-                           root.saveSettings();
-                         }
-            }
-
-            Rectangle {
-              visible: root.enableBlur
+            // --- Blur Settings ---
+            NCollapsible {
+              label: tr("settings.visualEffects.section.blur", "Blur Effects")
+              description: tr("settings.visualEffects.section.blur.desc", "Background blur for the overview panel")
+              expanded: true
               Layout.fillWidth: true
-              implicitHeight: blurHintColumn.implicitHeight + Style.marginM * 2
-              radius: Style.radiusS
-              color: Qt.rgba((Color.mInfo?.r ?? 0), (Color.mInfo?.g ?? 0.4), (Color.mInfo?.b ?? 0.8), Style.opacityLight)
 
-              Column {
-                id: blurHintColumn
-                anchors {
-                  left: parent.left
-                  right: parent.right
-                  top: parent.top
-                  margins: Style.marginM
-                }
-                spacing: Style.marginS
+              NToggle {
+                label: tr("settings.visualEffects.enableBlur.label", "Enable blur")
+                description: tr("settings.visualEffects.enableBlur.description", "Apply blur effect to the overview background")
+                checked: root.enableBlur
+                onToggled: checked => {
+                             root.enableBlur = checked;
+                             root.saveSettings();
+                           }
+              }
 
-                NText {
-                  width: parent.width
-                  wrapMode: Text.WordWrap
-                  text: tr("settings.visualEffects.blur.hint", "To enable blur, add this layerrule to your hyprland.conf:")
-                  pointSize: Style.fontSizeS
-                  color: Color.mOnSurface
-                }
+              Rectangle {
+                visible: root.enableBlur
+                Layout.fillWidth: true
+                implicitHeight: blurHintColumn.implicitHeight + Style.marginM * 2
+                radius: Style.radiusS
+                color: Qt.rgba((Color.mInfo?.r ?? 0), (Color.mInfo?.g ?? 0.4), (Color.mInfo?.b ?? 0.8), Style.opacityLight)
 
-                Rectangle {
-                  width: parent.width
-                  implicitHeight: layerruleText.implicitHeight + Style.marginS * 2
-                  radius: Style.radiusXS
-                  color: Qt.rgba(Color.mSurface.r, Color.mSurface.g, Color.mSurface.b, 0.8)
+                Column {
+                  id: blurHintColumn
+                  anchors {
+                    left: parent.left
+                    right: parent.right
+                    top: parent.top
+                    margins: Style.marginM
+                  }
+                  spacing: Style.marginS
 
                   NText {
-                    id: layerruleText
-                    anchors {
-                      left: parent.left
-                      right: parent.right
-                      verticalCenter: parent.verticalCenter
-                      leftMargin: Style.marginS
-                      rightMargin: Style.marginS
-                    }
-                    text: "layerrule = blur, hypr-overview"
-                    font.family: (Settings.data.ui.fontMono || Settings.data.ui.fontFixed || Settings.data.ui.fontDefault || "")
-                    pointSize: Style.fontSizeXS
+                    width: parent.width
+                    wrapMode: Text.WordWrap
+                    text: tr("settings.visualEffects.blur.hint", "To enable blur, add this layerrule to your hyprland.conf:")
+                    pointSize: Style.fontSizeS
                     color: Color.mOnSurface
-                    elide: Text.ElideRight
+                  }
+
+                  Rectangle {
+                    width: parent.width
+                    implicitHeight: layerruleText.implicitHeight + Style.marginS * 2
+                    radius: Style.radiusXS
+                    color: Qt.rgba(Color.mSurface.r, Color.mSurface.g, Color.mSurface.b, 0.8)
+
+                    NText {
+                      id: layerruleText
+                      anchors {
+                        left: parent.left
+                        right: parent.right
+                        verticalCenter: parent.verticalCenter
+                        leftMargin: Style.marginS
+                        rightMargin: Style.marginS
+                      }
+                      text: "layerrule = blur, hypr-overview"
+                      font.family: (Settings.data.ui.fontMono || Settings.data.ui.fontFixed || Settings.data.ui.fontDefault || "")
+                      pointSize: Style.fontSizeXS
+                      color: Color.mOnSurface
+                      elide: Text.ElideRight
+                    }
                   }
                 }
               }
             }
           }
-        }
 
-        ScrollBar.vertical: ScrollBar {
-          policy: ScrollBar.AsNeeded
+          ScrollBar.vertical: ScrollBar {
+            policy: ScrollBar.AsNeeded
+          }
         }
       }
-    }
 
-    // === Performance Tab ===
-    Item {
-      id: performanceSettingsPage
-      height: tabLayout.height
-      implicitHeight: performanceSettingsColumn.implicitHeight
+      // === Performance Tab ===
+      Item {
+        id: performanceSettingsPage
+        height: tabLayout.height
+        implicitHeight: performanceSettingsColumn.implicitHeight
 
-      Flickable {
-        id: performanceSettingsFlickable
-        anchors.fill: parent
-        clip: true
-        contentWidth: width
-        contentHeight: performanceSettingsColumn.implicitHeight
-        boundsBehavior: Flickable.StopAtBounds
-        interactive: contentHeight > height
+        Flickable {
+          id: performanceSettingsFlickable
+          anchors.fill: parent
+          clip: true
+          contentWidth: width
+          contentHeight: performanceSettingsColumn.implicitHeight
+          boundsBehavior: Flickable.StopAtBounds
+          interactive: contentHeight > height
 
-        ColumnLayout {
-          id: performanceSettingsColumn
-          width: performanceSettingsFlickable.width
-          spacing: Style.marginL
+          ColumnLayout {
+            id: performanceSettingsColumn
+            width: performanceSettingsFlickable.width
+            spacing: Style.marginL
 
-          // --- Preview Mode ---
-          NCollapsible {
-            label: tr("settings.performance.section.previewMode", "Preview Mode")
-            description: tr("settings.performance.section.previewMode.desc", "Control window preview resource usage and memory consumption")
-            expanded: true
-            Layout.fillWidth: true
-
-            NComboBox {
+            // --- Preview Mode ---
+            NCollapsible {
+              label: tr("settings.performance.section.previewMode", "Preview Mode")
+              description: tr("settings.performance.section.previewMode.desc", "Control window preview resource usage and memory consumption")
+              expanded: true
               Layout.fillWidth: true
-              label: tr("settings.performance.previewMode.label", "Preview mode")
-              description: tr("settings.performance.previewMode.description", "Control window preview resource usage")
-              model: [
-                {
-                  "key": "live",
-                  "name": tr("settings.performance.previewMode.live", "Live - Real-time updates")
-                },
-                {
-                  "key": "event",
-                  "name": tr("settings.performance.previewMode.event", "Event - Periodic snapshots")
-                },
-                {
-                  "key": "off",
-                  "name": tr("settings.performance.previewMode.off", "Off - No previews (icons only)")
-                }
-              ]
-              currentKey: root.previewMode
-              onSelected: key => {
-                            root.previewMode = key;
-                            root.saveSettings();
-                          }
-            }
 
-            Rectangle {
-              Layout.fillWidth: true
-              implicitHeight: previewModeInfoColumn.implicitHeight + Style.marginM * 2
-              radius: Style.radiusS
-              color: Qt.rgba((Color.mInfo?.r ?? 0), (Color.mInfo?.g ?? 0.4), (Color.mInfo?.b ?? 0.8), Style.opacityLight)
+              NComboBox {
+                Layout.fillWidth: true
+                label: tr("settings.performance.previewMode.label", "Preview mode")
+                description: tr("settings.performance.previewMode.description", "Control window preview resource usage")
+                model: [
+                  {
+                    "key": "live",
+                    "name": tr("settings.performance.previewMode.live", "Live - Real-time updates")
+                  },
+                  {
+                    "key": "event",
+                    "name": tr("settings.performance.previewMode.event", "Event - Periodic snapshots")
+                  },
+                  {
+                    "key": "off",
+                    "name": tr("settings.performance.previewMode.off", "Off - No previews (icons only)")
+                  }
+                ]
+                currentKey: root.previewMode
+                onSelected: key => {
+                              root.previewMode = key;
+                              root.saveSettings();
+                            }
+              }
 
-              Column {
-                id: previewModeInfoColumn
-                anchors {
-                  left: parent.left
-                  right: parent.right
-                  top: parent.top
-                  margins: Style.marginM
-                }
-                spacing: Style.marginS
+              Rectangle {
+                Layout.fillWidth: true
+                implicitHeight: previewModeInfoColumn.implicitHeight + Style.marginM * 2
+                radius: Style.radiusS
+                color: Qt.rgba((Color.mInfo?.r ?? 0), (Color.mInfo?.g ?? 0.4), (Color.mInfo?.b ?? 0.8), Style.opacityLight)
 
-                NText {
-                  width: parent.width
-                  wrapMode: Text.WordWrap
-                  text: tr("settings.performance.previewMode.memoryInfo", "Memory usage by mode:")
-                  pointSize: Style.fontSizeS
-                  font.weight: Style.fontWeightMedium
-                  color: Color.mOnSurface
-                }
+                Column {
+                  id: previewModeInfoColumn
+                  anchors {
+                    left: parent.left
+                    right: parent.right
+                    top: parent.top
+                    margins: Style.marginM
+                  }
+                  spacing: Style.marginS
 
-                NText {
-                  width: parent.width
-                  wrapMode: Text.WordWrap
-                  text: tr("settings.performance.previewMode.liveDesc", "• Live: Higher memory usage (50-200MB depending on window count). Real-time preview updates.")
-                  pointSize: Style.fontSizeS
-                  color: Qt.alpha(Color.mOnSurface, Style.opacityHeavy)
-                }
+                  NText {
+                    width: parent.width
+                    wrapMode: Text.WordWrap
+                    text: tr("settings.performance.previewMode.memoryInfo", "Memory usage by mode:")
+                    pointSize: Style.fontSizeS
+                    font.weight: Style.fontWeightMedium
+                    color: Color.mOnSurface
+                  }
 
-                NText {
-                  width: parent.width
-                  wrapMode: Text.WordWrap
-                  text: tr("settings.performance.previewMode.eventDesc", "• Event: Moderate memory usage (20-80MB). Updates on window events only.")
-                  pointSize: Style.fontSizeS
-                  color: Qt.alpha(Color.mOnSurface, Style.opacityHeavy)
-                }
+                  NText {
+                    width: parent.width
+                    wrapMode: Text.WordWrap
+                    text: tr("settings.performance.previewMode.liveDesc", "• Live: Higher memory usage (50-200MB depending on window count). Real-time preview updates.")
+                    pointSize: Style.fontSizeS
+                    color: Qt.alpha(Color.mOnSurface, Style.opacityHeavy)
+                  }
 
-                NText {
-                  width: parent.width
-                  wrapMode: Text.WordWrap
-                  text: tr("settings.performance.previewMode.offDesc", "• Off: Minimal memory usage. Shows only window icons and titles.")
-                  pointSize: Style.fontSizeS
-                  color: Qt.alpha(Color.mOnSurface, Style.opacityHeavy)
+                  NText {
+                    width: parent.width
+                    wrapMode: Text.WordWrap
+                    text: tr("settings.performance.previewMode.eventDesc", "• Event: Moderate memory usage (20-80MB). Updates on window events only.")
+                    pointSize: Style.fontSizeS
+                    color: Qt.alpha(Color.mOnSurface, Style.opacityHeavy)
+                  }
+
+                  NText {
+                    width: parent.width
+                    wrapMode: Text.WordWrap
+                    text: tr("settings.performance.previewMode.offDesc", "• Off: Minimal memory usage. Shows only window icons and titles.")
+                    pointSize: Style.fontSizeS
+                    color: Qt.alpha(Color.mOnSurface, Style.opacityHeavy)
+                  }
                 }
               }
             }
           }
-        }
 
-        ScrollBar.vertical: ScrollBar {
-          policy: ScrollBar.AsNeeded
+          ScrollBar.vertical: ScrollBar {
+            policy: ScrollBar.AsNeeded
+          }
         }
       }
-    }
     }
   }
 
