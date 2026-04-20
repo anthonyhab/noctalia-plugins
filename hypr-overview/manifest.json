@@ -1,7 +1,7 @@
 {
   "id": "hypr-overview",
   "name": "Hypr Overview",
-  "version": "0.2.0",
+  "version": "1.1.0",
   "minNoctaliaVersion": "3.6.0",
   "author": "habibe",
   "license": "MIT",
@@ -84,7 +84,10 @@
       "enableGlassMode": false,
       "glassTintStrength": 0.55,
       "glassBorderOpacity": 0.75,
-      "enableBlur": false
+      "enableBlur": false,
+      "showMonitorIndicators": true,
+      "enableCrossMonitorDrag": true,
+      "crossMonitorDragStyle": "border"
     }
   }
 }
