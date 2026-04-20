@@ -116,6 +116,24 @@ Item {
   property var addresses: []
   property var windowByAddress: ({})
   property var monitors: []
+  readonly property var workspaceMonitorBindings: {
+    var bindings = {};
+    var wins = windowList || [];
+    for (var i = 0; i < wins.length; i++) {
+      var win = wins[i];
+      if (!win || !win.workspace)
+        continue;
+      var wsId = win.workspace.id;
+      var monId = win.monitor;
+      if (wsId === undefined || monId === undefined)
+        continue;
+      if (!bindings[wsId])
+        bindings[wsId] = [];
+      if (bindings[wsId].indexOf(monId) === -1)
+        bindings[wsId].push(monId);
+    }
+    return bindings;
+  }
   property var activeWorkspace: null
   property string activeWindowAddress: ""
   property var workspaces: []
@@ -481,44 +499,34 @@ Item {
   }
 
   function getVisibleWorkspaces(monitorId) {
-    // Use pluginMain.activeWorkspace for consistency with OverviewGrid's getActiveWorkspaceValueForGrid()
     var workspacesPerGroup = gridRows * gridColumns;
-    var currentWs = activeWorkspace;
-    var currentId = (currentWs && currentWs.id) || 1;
-    var currentGroup = 0;
-    // If current is special, we need to find which group "owns" the view.
-    // OverviewGrid uses logic: isViewingSpecial ? 0 : ...
-    // So we default to group 0 when on a special workspace.
+    var targetMonitor = monitors.find(function (m) {
+      return String(m.id) === String(monitorId);
+    });
+    if (!targetMonitor)
+      return [];
+    var currentId = 1;
+    if (targetMonitor && targetMonitor.activeWorkspace) {
+      currentId = targetMonitor.activeWorkspace.id || 1;
+    }
     if (currentId < 0)
       currentId = 1;
-
-    currentGroup = Math.floor((currentId - 1) / workspacesPerGroup);
+    var currentGroup = Math.floor((currentId - 1) / workspacesPerGroup);
     var minWorkspaceId = currentGroup * workspacesPerGroup + 1;
     var visible = [];
-    // Normal workspaces in group
     for (var i = 0; i < workspacesPerGroup; i++) {
       var wsId = minWorkspaceId + i;
-      var maxNormalId = minWorkspaceId + workspacesPerGroup - 1;
-      // Should we include this row?
-      // Row index:
-      var rowIndex = Math.floor(i / gridColumns);
       visible.push({
                      "id": wsId,
                      "type": "normal"
                    });
     }
-    // Special workspaces
-    // We only show as many as fit in the remaining slots of the group, OR if we append them?
-    // OverviewGrid replaces the *last* slots.
     var reservedSlots = 0;
     if (showScratchpadWorkspaces) {
       reservedSlots = Math.min(specialWorkspaces.length, workspacesPerGroup);
-      // Logic from OverviewGrid: reserved = Math.min(reserved, Math.max(0, workspacesShown - 1));
       reservedSlots = Math.min(reservedSlots, Math.max(0, workspacesPerGroup - 1));
-      // Replace last N items of visible with special
       for (var j = 0; j < reservedSlots; j++) {
         var special = specialWorkspaces[j];
-        // Replace from end
         var targetIndex = visible.length - reservedSlots + j;
         if (targetIndex >= 0 && targetIndex < visible.length)
           visible[targetIndex] = {
@@ -530,6 +538,13 @@ Item {
       }
     }
     return visible;
+  }
+
+  function getMonitorIdForWorkspace(workspaceId) {
+    var bindings = workspaceMonitorBindings;
+    if (!bindings || !bindings[workspaceId] || bindings[workspaceId].length === 0)
+      return -1;
+    return bindings[workspaceId][0];
   }
 
   onOverviewOpenChanged: {
