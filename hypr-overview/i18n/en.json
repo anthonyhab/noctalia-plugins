@@ -276,6 +276,28 @@
             "selectionBorder": {
                 "label": "Selection border",
                 "description": "Border thickness of the active workspace indicator (-1 for default)"
+            },
+            "showMonitorIndicators": {
+                "label": "Show monitor indicators",
+                "description": "Show monitor badges on workspace cells for workspaces bound to other monitors"
+            },
+            "enableCrossMonitorDrag": {
+                "label": "Cross-monitor drag",
+                "description": "Enable dragging windows to workspaces on other monitors, migrating the window to that monitor"
+            },
+            "crossMonitorDragStyle": {
+                "label": "Drag indicator style",
+                "options": {
+                    "border": "Border highlight",
+                    "arrow": "Arrow indicator",
+                    "both": "Border + Arrow"
+                }
+            },
+            "workspaceMonitorBadge": {
+                "tooltip": "Workspace on monitor %1"
+            },
+            "migrationIndicator": {
+                "label": "Migrate to monitor %1"
             }
         },
         "visual": {
