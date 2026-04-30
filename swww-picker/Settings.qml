@@ -84,15 +84,15 @@ ColumnLayout {
 
   // Header
   NText {
-    text: pluginApi?.tr("settings.description") || "Configure wallpaper cycling with awww."
+    text: pluginApi?.tr("settings.description")
     wrapMode: Text.WordWrap
     color: Color.mOnSurface
   }
 
   // Directory settings
   NTextInput {
-    label: pluginApi?.tr("settings.wallpapers-dir") || "Wallpapers directory"
-    description: pluginApi?.tr("settings.wallpapers-dir-desc") || "Path to the directory containing your wallpaper images."
+    label: pluginApi?.tr("settings.wallpapers-dir")
+    description: pluginApi?.tr("settings.wallpapers-dir-desc")
     placeholderText: "~/Pictures/Wallpapers"
     text: root.wallpapersDir
     onTextChanged: root.wallpapersDir = text
@@ -104,22 +104,22 @@ ColumnLayout {
 
   // Auto-cycle section
   NText {
-    text: pluginApi?.tr("settings.auto-cycle.title") || "Auto-cycle"
+    text: pluginApi?.tr("settings.auto-cycle.title")
     pointSize: Style.fontSizeM
     font.weight: Style.fontWeightMedium
     color: Color.mOnSurface
   }
 
   NToggle {
-    label: pluginApi?.tr("settings.auto-cycle.enabled") || "Enable auto-cycling"
-    description: pluginApi?.tr("settings.auto-cycle.enabled-desc") || "Automatically change wallpaper at regular intervals."
+    label: pluginApi?.tr("settings.auto-cycle.enabled")
+    description: pluginApi?.tr("settings.auto-cycle.enabled-desc")
     checked: root.autoCycleEnabled
     onToggled: checked => root.autoCycleEnabled = checked
   }
 
   NTextInput {
-    label: pluginApi?.tr("settings.auto-cycle.interval") || "Interval (minutes)"
-    description: pluginApi?.tr("settings.auto-cycle.interval-desc") || "How often to change the wallpaper when auto-cycling is enabled."
+    label: pluginApi?.tr("settings.auto-cycle.interval")
+    description: pluginApi?.tr("settings.auto-cycle.interval-desc")
     placeholderText: "30"
     text: root.autoCycleInterval
     enabled: root.autoCycleEnabled
@@ -128,8 +128,8 @@ ColumnLayout {
   }
 
   NToggle {
-    label: pluginApi?.tr("settings.shuffle-mode") || "Shuffle mode"
-    description: pluginApi?.tr("settings.shuffle-desc") || "Pick random wallpapers instead of sequential order."
+    label: pluginApi?.tr("settings.shuffle-mode")
+    description: pluginApi?.tr("settings.shuffle-desc")
     checked: root.shuffleMode
     onToggled: checked => root.shuffleMode = checked
   }
@@ -140,7 +140,7 @@ ColumnLayout {
 
   // Transition settings
   NText {
-    text: pluginApi?.tr("settings.transitions.title") || "Transitions"
+    text: pluginApi?.tr("settings.transitions.title")
     pointSize: Style.fontSizeM
     font.weight: Style.fontWeightMedium
     color: Color.mOnSurface
@@ -148,20 +148,56 @@ ColumnLayout {
 
   NComboBox {
     Layout.fillWidth: true
-    label: pluginApi?.tr("settings.transitions.type") || "Transition type"
+    label: pluginApi?.tr("settings.transitions.type")
     model: [
-      { "key": "simple", "name": "Simple fade" },
-      { "key": "fade", "name": "Bezier fade" },
-      { "key": "grow", "name": "Grow (circle)" },
-      { "key": "center", "name": "Center grow" },
-      { "key": "outer", "name": "Outer shrink" },
-      { "key": "wipe", "name": "Wipe" },
-      { "key": "wave", "name": "Wave" },
-      { "key": "left", "name": "Slide left" },
-      { "key": "right", "name": "Slide right" },
-      { "key": "top", "name": "Slide top" },
-      { "key": "bottom", "name": "Slide bottom" },
-      { "key": "random", "name": "Random" }
+      {
+        "key": "simple",
+        "name": "Simple fade"
+      },
+      {
+        "key": "fade",
+        "name": "Bezier fade"
+      },
+      {
+        "key": "grow",
+        "name": "Grow (circle)"
+      },
+      {
+        "key": "center",
+        "name": "Center grow"
+      },
+      {
+        "key": "outer",
+        "name": "Outer shrink"
+      },
+      {
+        "key": "wipe",
+        "name": "Wipe"
+      },
+      {
+        "key": "wave",
+        "name": "Wave"
+      },
+      {
+        "key": "left",
+        "name": "Slide left"
+      },
+      {
+        "key": "right",
+        "name": "Slide right"
+      },
+      {
+        "key": "top",
+        "name": "Slide top"
+      },
+      {
+        "key": "bottom",
+        "name": "Slide bottom"
+      },
+      {
+        "key": "random",
+        "name": "Random"
+      }
     ]
     currentKey: root.transitionType
     onSelected: key => root.transitionType = key
@@ -173,7 +209,7 @@ ColumnLayout {
 
     NTextInput {
       Layout.fillWidth: true
-      label: pluginApi?.tr("settings.transitions.duration") || "Duration (seconds)"
+      label: pluginApi?.tr("settings.transitions.duration")
       placeholderText: "1"
       text: root.transitionDuration
       inputItem.inputMethodHints: Qt.ImhFormattedNumbersOnly
@@ -182,7 +218,7 @@ ColumnLayout {
 
     NTextInput {
       Layout.fillWidth: true
-      label: pluginApi?.tr("settings.transitions.fps") || "FPS"
+      label: pluginApi?.tr("settings.transitions.fps")
       placeholderText: "60"
       text: root.transitionFps
       inputItem.inputMethodHints: Qt.ImhDigitsOnly
@@ -191,7 +227,7 @@ ColumnLayout {
 
     NTextInput {
       Layout.fillWidth: true
-      label: pluginApi?.tr("settings.transitions.step") || "Step"
+      label: pluginApi?.tr("settings.transitions.step")
       placeholderText: "90"
       text: root.transitionStep
       inputItem.inputMethodHints: Qt.ImhDigitsOnly
@@ -205,14 +241,14 @@ ColumnLayout {
 
   // Bezier curve settings
   NText {
-    text: pluginApi?.tr("settings.bezier.title") || "Easing Curve"
+    text: pluginApi?.tr("settings.bezier.title")
     pointSize: Style.fontSizeM
     font.weight: Style.fontWeightMedium
     color: Color.mOnSurface
   }
 
   NText {
-    text: pluginApi?.tr("settings.bezier.description") || "Controls animation acceleration. Format: f1,f2,f3,f4 (0-1)"
+    text: pluginApi?.tr("settings.bezier.description")
     wrapMode: Text.WordWrap
     color: Color.mOnSurfaceVariant
     pointSize: Style.fontSizeS
@@ -224,19 +260,19 @@ ColumnLayout {
     spacing: Style.marginS
 
     NButton {
-      text: pluginApi?.tr("settings.bezier.snappy") || "Snappy"
+      text: pluginApi?.tr("settings.bezier.snappy")
       highlighted: transitionBezier === ".4,0,.2,1"
       onClicked: transitionBezier = ".4,0,.2,1"
     }
 
     NButton {
-      text: pluginApi?.tr("settings.bezier.natural") || "Natural"
+      text: pluginApi?.tr("settings.bezier.natural")
       highlighted: transitionBezier === ".17,.67,.83,.67"
       onClicked: transitionBezier = ".17,.67,.83,.67"
     }
 
     NButton {
-      text: pluginApi?.tr("settings.bezier.linear") || "Linear"
+      text: pluginApi?.tr("settings.bezier.linear")
       highlighted: transitionBezier === "0,0,1,1"
       onClicked: transitionBezier = "0,0,1,1"
     }
@@ -244,8 +280,8 @@ ColumnLayout {
 
   NTextInput {
     Layout.fillWidth: true
-    label: pluginApi?.tr("settings.transitions.bezier") || "Custom bezier"
-    description: pluginApi?.tr("settings.transitions.bezier-desc") || "Animation easing curve in format f1,f2,f3,f4 (0-1)"
+    label: pluginApi?.tr("settings.transitions.bezier")
+    description: pluginApi?.tr("settings.transitions.bezier-desc")
     placeholderText: ".4,0,.2,1"
     text: root.transitionBezier
     onTextChanged: root.transitionBezier = text
@@ -257,15 +293,15 @@ ColumnLayout {
 
   // Bar widget settings
   NText {
-    text: pluginApi?.tr("settings.bar-widget.title") || "Bar widget"
+    text: pluginApi?.tr("settings.bar-widget.title")
     pointSize: Style.fontSizeM
     font.weight: Style.fontWeightMedium
     color: Color.mOnSurface
   }
 
   NToggle {
-    label: pluginApi?.tr("settings.show-name") || "Show wallpaper name"
-    description: pluginApi?.tr("settings.show-name-desc") || "Display the current wallpaper filename in the bar."
+    label: pluginApi?.tr("settings.show-name")
+    description: pluginApi?.tr("settings.show-name-desc")
     checked: root.showWallpaperName
     onToggled: checked => root.showWallpaperName = checked
   }
@@ -280,7 +316,7 @@ ColumnLayout {
     spacing: Style.marginS
 
     NText {
-      text: pluginApi?.tr("settings.status.title") || "Status"
+      text: pluginApi?.tr("settings.status.title")
       pointSize: Style.fontSizeM
       font.weight: Style.fontWeightMedium
       color: Color.mOnSurface
@@ -291,10 +327,8 @@ ColumnLayout {
       text: {
         const available = pluginMain?.available || false;
         const count = pluginMain?.wallpaperList?.length || 0;
-        const status = available
-          ? (pluginApi?.tr("status.daemon-running") || "awww daemon running")
-          : (pluginApi?.tr("status.daemon-stopped") || "awww daemon not running");
-        return status + " | " + count + " " + (pluginApi?.tr("status.wallpapers") || "wallpapers");
+        const status = available ? (pluginApi?.tr("status.daemon-running")) : (pluginApi?.tr("status.daemon-stopped"));
+        return status + " | " + count + " " + (pluginApi?.tr("status.wallpapers"));
       }
       color: Color.mOnSurfaceVariant
       pointSize: Style.fontSizeS
@@ -302,7 +336,7 @@ ColumnLayout {
     }
 
     NButton {
-      text: pluginApi?.tr("actions.refresh") || "Refresh"
+      text: pluginApi?.tr("actions.refresh")
       onClicked: pluginMain?.refresh()
     }
   }
