@@ -42,7 +42,7 @@ ColumnLayout {
     return fallback;
   }
 
-  function syncFromSettings() {
+  function syncFromPlugin() {
     editShowGrid = settingValue("showGrid", true);
     editSnapToWindows = settingValue("snapToWindows", true);
     editCopyToClipboard = settingValue("copyToClipboard", true);
@@ -68,8 +68,15 @@ ColumnLayout {
     pluginApi.saveSettings();
   }
 
-  onPluginApiChanged: syncFromSettings()
-  Component.onCompleted: syncFromSettings()
+  onPluginApiChanged: syncFromPlugin()
+  Component.onCompleted: syncFromPlugin()
+
+  Connections {
+    target: pluginApi
+    function onPluginSettingsChanged() {
+      syncFromPlugin();
+    }
+  }
 
   NText {
     text: pluginApi?.tr("settings.title")
