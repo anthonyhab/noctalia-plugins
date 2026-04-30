@@ -337,7 +337,12 @@
         "tooltip": {
             "xwayland": "XWayland",
             "unknown": "Unknown",
-            "unknown-class": "unknown"
+            "unknown-class": "unknown",
+            "special-prefix": "Special: ",
+            "workspace-prefix": "Workspace ",
+            "active-suffix": " (active)",
+            "special": "special",
+            "windows-count": "({count} windows)"
         }
     }
 }

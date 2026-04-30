@@ -428,16 +428,17 @@ ColumnLayout {
   }
 
   function workspaceDisplayName(key, count, isActive) {
-    var suffix = count > 0 ? (" (" + count + " windows)") : "";
+    var suffix = count > 0 ? (" " + tr("overview.tooltip.windows-count", "({count} windows)").replace("{count}", count)) : "";
     if (key.startsWith("special:")) {
       var specialName = key.slice("special:".length);
-      return "Special: " + specialName + suffix + (isActive ? " (active)" : "");
+      var displaySpecialName = specialName === "special" ? tr("overview.tooltip.special", "special") : specialName;
+      return tr("overview.tooltip.special-prefix", "Special: ") + displaySpecialName + suffix + (isActive ? tr("overview.tooltip.active-suffix", " (active)") : "");
     }
     if (key.startsWith("ws:")) {
       var id = key.slice(3);
-      return "Workspace " + id + suffix + (isActive ? " (active)" : "");
+      return tr("overview.tooltip.workspace-prefix", "Workspace ") + id + suffix + (isActive ? tr("overview.tooltip.active-suffix", " (active)") : "");
     }
-    return key + suffix + (isActive ? " (active)" : "");
+    return key + suffix + (isActive ? tr("overview.tooltip.active-suffix", " (active)") : "");
   }
 
   function isPreviewWindowFocused(win) {
