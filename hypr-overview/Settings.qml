@@ -880,8 +880,8 @@ ColumnLayout {
   // Tab Bar
   NTabBar {
     id: tabBar
-
     Layout.fillWidth: true
+    Layout.fillHeight: false
     currentIndex: 0
     distributeEvenly: true
 
@@ -890,35 +890,20 @@ ColumnLayout {
       tabIndex: 0
       checked: tabBar.currentIndex === 0
     }
-
     NTabButton {
       text: tr("settings.tabs.behavior", "Behavior")
       tabIndex: 1
       checked: tabBar.currentIndex === 1
     }
-
     NTabButton {
       text: tr("settings.tabs.layout", "Layout")
       tabIndex: 2
       checked: tabBar.currentIndex === 2
     }
-
     NTabButton {
       text: tr("settings.tabs.appearance", "Appearance")
       tabIndex: 3
       checked: tabBar.currentIndex === 3
-    }
-
-    NTabButton {
-      text: tr("settings.tabs.visual", "Visual Effects")
-      tabIndex: 4
-      checked: tabBar.currentIndex === 4
-    }
-
-    NTabButton {
-      text: tr("settings.tabs.performance", "Performance")
-      tabIndex: 5
-      checked: tabBar.currentIndex === 5
     }
   }
 
@@ -1382,97 +1367,6 @@ ColumnLayout {
                           root.saveSettings();
                         }
           }
-
-          NToggle {
-            label: tr("settings.layout.rowColumnGuides.label", "Row/column guides")
-            description: tr("settings.layout.rowColumnGuides.description", "Show subtle center guides in each workspace cell")
-            checked: root.showRowColumnGuides
-            onToggled: checked => {
-                         root.showRowColumnGuides = checked;
-                         root.saveSettings();
-                       }
-          }
-
-          NToggle {
-            label: tr("settings.layout.layoutBadge.label", "Layout badge")
-            description: tr("settings.layout.layoutBadge.description", "Show a clickable layout badge (D/M/S) on each workspace to switch Hyprland tiling layout")
-            checked: root.showLayoutBadge
-            onToggled: checked => {
-                         root.showLayoutBadge = checked;
-                         root.saveSettings();
-                       }
-          }
-
-          // One-time setup hint shown when layout badge is enabled
-          Rectangle {
-            visible: root.showLayoutBadge
-            Layout.fillWidth: true
-            implicitHeight: setupHintColumn.implicitHeight + Style.marginM * 2
-            radius: Style.radiusS
-            color: Qt.rgba(Color.mOnSurface.r, Color.mOnSurface.g, Color.mOnSurface.b, Style.opacityLight * 0.5)
-
-            Column {
-              id: setupHintColumn
-              anchors {
-                left: parent.left
-                right: parent.right
-                top: parent.top
-                margins: Style.marginM
-              }
-              spacing: Style.marginS
-
-              NText {
-                width: parent.width
-                wrapMode: Text.WordWrap
-                text: tr("settings.layout.layoutBadge.setupHint", "To persist layouts across restarts, add this line to your hyprland.conf:")
-                pointSize: Style.fontSizeS
-                color: Qt.alpha(Color.mOnSurface, Style.opacityHeavy)
-              }
-
-              Rectangle {
-                width: parent.width
-                implicitHeight: sourceLineText.implicitHeight + Style.marginS * 2
-                radius: Style.radiusXS
-                color: Qt.rgba(Color.mSurface.r, Color.mSurface.g, Color.mSurface.b, 0.8)
-
-                NText {
-                  id: sourceLineText
-                  anchors {
-                    left: parent.left
-                    right: copyButton.left
-                    verticalCenter: parent.verticalCenter
-                    leftMargin: Style.marginS
-                    rightMargin: Style.marginS
-                  }
-                  text: "source = ~/.config/hypr/hypr-overview-layouts.conf"
-                  font.family: (Settings.data.ui.fontMono || Settings.data.ui.fontFixed || Settings.data.ui.fontDefault || "")
-                  pointSize: Style.fontSizeXS
-                  elide: Text.ElideRight
-                }
-
-                // Hidden TextEdit used for clipboard copy
-                TextEdit {
-                  id: clipboardHelper
-                  visible: false
-                  text: sourceLineText.text
-                }
-
-                NButton {
-                  id: copyButton
-                  anchors {
-                    right: parent.right
-                    verticalCenter: parent.verticalCenter
-                    rightMargin: Style.marginXS
-                  }
-                  text: tr("settings.layout.layoutBadge.copy", "Copy")
-                  onClicked: {
-                    clipboardHelper.selectAll();
-                    clipboardHelper.copy();
-                  }
-                }
-              }
-            }
-          }
         }
 
         ScrollBar.vertical: ScrollBar {
@@ -1513,7 +1407,7 @@ ColumnLayout {
             NComboBox {
               Layout.fillWidth: true
               label: tr("settings.appearance.visualMode.label", "Visual mode")
-              description: tr("settings.appearance.visualMode.description", "Switch between faithful live previews and stylized shader presets")
+              description: tr("settings.appearance.visualMode.description", "Controls window preview rendering — choose live, stylized, or off for lowest resource usage")
               model: [
                 {
                   "key": "live",
@@ -1524,23 +1418,32 @@ ColumnLayout {
                   "name": tr("settings.appearance.visualMode.simplified", "Simplified")
                 },
                 {
-                  "key": "cinematic",
-                  "name": tr("settings.appearance.visualMode.cinematic", "Cinematic")
+                  "key": "off",
+                  "name": tr("settings.appearance.visualMode.off", "Off")
                 }
               ]
               currentKey: root.visualMode
               onSelected: key => {
                             root.visualMode = key;
-                            root.useSimplifiedPreview = key !== "live";
+                            if (key === "off") {
+                              root.previewMode = "off";
+                              root.useSimplifiedPreview = false;
+                            } else if (key === "simplified") {
+                              root.previewMode = "event";
+                              root.useSimplifiedPreview = true;
+                            } else {
+                              root.previewMode = "live";
+                              root.useSimplifiedPreview = false;
+                            }
                             root.saveSettings();
                           }
             }
 
             Item {
               Layout.fillWidth: true
-              Layout.maximumHeight: root.visualMode !== "live" ? implicitHeight : 0
-              implicitHeight: shaderControlsColumn.implicitHeight
-              opacity: root.visualMode !== "live" ? 1.0 : 0.0
+              Layout.maximumHeight: root.visualMode === "simplified" ? implicitHeight : 0
+              implicitHeight: pixelDensitySlider.implicitHeight
+              opacity: root.visualMode === "simplified" ? 1.0 : 0.0
               visible: opacity > 0
               clip: true
 
@@ -1550,7 +1453,6 @@ ColumnLayout {
                   easing.type: Easing.OutCubic
                 }
               }
-
               Behavior on opacity {
                 NumberAnimation {
                   duration: Style.animationFast
@@ -1558,126 +1460,23 @@ ColumnLayout {
                 }
               }
 
-              ColumnLayout {
-                id: shaderControlsColumn
-
+              NValueSlider {
+                id: pixelDensitySlider
                 anchors.left: parent.left
                 anchors.right: parent.right
-                spacing: Style.marginL
-
-                NComboBox {
-                  Layout.fillWidth: true
-                  label: tr("settings.appearance.shaderPreset.label", "Shader preset")
-                  description: tr("settings.appearance.shaderPreset.description", "Fine tune how stylized modes process window previews")
-                  model: [
-                    {
-                      "key": "classic",
-                      "name": tr("settings.appearance.shaderPreset.classic", "Classic")
-                    },
-                    {
-                      "key": "simplified",
-                      "name": tr("settings.appearance.shaderPreset.simplified", "Simplified")
-                    },
-                    {
-                      "key": "mac",
-                      "name": tr("settings.appearance.shaderPreset.mac", "Mac OS Classic")
-                    },
-                    {
-                      "key": "cinematic",
-                      "name": tr("settings.appearance.shaderPreset.cinematic", "Cinematic")
-                    }
-                  ]
-                  currentKey: root.shaderPreset
-                  onSelected: key => {
-                                root.shaderPreset = key;
-                                root.saveSettings();
-                              }
-                }
-
-                NValueSlider {
-                  Layout.fillWidth: true
-                  label: tr("settings.appearance.shaderPresetStrength.label", "Preset strength")
-                  description: tr("settings.appearance.shaderPresetStrength.description", "How strongly the selected shader preset is applied")
-                  from: 0
-                  to: 1
-                  stepSize: 0.05
-                  value: root.shaderPresetStrength
-                  text: value.toFixed(2)
-                  onMoved: value => {
-                             if (Math.abs(root.shaderPresetStrength - value) > 0.001) {
-                               root.shaderPresetStrength = value;
-                               root.saveSettings();
-                             }
+                label: tr("settings.appearance.pixelDensity.label", "Pixel Density")
+                description: tr("settings.appearance.pixelDensity.description", "Controls pixelation level — higher values show more detail")
+                from: 0.1
+                to: 1
+                stepSize: 0.05
+                value: root.simplifiedPixelDensity
+                text: value.toFixed(2)
+                onMoved: value => {
+                           if (Math.abs(root.simplifiedPixelDensity - value) > 0.001) {
+                             root.simplifiedPixelDensity = value;
+                             root.saveSettings();
                            }
-                }
-
-                NValueSlider {
-                  Layout.fillWidth: true
-                  label: tr("settings.appearance.pixelDensity.label", "Pixel Density")
-                  description: tr("settings.appearance.pixelDensity.description", "Controls pixelation level (higher = more detail)")
-                  from: 0
-                  to: 1
-                  stepSize: 0.05
-                  value: root.simplifiedPixelDensity
-                  text: value.toFixed(2)
-                  onMoved: value => {
-                             if (Math.abs(root.simplifiedPixelDensity - value) > 0.001) {
-                               root.simplifiedPixelDensity = value;
-                               root.saveSettings();
-                             }
-                           }
-                }
-
-                NValueSlider {
-                  Layout.fillWidth: true
-                  label: tr("settings.appearance.colorDepth.label", "Color Depth")
-                  description: tr("settings.appearance.colorDepth.description", "Bits per color channel (lower = posterized look)")
-                  from: 1
-                  to: 8
-                  stepSize: 0.5
-                  value: root.simplifiedColorDepth
-                  text: value.toFixed(1) + " bits"
-                  onMoved: value => {
-                             if (Math.abs(root.simplifiedColorDepth - value) > 0.01) {
-                               root.simplifiedColorDepth = value;
-                               root.saveSettings();
-                             }
-                           }
-                }
-
-                NValueSlider {
-                  Layout.fillWidth: true
-                  label: tr("settings.appearance.saturation.label", "Saturation")
-                  description: tr("settings.appearance.saturation.description", "Color intensity (1.0 = normal)")
-                  from: 0.5
-                  to: 2
-                  stepSize: 0.1
-                  value: root.simplifiedSaturation
-                  text: value.toFixed(1)
-                  onMoved: value => {
-                             if (Math.abs(root.simplifiedSaturation - value) > 0.01) {
-                               root.simplifiedSaturation = value;
-                               root.saveSettings();
-                             }
-                           }
-                }
-
-                NValueSlider {
-                  Layout.fillWidth: true
-                  label: tr("settings.appearance.contrast.label", "Contrast")
-                  description: tr("settings.appearance.contrast.description", "Contrast strength (1.0 = normal)")
-                  from: 0.5
-                  to: 2
-                  stepSize: 0.1
-                  value: root.simplifiedContrast
-                  text: value.toFixed(1)
-                  onMoved: value => {
-                             if (Math.abs(root.simplifiedContrast - value) > 0.01) {
-                               root.simplifiedContrast = value;
-                               root.saveSettings();
-                             }
-                           }
-                }
+                         }
               }
             }
           }
@@ -1697,68 +1496,6 @@ ColumnLayout {
                            root.showWindowIcons = checked;
                            root.saveSettings();
                          }
-            }
-
-            Item {
-              Layout.fillWidth: true
-              Layout.maximumHeight: root.showWindowIcons ? implicitHeight : 0
-              implicitHeight: iconOptionsColumn.implicitHeight
-              opacity: root.showWindowIcons ? 1.0 : 0.0
-              visible: opacity > 0
-              clip: true
-
-              Behavior on Layout.maximumHeight {
-                NumberAnimation {
-                  duration: Style.animationFast
-                  easing.type: Easing.OutCubic
-                }
-              }
-
-              Behavior on opacity {
-                NumberAnimation {
-                  duration: Style.animationFast
-                  easing.type: Easing.OutCubic
-                }
-              }
-
-              ColumnLayout {
-                id: iconOptionsColumn
-
-                anchors.left: parent.left
-                anchors.right: parent.right
-                spacing: Style.marginL
-
-                NToggle {
-                  label: tr("settings.appearance.colorizeIcons.label", "Colorize icons")
-                  description: tr("settings.appearance.colorizeIcons.description", "Tint the app icons using the system accent color")
-                  checked: root.colorizeWindowIcons
-                  onToggled: checked => {
-                               root.colorizeWindowIcons = checked;
-                               root.saveSettings();
-                             }
-                }
-
-                NComboBox {
-                  Layout.fillWidth: true
-                  label: tr("settings.appearance.iconPlacement.label", "Icon placement")
-                  description: tr("settings.appearance.iconPlacement.description", "Where to position the icon inside the window preview")
-                  model: [
-                    {
-                      "key": "center",
-                      "name": tr("settings.appearance.iconPlacement.center", "Center")
-                    },
-                    {
-                      "key": "corner",
-                      "name": tr("settings.appearance.iconPlacement.corner", "Bottom Corner")
-                    }
-                  ]
-                  currentKey: root.windowIconPlacement
-                  onSelected: key => {
-                                root.windowIconPlacement = key;
-                                root.saveSettings();
-                              }
-                }
-              }
             }
           }
 
@@ -1861,31 +1598,6 @@ ColumnLayout {
                              }
                            }
                 }
-
-                NComboBox {
-                  Layout.fillWidth: true
-                  label: tr("settings.appearance.titleStripMeta.label", "Title strip metadata")
-                  description: tr("settings.appearance.titleStripMeta.description", "Choose what extra metadata appears on the right side of the title strip")
-                  model: [
-                    {
-                      "key": "none",
-                      "name": tr("settings.appearance.titleStripMeta.none", "None")
-                    },
-                    {
-                      "key": "class",
-                      "name": tr("settings.appearance.titleStripMeta.class", "Class")
-                    },
-                    {
-                      "key": "class-pid",
-                      "name": tr("settings.appearance.titleStripMeta.class-pid", "Class + PID")
-                    }
-                  ]
-                  currentKey: root.titleStripMeta
-                  onSelected: key => {
-                                root.titleStripMeta = key;
-                                root.saveSettings();
-                              }
-                }
               }
             }
           }
@@ -1917,26 +1629,6 @@ ColumnLayout {
                          }
             }
 
-            NToggle {
-              label: tr("settings.appearance.fullscreenBadge.label", "Fullscreen badge")
-              description: tr("settings.appearance.fullscreenBadge.description", "Show a badge on fullscreen or maximized window previews")
-              checked: root.showFullscreenBadge
-              onToggled: checked => {
-                           root.showFullscreenBadge = checked;
-                           root.saveSettings();
-                         }
-            }
-
-            NToggle {
-              label: tr("settings.appearance.monitorBadge.label", "Monitor badge")
-              description: tr("settings.appearance.monitorBadge.description", "Show monitor index badges on window previews")
-              checked: root.showMonitorBadge
-              onToggled: checked => {
-                           root.showMonitorBadge = checked;
-                           root.saveSettings();
-                         }
-            }
-
             NText {
               text: tr("settings.appearance.section.multiMonitor", "Multi-Monitor")
               font.weight: Font.Bold
@@ -1961,36 +1653,12 @@ ColumnLayout {
                            root.saveSettings();
                          }
             }
-
-            NComboBox {
-              Layout.fillWidth: true
-              label: tr("settings.appearance.crossMonitorDragStyle.label", "Drag indicator style")
-              model: [
-                {
-                  "key": "border",
-                  "name": tr("settings.appearance.crossMonitorDragStyle.options.border", "Border highlight")
-                },
-                {
-                  "key": "arrow",
-                  "name": tr("settings.appearance.crossMonitorDragStyle.options.arrow", "Arrow indicator")
-                },
-                {
-                  "key": "both",
-                  "name": tr("settings.appearance.crossMonitorDragStyle.options.both", "Border + Arrow")
-                }
-              ]
-              currentKey: root.crossMonitorDragStyle || "border"
-              onSelected: key => {
-                            root.crossMonitorDragStyle = key;
-                            root.saveSettings();
-                          }
-            }
           }
 
           // --- Dimming & Focus ---
           NCollapsible {
             label: tr("settings.appearance.section.dimmingFocus", "Dimming & Focus")
-            description: tr("settings.appearance.section.dimmingFocus.desc", "Inactive workspace dimming and focus emphasis")
+            description: tr("settings.appearance.section.dimmingFocus.desc", "Inactive workspace dimming")
             expanded: true
             Layout.fillWidth: true
 
@@ -2010,56 +1678,12 @@ ColumnLayout {
                          }
                        }
             }
-
-            NValueSlider {
-              Layout.fillWidth: true
-              label: tr("settings.appearance.inactiveSaturation.label", "Inactive saturation")
-              description: tr("settings.appearance.inactiveSaturation.description", "Keep non-focused workspaces colorful or push them toward monochrome")
-              from: 0.3
-              to: 1
-              stepSize: 0.05
-              value: root.inactiveWorkspaceSaturation
-              text: value.toFixed(2)
-              onMoved: value => {
-                         if (Math.abs(root.inactiveWorkspaceSaturation - value) > 0.001) {
-                           root.inactiveWorkspaceSaturation = value;
-                           root.saveSettings();
-                         }
-                       }
-            }
-
-            NValueSlider {
-              Layout.fillWidth: true
-              label: tr("settings.appearance.hoverLift.label", "Hover emphasis")
-              description: tr("settings.appearance.hoverLift.description", "How strong the hovered window preview is emphasized")
-              from: 0
-              to: 12
-              stepSize: 1
-              value: root.hoverLiftAmount
-              text: value + "px"
-              onMoved: value => {
-                         if (root.hoverLiftAmount !== value) {
-                           root.hoverLiftAmount = value;
-                           root.saveSettings();
-                         }
-                       }
-            }
-
-            NToggle {
-              label: tr("settings.appearance.focusedGlow.label", "Focused glow")
-              description: tr("settings.appearance.focusedGlow.description", "Add a subtle glow around the focused window preview")
-              checked: root.showFocusedWindowGlow
-              onToggled: checked => {
-                           root.showFocusedWindowGlow = checked;
-                           root.saveSettings();
-                         }
-            }
           }
 
           // --- Borders & Corners ---
           NCollapsible {
             label: tr("settings.appearance.section.bordersCorners", "Borders & Corners")
-            description: tr("settings.appearance.section.bordersCorners.desc", "Rounding, borders, and accent color")
+            description: tr("settings.appearance.section.bordersCorners.desc", "Preview corner rounding")
             expanded: true
             Layout.fillWidth: true
 
@@ -2126,428 +1750,32 @@ ColumnLayout {
                          }
               }
             }
-
-            NToggle {
-              label: tr("settings.appearance.borderGradient.label", "Border gradient")
-              description: tr("settings.appearance.borderGradient.description", "Blend active/inactive border tones for a richer border highlight")
-              checked: root.useBorderGradient
-              onToggled: checked => {
-                           root.useBorderGradient = checked;
-                           root.saveSettings();
-                         }
-            }
-
-            NComboBox {
-              Layout.fillWidth: true
-              label: tr("settings.appearance.accentColor.label", "Accent color")
-              description: tr("settings.appearance.accentColor.description", "Color used for selection indicator and special workspaces")
-              model: [
-                {
-                  "key": "secondary",
-                  "name": tr("settings.appearance.accentColor.secondary", "Secondary (default)")
-                },
-                {
-                  "key": "primary",
-                  "name": tr("settings.appearance.accentColor.primary", "Primary")
-                }
-              ]
-              currentKey: root.accentColorType
-              onSelected: key => {
-                            root.accentColorType = key;
-                            root.saveSettings();
-                          }
-            }
-
-            NValueSlider {
-              Layout.fillWidth: true
-              label: tr("settings.appearance.containerBorder.label", "Container border")
-              description: tr("settings.appearance.containerBorder.description", "Border thickness of the overview container (-1 for default)")
-              from: -1
-              to: 10
-              stepSize: 1
-              value: root.containerBorderWidth
-              text: value < 0 ? tr("settings.common.default", "Default") : value + "px"
-              onMoved: value => {
-                         if (root.containerBorderWidth !== value) {
-                           root.containerBorderWidth = value;
-                           root.saveSettings();
-                         }
-                       }
-            }
-
-            NValueSlider {
-              Layout.fillWidth: true
-              label: tr("settings.appearance.selectionBorder.label", "Selection border")
-              description: tr("settings.appearance.selectionBorder.description", "Border thickness of the active workspace indicator (-1 for default)")
-              from: -1
-              to: 10
-              stepSize: 1
-              value: root.selectionBorderWidth
-              text: value < 0 ? tr("settings.common.default", "Default") : value + "px"
-              onMoved: value => {
-                         if (root.selectionBorderWidth !== value) {
-                           root.selectionBorderWidth = value;
-                           root.saveSettings();
-                         }
-                       }
-            }
           }
 
-          Item {
+          NComboBox {
             Layout.fillWidth: true
-            Layout.preferredHeight: Style.marginM
+            label: tr("settings.appearance.accentColor.label", "Accent color")
+            description: tr("settings.appearance.accentColor.description", "Color used for selection indicator and special workspaces")
+            model: [
+              {
+                "key": "secondary",
+                "name": tr("settings.appearance.accentColor.secondary", "Secondary")
+              },
+              {
+                "key": "primary",
+                "name": tr("settings.appearance.accentColor.primary", "Primary")
+              }
+            ]
+            currentKey: root.accentColorType
+            onSelected: key => {
+                          root.accentColorType = key;
+                          root.saveSettings();
+                        }
           }
         }
 
         ScrollBar.vertical: ScrollBar {
           policy: ScrollBar.AsNeeded
-        }
-      }
-
-      // === Visual Effects Tab ===
-      Item {
-        id: visualEffectsSettingsPage
-        height: tabLayout.height
-        implicitHeight: visualEffectsSettingsColumn.implicitHeight
-
-        Flickable {
-          id: visualEffectsSettingsFlickable
-          anchors.fill: parent
-          clip: true
-          contentWidth: width
-          contentHeight: visualEffectsSettingsColumn.implicitHeight
-          boundsBehavior: Flickable.StopAtBounds
-          interactive: contentHeight > height
-
-          ColumnLayout {
-            id: visualEffectsSettingsColumn
-            width: visualEffectsSettingsFlickable.width
-            spacing: Style.marginL
-
-            // --- Wallpaper Settings ---
-            NCollapsible {
-              label: tr("settings.visualEffects.section.wallpaper", "Empty Workspace Wallpaper")
-              description: tr("settings.visualEffects.section.wallpaper.desc", "Display a custom wallpaper in empty workspace thumbnails")
-              expanded: true
-              Layout.fillWidth: true
-
-              NToggle {
-                label: tr("settings.visualEffects.showEmptyWorkspaceWallpaper.label", "Show wallpaper in empty workspaces")
-                description: tr("settings.visualEffects.showEmptyWorkspaceWallpaper.description", "Display a custom image behind window previews in empty workspaces")
-                checked: root.showEmptyWorkspaceWallpaper
-                onToggled: checked => {
-                             root.showEmptyWorkspaceWallpaper = checked;
-                             root.saveSettings();
-                           }
-              }
-
-              Item {
-                Layout.fillWidth: true
-                Layout.maximumHeight: root.showEmptyWorkspaceWallpaper ? implicitHeight : 0
-                implicitHeight: wallpaperPathField.implicitHeight + Style.marginS
-                opacity: root.showEmptyWorkspaceWallpaper ? 1.0 : 0.0
-                visible: opacity > 0
-                clip: true
-
-                Behavior on Layout.maximumHeight {
-                  NumberAnimation {
-                    duration: Style.animationFast
-                    easing.type: Easing.OutCubic
-                  }
-                }
-
-                Behavior on opacity {
-                  NumberAnimation {
-                    duration: Style.animationFast
-                    easing.type: Easing.OutCubic
-                  }
-                }
-
-                NTextInput {
-                  id: wallpaperPathField
-                  anchors.left: parent.left
-                  anchors.right: parent.right
-                  anchors.top: parent.top
-                  anchors.topMargin: Style.marginS
-                  label: tr("settings.visualEffects.wallpaperPath.label", "Wallpaper path")
-                  description: tr("settings.visualEffects.wallpaperPath.description", "Full path to the wallpaper image file")
-                  placeholderText: "/home/user/Pictures/wallpaper.jpg"
-                  text: root.emptyWorkspaceWallpaperPath
-                  onTextChanged: {
-                    if (root.emptyWorkspaceWallpaperPath !== text) {
-                      root.emptyWorkspaceWallpaperPath = text;
-                      root.saveSettings();
-                    }
-                  }
-                }
-              }
-            }
-
-            // --- Glass Mode ---
-            NCollapsible {
-              label: tr("settings.visualEffects.section.glass", "Glass Mode")
-              description: tr("settings.visualEffects.section.glass.desc", "Semi-transparent glass-like window effects")
-              expanded: true
-              Layout.fillWidth: true
-
-              NToggle {
-                label: tr("settings.visualEffects.enableGlassMode.label", "Enable glass mode")
-                description: tr("settings.visualEffects.enableGlassMode.description", "Apply a glass-like transparency effect to window previews")
-                checked: root.enableGlassMode
-                onToggled: checked => {
-                             root.enableGlassMode = checked;
-                             root.saveSettings();
-                           }
-              }
-
-              Item {
-                Layout.fillWidth: true
-                Layout.maximumHeight: root.enableGlassMode ? implicitHeight : 0
-                implicitHeight: glassControlsColumn.implicitHeight
-                opacity: root.enableGlassMode ? 1.0 : 0.0
-                visible: opacity > 0
-                clip: true
-
-                Behavior on Layout.maximumHeight {
-                  NumberAnimation {
-                    duration: Style.animationFast
-                    easing.type: Easing.OutCubic
-                  }
-                }
-
-                Behavior on opacity {
-                  NumberAnimation {
-                    duration: Style.animationFast
-                    easing.type: Easing.OutCubic
-                  }
-                }
-
-                ColumnLayout {
-                  id: glassControlsColumn
-                  anchors.left: parent.left
-                  anchors.right: parent.right
-                  spacing: Style.marginL
-
-                  NValueSlider {
-                    Layout.fillWidth: true
-                    label: tr("settings.visualEffects.glassTintStrength.label", "Tint strength")
-                    description: tr("settings.visualEffects.glassTintStrength.description", "Intensity of the glass tint color")
-                    from: 0
-                    to: 1
-                    stepSize: 0.05
-                    value: root.glassTintStrength
-                    text: value.toFixed(2)
-                    onMoved: value => {
-                               if (Math.abs(root.glassTintStrength - value) > 0.001) {
-                                 root.glassTintStrength = value;
-                                 root.saveSettings();
-                               }
-                             }
-                  }
-
-                  NValueSlider {
-                    Layout.fillWidth: true
-                    label: tr("settings.visualEffects.glassBorderOpacity.label", "Border opacity")
-                    description: tr("settings.visualEffects.glassBorderOpacity.description", "Opacity of the glass border highlight")
-                    from: 0
-                    to: 1
-                    stepSize: 0.05
-                    value: root.glassBorderOpacity
-                    text: value.toFixed(2)
-                    onMoved: value => {
-                               if (Math.abs(root.glassBorderOpacity - value) > 0.001) {
-                                 root.glassBorderOpacity = value;
-                                 root.saveSettings();
-                               }
-                             }
-                  }
-                }
-              }
-            }
-
-            // --- Blur Settings ---
-            NCollapsible {
-              label: tr("settings.visualEffects.section.blur", "Blur Effects")
-              description: tr("settings.visualEffects.section.blur.desc", "Background blur for the overview panel")
-              expanded: true
-              Layout.fillWidth: true
-
-              NToggle {
-                label: tr("settings.visualEffects.enableBlur.label", "Enable blur")
-                description: tr("settings.visualEffects.enableBlur.description", "Apply blur effect to the overview background")
-                checked: root.enableBlur
-                onToggled: checked => {
-                             root.enableBlur = checked;
-                             root.saveSettings();
-                           }
-              }
-
-              Rectangle {
-                visible: root.enableBlur
-                Layout.fillWidth: true
-                implicitHeight: blurHintColumn.implicitHeight + Style.marginM * 2
-                radius: Style.radiusS
-                color: Qt.rgba((Color.mInfo?.r ?? 0), (Color.mInfo?.g ?? 0.4), (Color.mInfo?.b ?? 0.8), Style.opacityLight)
-
-                Column {
-                  id: blurHintColumn
-                  anchors {
-                    left: parent.left
-                    right: parent.right
-                    top: parent.top
-                    margins: Style.marginM
-                  }
-                  spacing: Style.marginS
-
-                  NText {
-                    width: parent.width
-                    wrapMode: Text.WordWrap
-                    text: tr("settings.visualEffects.blur.hint", "To enable blur, add this layerrule to your hyprland.conf:")
-                    pointSize: Style.fontSizeS
-                    color: Color.mOnSurface
-                  }
-
-                  Rectangle {
-                    width: parent.width
-                    implicitHeight: layerruleText.implicitHeight + Style.marginS * 2
-                    radius: Style.radiusXS
-                    color: Qt.rgba(Color.mSurface.r, Color.mSurface.g, Color.mSurface.b, 0.8)
-
-                    NText {
-                      id: layerruleText
-                      anchors {
-                        left: parent.left
-                        right: parent.right
-                        verticalCenter: parent.verticalCenter
-                        leftMargin: Style.marginS
-                        rightMargin: Style.marginS
-                      }
-                      text: "layerrule = blur, hypr-overview"
-                      font.family: (Settings.data.ui.fontMono || Settings.data.ui.fontFixed || Settings.data.ui.fontDefault || "")
-                      pointSize: Style.fontSizeXS
-                      color: Color.mOnSurface
-                      elide: Text.ElideRight
-                    }
-                  }
-                }
-              }
-            }
-          }
-
-          ScrollBar.vertical: ScrollBar {
-            policy: ScrollBar.AsNeeded
-          }
-        }
-      }
-
-      // === Performance Tab ===
-      Item {
-        id: performanceSettingsPage
-        height: tabLayout.height
-        implicitHeight: performanceSettingsColumn.implicitHeight
-
-        Flickable {
-          id: performanceSettingsFlickable
-          anchors.fill: parent
-          clip: true
-          contentWidth: width
-          contentHeight: performanceSettingsColumn.implicitHeight
-          boundsBehavior: Flickable.StopAtBounds
-          interactive: contentHeight > height
-
-          ColumnLayout {
-            id: performanceSettingsColumn
-            width: performanceSettingsFlickable.width
-            spacing: Style.marginL
-
-            // --- Preview Mode ---
-            NCollapsible {
-              label: tr("settings.performance.section.previewMode", "Preview Mode")
-              description: tr("settings.performance.section.previewMode.desc", "Control window preview resource usage and memory consumption")
-              expanded: true
-              Layout.fillWidth: true
-
-              NComboBox {
-                Layout.fillWidth: true
-                label: tr("settings.performance.previewMode.label", "Preview mode")
-                description: tr("settings.performance.previewMode.description", "Control window preview resource usage")
-                model: [
-                  {
-                    "key": "live",
-                    "name": tr("settings.performance.previewMode.live", "Live - Real-time updates")
-                  },
-                  {
-                    "key": "event",
-                    "name": tr("settings.performance.previewMode.event", "Event - Periodic snapshots")
-                  },
-                  {
-                    "key": "off",
-                    "name": tr("settings.performance.previewMode.off", "Off - No previews (icons only)")
-                  }
-                ]
-                currentKey: root.previewMode
-                onSelected: key => {
-                              root.previewMode = key;
-                              root.saveSettings();
-                            }
-              }
-
-              Rectangle {
-                Layout.fillWidth: true
-                implicitHeight: previewModeInfoColumn.implicitHeight + Style.marginM * 2
-                radius: Style.radiusS
-                color: Qt.rgba((Color.mInfo?.r ?? 0), (Color.mInfo?.g ?? 0.4), (Color.mInfo?.b ?? 0.8), Style.opacityLight)
-
-                Column {
-                  id: previewModeInfoColumn
-                  anchors {
-                    left: parent.left
-                    right: parent.right
-                    top: parent.top
-                    margins: Style.marginM
-                  }
-                  spacing: Style.marginS
-
-                  NText {
-                    width: parent.width
-                    wrapMode: Text.WordWrap
-                    text: tr("settings.performance.previewMode.memoryInfo", "Memory usage by mode:")
-                    pointSize: Style.fontSizeS
-                    font.weight: Style.fontWeightMedium
-                    color: Color.mOnSurface
-                  }
-
-                  NText {
-                    width: parent.width
-                    wrapMode: Text.WordWrap
-                    text: tr("settings.performance.previewMode.liveDesc", "• Live: Higher memory usage (50-200MB depending on window count). Real-time preview updates.")
-                    pointSize: Style.fontSizeS
-                    color: Qt.alpha(Color.mOnSurface, Style.opacityHeavy)
-                  }
-
-                  NText {
-                    width: parent.width
-                    wrapMode: Text.WordWrap
-                    text: tr("settings.performance.previewMode.eventDesc", "• Event: Moderate memory usage (20-80MB). Updates on window events only.")
-                    pointSize: Style.fontSizeS
-                    color: Qt.alpha(Color.mOnSurface, Style.opacityHeavy)
-                  }
-
-                  NText {
-                    width: parent.width
-                    wrapMode: Text.WordWrap
-                    text: tr("settings.performance.previewMode.offDesc", "• Off: Minimal memory usage. Shows only window icons and titles.")
-                    pointSize: Style.fontSizeS
-                    color: Qt.alpha(Color.mOnSurface, Style.opacityHeavy)
-                  }
-                }
-              }
-            }
-          }
-
-          ScrollBar.vertical: ScrollBar {
-            policy: ScrollBar.AsNeeded
-          }
         }
       }
     }
