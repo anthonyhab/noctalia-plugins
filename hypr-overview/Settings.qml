@@ -931,7 +931,7 @@ ColumnLayout {
     id: tabLayout
 
     Layout.fillWidth: true
-    Layout.fillHeight: true
+    Layout.preferredHeight: Math.round(640 * Style.uiScaleRatio)
     currentIndex: tabBar.currentIndex
 
     // === Grid Tab ===
@@ -1937,9 +1937,9 @@ ColumnLayout {
                          }
             }
 
-            NLabel {
+            NText {
               text: tr("settings.appearance.section.multiMonitor", "Multi-Monitor")
-              font.bold: true
+              font.weight: Font.Bold
             }
 
             NToggle {
@@ -1963,17 +1963,27 @@ ColumnLayout {
             }
 
             NComboBox {
+              Layout.fillWidth: true
               label: tr("settings.appearance.crossMonitorDragStyle.label", "Drag indicator style")
-              model: ["border", "arrow", "both"]
-              currentIndex: {
-                var style = root.crossMonitorDragStyle || "border";
-                var idx = ["border", "arrow", "both"].indexOf(style);
-                return idx >= 0 ? idx : 0;
-              }
-              onActivated: index => {
-                             root.crossMonitorDragStyle = ["border", "arrow", "both"][index];
-                             root.saveSettings();
-                           }
+              model: [
+                {
+                  "key": "border",
+                  "name": tr("settings.appearance.crossMonitorDragStyle.options.border", "Border highlight")
+                },
+                {
+                  "key": "arrow",
+                  "name": tr("settings.appearance.crossMonitorDragStyle.options.arrow", "Arrow indicator")
+                },
+                {
+                  "key": "both",
+                  "name": tr("settings.appearance.crossMonitorDragStyle.options.both", "Border + Arrow")
+                }
+              ]
+              currentKey: root.crossMonitorDragStyle || "border"
+              onSelected: key => {
+                            root.crossMonitorDragStyle = key;
+                            root.saveSettings();
+                          }
             }
           }
 
