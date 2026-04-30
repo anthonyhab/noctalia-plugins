@@ -9,11 +9,18 @@ ColumnLayout {
 
   property var pluginApi: null
 
+  FontMetrics {
+    id: appFontMetrics
+    font: Qt.application.font
+  }
+
+  readonly property int basePreferredWidth: Math.round(520 * Style.uiScaleRatio)
+  readonly property int fontSafePreferredWidth: Math.round(appFontMetrics.averageCharacterWidth * 56 + Style.marginL * 2)
+
   spacing: Style.marginL
-  implicitWidth: Math.round(520 * Style.uiScaleRatio)
-  Layout.minimumWidth: implicitWidth
-  Layout.maximumWidth: implicitWidth
-  Layout.preferredWidth: implicitWidth
+  Layout.minimumWidth: Math.round(360 * Style.uiScaleRatio)
+  Layout.preferredWidth: Math.max(basePreferredWidth, fontSafePreferredWidth)
+  Layout.maximumWidth: Layout.preferredWidth
 
   readonly property var defaultSettings: pluginApi?.manifest?.metadata?.defaultSettings || ({})
   readonly property var pluginMain: pluginApi?.mainInstance
