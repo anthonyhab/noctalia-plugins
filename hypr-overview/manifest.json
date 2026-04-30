@@ -86,7 +86,7 @@
       "enableBlur": false,
       "showMonitorIndicators": true,
       "enableCrossMonitorDrag": true,
-      "crossMonitorDragStyle": "border"
+      "crossMonitorDragStyle": "both"
     }
   }
 }

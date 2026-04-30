@@ -21,9 +21,7 @@
             "grid": "Grid",
             "behavior": "Behavior",
             "layout": "Layout",
-            "appearance": "Appearance",
-            "visual": "Visual Effects",
-            "performance": "Performance"
+            "appearance": "Appearance"
         },
         "grid": {
             "title": "Workspace Grid",
@@ -48,14 +46,9 @@
                 "description": "How quickly workspace cards and windows animate",
                 "none": "No animation",
                 "fast": "Fast",
-                "hyprlike": "Hyprlike",
-                "slow": "Slow",
-                "custom": "Custom"
+                "hyprlike": "Hyprlike"
             },
-            "animationDuration": {
-                "label": "Animation duration",
-                "description": "Custom animation duration used by workspace and window transitions"
-            },
+
             "scale-warning": "Current settings exceed screen size. Overview is being scaled down to fit.",
             "total-workspaces": "{count} total workspaces"
         },
@@ -76,10 +69,7 @@
                 "basic": "Basic",
                 "smart": "Smart"
             },
-            "dragSnapThreshold": {
-                "label": "Drag snap threshold",
-                "description": "How close to an edge the pointer must be before split zones commit"
-            },
+
             "retilePreviewOpacity": {
                 "label": "Retile preview opacity",
                 "description": "Opacity multiplier for split/swap guidance overlays"
@@ -126,16 +116,6 @@
                 "pill": "Pill",
                 "chip": "Chip",
                 "plain": "Plain"
-            },
-            "rowColumnGuides": {
-                "label": "Row/column guides",
-                "description": "Show subtle center guides in each workspace cell"
-            },
-            "layoutBadge": {
-                "label": "Layout badge",
-                "description": "Show a clickable layout badge (D/M/S) on each workspace to switch Hyprland tiling layout",
-                "setupHint": "To persist layouts across restarts, add this line to your hyprland.conf:",
-                "copy": "Copy"
             }
         },
         "appearance": {
@@ -146,39 +126,20 @@
             },
             "visualMode": {
                 "label": "Visual mode",
-                "description": "Switch between faithful live previews and stylized shader presets",
+                "description": "Controls window preview rendering \u2014 choose live, stylized, or off for lowest resource usage",
                 "live": "Live",
                 "simplified": "Simplified",
-                "cinematic": "Cinematic"
+                "off": "Off"
             },
-            "shaderPreset": {
-                "label": "Shader preset",
-                "description": "Fine tune how stylized modes process window previews",
-                "classic": "Classic",
-                "simplified": "Simplified",
-                "mac": "Mac OS Classic",
-                "cinematic": "Cinematic"
-            },
-            "shaderPresetStrength": {
-                "label": "Preset strength",
-                "description": "How strongly the selected shader preset is applied"
-            },
+
+
             "pixelDensity": {
                 "label": "Pixel Density",
                 "description": "Controls pixelation level (higher = more detail)"
             },
-            "colorDepth": {
-                "label": "Color Depth",
-                "description": "Bits per color channel (lower = posterized look)"
-            },
-            "saturation": {
-                "label": "Saturation",
-                "description": "Color intensity (1.0 = normal)"
-            },
-            "contrast": {
-                "label": "Contrast",
-                "description": "Contrast strength (1.0 = normal)"
-            },
+
+
+
             "accentColor": {
                 "label": "Accent color",
                 "description": "Color used for selection indicator and special workspaces",
@@ -189,16 +150,8 @@
                 "label": "Window icons",
                 "description": "Show app icons inside each window preview card"
             },
-            "colorizeIcons": {
-                "label": "Colorize icons",
-                "description": "Tint the app icons using the system accent color"
-            },
-            "iconPlacement": {
-                "label": "Icon placement",
-                "description": "Where to position the icon inside the window preview",
-                "center": "Center",
-                "corner": "Bottom Corner"
-            },
+
+
             "titleStripPosition": {
                 "label": "Title strip position",
                 "description": "Where the title overlay is rendered",
@@ -216,17 +169,8 @@
                 "label": "Title strip height",
                 "description": "Height of the window title strip before monitor scaling"
             },
-            "titleStripMeta": {
-                "label": "Title strip metadata",
-                "description": "Choose what extra metadata appears on the right side of the title strip",
-                "none": "None",
-                "class": "Class",
-                "class-pid": "Class + PID"
-            },
-            "focusedGlow": {
-                "label": "Focused glow",
-                "description": "Add a subtle glow around the focused window preview"
-            },
+
+
             "urgencyBadge": {
                 "label": "Urgency badge",
                 "description": "Show a red badge when a window requests urgent attention"
@@ -235,22 +179,13 @@
                 "label": "Floating badge",
                 "description": "Show a badge on windows currently floating in Hyprland"
             },
-            "fullscreenBadge": {
-                "label": "Fullscreen badge",
-                "description": "Show a badge on fullscreen or maximized window previews"
-            },
-            "monitorBadge": {
-                "label": "Monitor badge",
-                "description": "Show monitor index badges on window previews"
-            },
+
+
             "dimInactive": {
                 "label": "Inactive workspace dim",
                 "description": "How much previews are dimmed when not on the active workspace"
             },
-            "inactiveSaturation": {
-                "label": "Inactive saturation",
-                "description": "Keep non-focused workspaces colorful or push them toward monochrome"
-            },
+
             "hoverLift": {
                 "label": "Hover emphasis",
                 "description": "How strong the hovered window preview is emphasized"
@@ -265,18 +200,6 @@
                 "label": "Fixed corner radius",
                 "description": "Corner radius applied when corner mode is set to Fixed"
             },
-            "borderGradient": {
-                "label": "Border gradient",
-                "description": "Blend active/inactive border tones for a richer border highlight"
-            },
-            "containerBorder": {
-                "label": "Container border",
-                "description": "Border thickness of the overview container (-1 for default)"
-            },
-            "selectionBorder": {
-                "label": "Selection border",
-                "description": "Border thickness of the active workspace indicator (-1 for default)"
-            },
             "showMonitorIndicators": {
                 "label": "Show monitor indicators",
                 "description": "Show monitor badges on workspace cells for workspaces bound to other monitors"
@@ -286,50 +209,13 @@
                 "description": "Enable dragging windows to workspaces on other monitors, migrating the window to that monitor"
             },
             "crossMonitorDragStyle": {
-                "label": "Drag indicator style",
-                "options": {
-                    "border": "Border highlight",
-                    "arrow": "Arrow indicator",
-                    "both": "Border + Arrow"
-                }
+                "label": "Drag indicator style"
             },
             "workspaceMonitorBadge": {
                 "tooltip": "Workspace on monitor %1"
             },
             "migrationIndicator": {
                 "label": "Migrate to monitor %1"
-            }
-        },
-        "visual": {
-            "wallpaper": {
-                "title": "Workspace Wallpaper",
-                "show": "Show wallpaper in empty workspaces",
-                "show.description": "Display wallpaper behind empty workspace tiles",
-                "path": "Wallpaper path (optional)",
-                "path.description": "Leave empty to auto-detect from hyprpaper"
-            },
-            "glass": {
-                "title": "Glass Mode",
-                "enable": "Enable glass mode",
-                "tint": "Tint strength",
-                "border": "Border opacity"
-            },
-            "blur": {
-                "title": "Blur Effects",
-                "enable": "Enable blur",
-                "hint": "Add layerrule = blur, noctalia:hypr-overview-blur to your hyprland.conf"
-            }
-        },
-        "performance": {
-            "preview": {
-                "title": "Preview Mode",
-                "description": "Control window preview resource usage",
-                "live": "Live (real-time, high memory)",
-                "event": "Event (periodic refresh, moderate memory)",
-                "off": "Off (placeholders only, minimal memory)",
-                "live.description": "Real-time window previews. Highest quality, uses most memory.",
-                "event.description": "Static snapshots refreshed periodically. Good balance of quality and memory.",
-                "off.description": "No window previews, only window frames and icons. Minimal memory usage."
             }
         }
     },
