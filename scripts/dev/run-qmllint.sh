@@ -36,9 +36,9 @@ for file in "$@"; do
     if [ ! -f "$file" ]; then
         continue
     fi
-    if ! $QMLLINT -s "$file" >/dev/null 2>&1; then
+    if ! $QMLLINT "$file" >/dev/null 2>&1; then
         echo "error: qmllint reported issues in $file"
-        $QMLLINT -s "$file" 2>&1 || true
+        $QMLLINT "$file" 2>&1 || true
         errors=$((errors + 1))
     fi
 done

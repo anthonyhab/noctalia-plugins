@@ -2,123 +2,119 @@ import QtQuick
 import Quickshell
 import Quickshell.Hyprland
 import Quickshell.Io
+import "../helpers/LayoutStrategy.js" as LayoutStrategy
 import qs.Commons
 import qs.Widgets
-import "../helpers/LayoutStrategy.js" as LayoutStrategy
 
 Item {
-    id: switcher
+  id: switcher
 
-    required property var pluginMain
-    required property int workspaceId
-    required property string currentLayout
-    required property bool showBadge
-    required property bool isSpecialSlot
-    required property bool isActiveCell
-    required property color accentColor
+  required property var pluginMain
+  required property int workspaceId
+  required property string currentLayout
+  required property bool showBadge
+  required property bool isSpecialSlot
+  required property bool isActiveCell
+  required property color accentColor
 
-    signal badgeClicked(int wsId, string layout, real globalX, real globalY, real badgeWidth, real badgeHeight)
-    signal layoutChanged(int wsId, string newLayout)
+  signal badgeClicked(int wsId, string layout, real globalX, real globalY, real badgeWidth, real badgeHeight)
+  signal layoutChanged(int wsId, string newLayout)
 
-    visible: showBadge && !isSpecialSlot
+  visible: showBadge && !isSpecialSlot
 
-    readonly property string badgeLabel: LayoutStrategy.allBadgeLabels[currentLayout] || "D"
+  readonly property string badgeLabel: LayoutStrategy.allBadgeLabels[currentLayout] || "D"
 
-    // Badge rectangle (top-right corner of workspace cell)
-    Rectangle {
-        id: badge
+  // Badge rectangle (top-right corner of workspace cell)
+  Rectangle {
+    id: badge
 
-        anchors.right: parent.right
-        anchors.top: parent.top
-        anchors.rightMargin: Math.max(6, parent.width * 0.04)
-        anchors.topMargin: Math.max(6, parent.height * 0.04)
-        width: Math.min(parent.width * 0.35, badgeText.implicitWidth + 12)
-        height: Math.max(16, Math.min(26, parent.height * 0.18))
-        radius: height / 2
-        color: Qt.rgba(Color.mSurface.r, Color.mSurface.g, Color.mSurface.b, switcher.isActiveCell ? 0.88 : 0.58)
-        border.width: 1
-        border.color: Qt.rgba(Color.mOutline.r, Color.mOutline.g, Color.mOutline.b, switcher.isActiveCell ? 0.5 : 0.28)
-        z: 10
+    anchors.right: parent.right
+    anchors.top: parent.top
+    anchors.rightMargin: Math.max(6, parent.width * 0.04)
+    anchors.topMargin: Math.max(6, parent.height * 0.04)
+    width: Math.min(parent.width * 0.35, badgeText.implicitWidth + 12)
+    height: Math.max(16, Math.min(26, parent.height * 0.18))
+    radius: height / 2
+    color: Qt.rgba(Color.mSurface.r, Color.mSurface.g, Color.mSurface.b, switcher.isActiveCell ? 0.88 : 0.58)
+    border.width: 1
+    border.color: Qt.rgba(Color.mOutline.r, Color.mOutline.g, Color.mOutline.b, switcher.isActiveCell ? 0.5 : 0.28)
+    z: 10
 
-        NText {
-            id: badgeText
+    NText {
+      id: badgeText
 
-            anchors.centerIn: parent
-            text: switcher.badgeLabel
-            pointSize: Math.max(6, Math.min(8, parent.height * 0.38))
-            color: Color.mOnSurface
-        }
-
-        MouseArea {
-            anchors.fill: parent
-            acceptedButtons: Qt.LeftButton
-            onClicked: (mouse) => {
-                // Emit badge position in switcher-local coordinates so parent can mapToItem
-                switcher.badgeClicked(switcher.workspaceId, switcher.currentLayout,
-                                      badge.x, badge.y + badge.height + 3,
-                                      badge.width, badge.height);
-                mouse.accepted = true;
-            }
-        }
+      anchors.centerIn: parent
+      text: switcher.badgeLabel
+      pointSize: Math.max(6, Math.min(8, parent.height * 0.38))
+      color: Color.mOnSurface
     }
 
-    // Layout switching logic — session-only, no disk persistence
-    function switchLayout(wsId, layoutName) {
-        var validLayouts = LayoutStrategy.allLayouts;
-        if (validLayouts.indexOf(layoutName) < 0)
-            return;
+    MouseArea {
+      anchors.fill: parent
+      acceptedButtons: Qt.LeftButton
+      onClicked: mouse => {
+                   // Emit badge position in switcher-local coordinates so parent can mapToItem
+                   switcher.badgeClicked(switcher.workspaceId, switcher.currentLayout, badge.x, badge.y + badge.height + 3, badge.width, badge.height);
+                   mouse.accepted = true;
+                 }
+    }
+  }
 
-        var activeWsId = (pluginMain && pluginMain.activeWorkspace && pluginMain.activeWorkspace.id) || -1;
+  // Layout switching logic — session-only, no disk persistence
+  function switchLayout(wsId, layoutName) {
+    var validLayouts = LayoutStrategy.allLayouts;
+    if (validLayouts.indexOf(layoutName) < 0)
+      return;
 
-        var cmd;
-        if (wsId == activeWsId) {
-            cmd = "hyprctl keyword general:layout " + layoutName;
-        } else {
-            cmd = "hyprctl dispatch workspace " + wsId
-                + " && hyprctl keyword general:layout " + layoutName
-                + " && hyprctl dispatch workspace " + activeWsId;
-        }
+    var activeWsId = (pluginMain && pluginMain.activeWorkspace && pluginMain.activeWorkspace.id) || -1;
 
-        layoutProcessComponent.createObject(switcher, {
-            "command": ["bash", "-c", cmd]
-        }).running = true;
-
-        // Optimistic update
-        if (pluginMain) {
-            var updated = {};
-            var old = pluginMain.workspaceLayouts || {};
-            for (var k in old)
-                updated[k] = old[k];
-            updated[wsId] = layoutName;
-            pluginMain.workspaceLayouts = updated;
-            pluginMain.setPendingLayout(wsId, layoutName);
-        }
-
-        switcher.layoutChanged(wsId, layoutName);
+    var cmd;
+    if (wsId == activeWsId) {
+      cmd = "hyprctl keyword general:layout " + layoutName;
+    } else {
+      cmd = "hyprctl dispatch workspace " + wsId + " && hyprctl keyword general:layout " + layoutName + " && hyprctl dispatch workspace " + activeWsId;
     }
 
-    Component {
-        id: layoutProcessComponent
+    layoutProcessComponent.createObject(switcher, {
+                                          "command": ["bash", "-c", cmd]
+                                        }).running = true;
 
-        Process {
-            stderr: StdioCollector {
-                onStreamFinished: {
-                    if (text.trim())
-                        console.warn("WorkspaceOverview switchLayout stderr:", text.trim());
-                }
-            }
-
-            stdout: StdioCollector {
-                onStreamFinished: {
-                    if (text.trim())
-                        console.log("WorkspaceOverview switchLayout:", text.trim());
-                }
-            }
-
-            onRunningChanged: {
-                if (!running)
-                    destroy();
-            }
-        }
+    // Optimistic update
+    if (pluginMain) {
+      var updated = {};
+      var old = pluginMain.workspaceLayouts || {};
+      for (var k in old)
+        updated[k] = old[k];
+      updated[wsId] = layoutName;
+      pluginMain.workspaceLayouts = updated;
+      pluginMain.setPendingLayout(wsId, layoutName);
     }
+
+    switcher.layoutChanged(wsId, layoutName);
+  }
+
+  Component {
+    id: layoutProcessComponent
+
+    Process {
+      stderr: StdioCollector {
+        onStreamFinished: {
+          if (text.trim())
+            Logger.w("HyprOverview", "switchLayout stderr:", text.trim());
+        }
+      }
+
+      stdout: StdioCollector {
+        onStreamFinished: {
+          if (text.trim())
+            Logger.i("HyprOverview", "switchLayout:", text.trim());
+        }
+      }
+
+      onRunningChanged: {
+        if (!running)
+          destroy();
+      }
+    }
+  }
 }
