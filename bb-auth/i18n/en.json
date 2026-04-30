@@ -70,7 +70,24 @@
     "sync-panel-mode": "Sync panel mode with shell",
     "sync-panel-mode-desc": "Automatically use the same panel mode as the main shell settings.",
     "success-animation-duration": "Success animation duration (ms)",
-    "success-animation-duration-desc": "How long the success state is shown before closing."
+    "success-animation-duration-desc": "How long the success state is shown before closing.",
+    "dialog-behavior": {
+      "title": "Dialog behavior",
+      "description": "Configure how the authentication dialog appears and behaves."
+    },
+    "status": {
+      "title": "Status"
+    },
+    "about": {
+      "title": "About"
+    }
+  },
+  "status": {
+    "disconnected": "Disconnected from auth daemon",
+    "negotiating": "Negotiating with auth daemon",
+    "active": "Active — ready to handle requests",
+    "standby": "Standby — another agent is active",
+    "conflict-policy": "Conflict policy: "
   },
   "widget": {
     "tooltip-ready": "Authentication agent ready",
