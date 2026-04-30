@@ -15,21 +15,41 @@ ColumnLayout {
   Layout.preferredWidth: Layout.minimumWidth
 
   // Local state - track changes before saving
-  property string valueHaUrl: pluginApi?.pluginSettings?.haUrl || pluginApi?.manifest?.metadata?.defaultSettings?.haUrl || ""
-  property string valueHaToken: pluginApi?.pluginSettings?.haToken || pluginApi?.manifest?.metadata?.defaultSettings?.haToken || ""
-  property string valueDefaultMediaPlayer: pluginApi?.pluginSettings?.defaultMediaPlayer || pluginApi?.manifest?.metadata?.defaultSettings?.defaultMediaPlayer || ""
-  property string valueBarWidgetMaxWidth: (pluginApi?.pluginSettings?.barWidgetMaxWidth ?? pluginApi?.manifest?.metadata?.defaultSettings?.barWidgetMaxWidth ?? 200).toString()
-  property bool valueBarWidgetUseFixedWidth: pluginApi?.pluginSettings?.barWidgetUseFixedWidth ?? pluginApi?.manifest?.metadata?.defaultSettings?.barWidgetUseFixedWidth ?? false
-  property string valueBarWidgetScrollingMode: pluginApi?.pluginSettings?.barWidgetScrollingMode || pluginApi?.manifest?.metadata?.defaultSettings?.barWidgetScrollingMode || "hover"
-  property bool valueShowVolumePercentage: pluginApi?.pluginSettings?.showVolumePercentage ?? pluginApi?.manifest?.metadata?.defaultSettings?.showVolumePercentage ?? false
+  property string valueHaUrl: ""
+  property string valueHaToken: ""
+  property string valueDefaultMediaPlayer: ""
+  property string valueBarWidgetMaxWidth: "200"
+  property bool valueBarWidgetUseFixedWidth: false
+  property string valueBarWidgetScrollingMode: "hover"
+  property bool valueShowVolumePercentage: false
   property bool testingConnection: false
   property string testResult: ""
   property bool testSuccess: true
 
   readonly property var pluginMain: pluginApi?.mainInstance
 
+  function syncFromPlugin() {
+    if (!pluginApi)
+      return;
+    valueHaUrl = pluginApi?.pluginSettings?.haUrl || pluginApi?.manifest?.metadata?.defaultSettings?.haUrl || "";
+    valueHaToken = pluginApi?.pluginSettings?.haToken || pluginApi?.manifest?.metadata?.defaultSettings?.haToken || "";
+    valueDefaultMediaPlayer = pluginApi?.pluginSettings?.defaultMediaPlayer || pluginApi?.manifest?.metadata?.defaultSettings?.defaultMediaPlayer || "";
+    valueBarWidgetMaxWidth = (pluginApi?.pluginSettings?.barWidgetMaxWidth ?? pluginApi?.manifest?.metadata?.defaultSettings?.barWidgetMaxWidth ?? 200).toString();
+    valueBarWidgetUseFixedWidth = pluginApi?.pluginSettings?.barWidgetUseFixedWidth ?? pluginApi?.manifest?.metadata?.defaultSettings?.barWidgetUseFixedWidth ?? false;
+    valueBarWidgetScrollingMode = pluginApi?.pluginSettings?.barWidgetScrollingMode || pluginApi?.manifest?.metadata?.defaultSettings?.barWidgetScrollingMode || "hover";
+    valueShowVolumePercentage = pluginApi?.pluginSettings?.showVolumePercentage ?? pluginApi?.manifest?.metadata?.defaultSettings?.showVolumePercentage ?? false;
+  }
+
   Component.onCompleted: {
+    syncFromPlugin();
     Logger.i("HomeAssistant", "Settings UI loaded");
+  }
+
+  Connections {
+    target: pluginApi
+    function onPluginSettingsChanged() {
+      syncFromPlugin();
+    }
   }
 
   // This function is called by the dialog to save settings

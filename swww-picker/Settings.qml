@@ -58,6 +58,13 @@ ColumnLayout {
   onPluginApiChanged: syncFromPlugin()
   Component.onCompleted: syncFromPlugin()
 
+  Connections {
+    target: pluginApi
+    function onPluginSettingsChanged() {
+      syncFromPlugin();
+    }
+  }
+
   function saveSettings() {
     if (!pluginApi)
       return;
