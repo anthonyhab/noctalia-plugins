@@ -1043,14 +1043,6 @@ ColumnLayout {
               {
                 "key": "hyprlike",
                 "name": tr("settings.grid.animationProfile.hyprlike", "Hyprlike")
-              },
-              {
-                "key": "slow",
-                "name": tr("settings.grid.animationProfile.slow", "Slow")
-              },
-              {
-                "key": "custom",
-                "name": tr("settings.grid.animationProfile.custom", "Custom")
               }
             ]
             currentKey: root.animationProfile
@@ -1058,49 +1050,6 @@ ColumnLayout {
                           root.animationProfile = key;
                           root.saveSettings();
                         }
-          }
-
-          Item {
-            Layout.fillWidth: true
-            Layout.maximumHeight: root.animationProfile === "custom" ? implicitHeight : 0
-            implicitHeight: animDurationSlider.implicitHeight
-            opacity: root.animationProfile === "custom" ? 1.0 : 0.0
-            visible: opacity > 0
-            clip: true
-
-            Behavior on Layout.maximumHeight {
-              NumberAnimation {
-                duration: Style.animationFast
-                easing.type: Easing.OutCubic
-              }
-            }
-
-            Behavior on opacity {
-              NumberAnimation {
-                duration: Style.animationFast
-                easing.type: Easing.OutCubic
-              }
-            }
-
-            NValueSlider {
-              id: animDurationSlider
-
-              anchors.left: parent.left
-              anchors.right: parent.right
-              label: tr("settings.grid.animationDuration.label", "Animation duration")
-              description: tr("settings.grid.animationDuration.description", "Custom animation duration used by workspace and window transitions")
-              from: 80
-              to: 400
-              stepSize: 10
-              value: root.animationDurationMs
-              text: value + "ms"
-              onMoved: value => {
-                         if (root.animationDurationMs !== value) {
-                           root.animationDurationMs = value;
-                           root.saveSettings();
-                         }
-                       }
-            }
           }
         }
 
@@ -1173,24 +1122,6 @@ ColumnLayout {
                           root.dragPreviewMode = key;
                           root.saveSettings();
                         }
-          }
-
-          NValueSlider {
-            visible: root.dragPreviewMode !== "off"
-            Layout.fillWidth: true
-            label: tr("settings.behavior.dragSnapThreshold.label", "Drag snap threshold")
-            description: tr("settings.behavior.dragSnapThreshold.description", "How close to an edge the pointer must be before split zones commit")
-            from: 0.12
-            to: 0.45
-            stepSize: 0.01
-            value: root.dragSnapThreshold
-            text: value.toFixed(2)
-            onMoved: value => {
-                       if (Math.abs(root.dragSnapThreshold - value) > 0.001) {
-                         root.dragSnapThreshold = value;
-                         root.saveSettings();
-                       }
-                     }
           }
 
           NValueSlider {
