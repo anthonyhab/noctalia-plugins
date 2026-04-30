@@ -65,6 +65,13 @@ ColumnLayout {
   onPluginApiChanged: syncFromPlugin()
   Component.onCompleted: syncFromPlugin()
 
+  Timer {
+    id: saveDebounce
+    interval: 350
+    repeat: false
+    onTriggered: saveSettings()
+  }
+
   Connections {
     target: pluginApi
     function onPluginSettingsChanged() {
@@ -109,7 +116,10 @@ ColumnLayout {
     description: pluginApi?.tr("settings.wallpapers-dir-desc")
     placeholderText: "~/Pictures/Wallpapers"
     text: root.wallpapersDir
-    onTextChanged: root.wallpapersDir = text
+    onTextChanged: {
+      root.wallpapersDir = text;
+      saveDebounce.restart();
+    }
   }
 
   NDivider {
@@ -128,7 +138,10 @@ ColumnLayout {
     label: pluginApi?.tr("settings.auto-cycle.enabled")
     description: pluginApi?.tr("settings.auto-cycle.enabled-desc")
     checked: root.autoCycleEnabled
-    onToggled: checked => root.autoCycleEnabled = checked
+    onToggled: checked => {
+                 root.autoCycleEnabled = checked;
+                 saveSettings();
+               }
   }
 
   NTextInput {
@@ -138,14 +151,20 @@ ColumnLayout {
     text: root.autoCycleInterval
     enabled: root.autoCycleEnabled
     inputItem.inputMethodHints: Qt.ImhDigitsOnly
-    onTextChanged: root.autoCycleInterval = text
+    onTextChanged: {
+      root.autoCycleInterval = text;
+      saveDebounce.restart();
+    }
   }
 
   NToggle {
     label: pluginApi?.tr("settings.shuffle-mode")
     description: pluginApi?.tr("settings.shuffle-desc")
     checked: root.shuffleMode
-    onToggled: checked => root.shuffleMode = checked
+    onToggled: checked => {
+                 root.shuffleMode = checked;
+                 saveSettings();
+               }
   }
 
   NDivider {
@@ -214,7 +233,10 @@ ColumnLayout {
       }
     ]
     currentKey: root.transitionType
-    onSelected: key => root.transitionType = key
+    onSelected: key => {
+                  root.transitionType = key;
+                  saveSettings();
+                }
   }
 
   RowLayout {
@@ -227,7 +249,10 @@ ColumnLayout {
       placeholderText: "1"
       text: root.transitionDuration
       inputItem.inputMethodHints: Qt.ImhFormattedNumbersOnly
-      onTextChanged: root.transitionDuration = text
+      onTextChanged: {
+        root.transitionDuration = text;
+        saveDebounce.restart();
+      }
     }
 
     NTextInput {
@@ -236,7 +261,10 @@ ColumnLayout {
       placeholderText: "60"
       text: root.transitionFps
       inputItem.inputMethodHints: Qt.ImhDigitsOnly
-      onTextChanged: root.transitionFps = text
+      onTextChanged: {
+        root.transitionFps = text;
+        saveDebounce.restart();
+      }
     }
 
     NTextInput {
@@ -245,7 +273,10 @@ ColumnLayout {
       placeholderText: "90"
       text: root.transitionStep
       inputItem.inputMethodHints: Qt.ImhDigitsOnly
-      onTextChanged: root.transitionStep = text
+      onTextChanged: {
+        root.transitionStep = text;
+        saveDebounce.restart();
+      }
     }
   }
 
@@ -298,7 +329,10 @@ ColumnLayout {
     description: pluginApi?.tr("settings.transitions.bezier-desc")
     placeholderText: ".4,0,.2,1"
     text: root.transitionBezier
-    onTextChanged: root.transitionBezier = text
+    onTextChanged: {
+      root.transitionBezier = text;
+      saveDebounce.restart();
+    }
   }
 
   NDivider {
@@ -317,7 +351,10 @@ ColumnLayout {
     label: pluginApi?.tr("settings.show-name")
     description: pluginApi?.tr("settings.show-name-desc")
     checked: root.showWallpaperName
-    onToggled: checked => root.showWallpaperName = checked
+    onToggled: checked => {
+                 root.showWallpaperName = checked;
+                 saveSettings();
+               }
   }
 
   NDivider {

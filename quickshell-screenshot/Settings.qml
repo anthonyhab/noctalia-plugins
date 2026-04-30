@@ -115,7 +115,10 @@ ColumnLayout {
         description: pluginApi?.tr("settings.show-grid.desc")
         checked: root.editShowGrid
         Layout.fillWidth: true
-        onToggled: checked => root.editShowGrid = checked
+        onToggled: checked => {
+                     root.editShowGrid = checked;
+                     saveSettings();
+                   }
       }
 
       NToggle {
@@ -123,7 +126,10 @@ ColumnLayout {
         description: pluginApi?.tr("settings.snap-to-windows.desc")
         checked: root.editSnapToWindows
         Layout.fillWidth: true
-        onToggled: checked => root.editSnapToWindows = checked
+        onToggled: checked => {
+                     root.editSnapToWindows = checked;
+                     saveSettings();
+                   }
       }
 
       NDivider {
@@ -142,7 +148,10 @@ ColumnLayout {
         description: pluginApi?.tr("settings.copy-to-clipboard.desc")
         checked: root.editCopyToClipboard
         Layout.fillWidth: true
-        onToggled: checked => root.editCopyToClipboard = checked
+        onToggled: checked => {
+                     root.editCopyToClipboard = checked;
+                     saveSettings();
+                   }
       }
 
       NToggle {
@@ -150,7 +159,10 @@ ColumnLayout {
         description: pluginApi?.tr("settings.open-after-capture.desc")
         checked: root.editOpenAfterCapture
         Layout.fillWidth: true
-        onToggled: checked => root.editOpenAfterCapture = checked
+        onToggled: checked => {
+                     root.editOpenAfterCapture = checked;
+                     saveSettings();
+                   }
       }
 
       NDivider {
@@ -221,7 +233,10 @@ ColumnLayout {
             }
           ]
           currentKey: root.editResetTimeoutMinutes.toString()
-          onSelected: key => root.editResetTimeoutMinutes = parseInt(key, 10)
+          onSelected: key => {
+                        root.editResetTimeoutMinutes = parseInt(key, 10);
+                        saveSettings();
+                      }
         }
 
         NButton {

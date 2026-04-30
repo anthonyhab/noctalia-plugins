@@ -36,6 +36,13 @@ ColumnLayout {
 
   readonly property var pluginMain: pluginApi?.mainInstance
 
+  Timer {
+    id: saveDebounce
+    interval: 350
+    repeat: false
+    onTriggered: root.saveSettings()
+  }
+
   function syncFromPlugin() {
     if (!pluginApi)
       return;
@@ -184,7 +191,10 @@ ColumnLayout {
         text: root.valueBarWidgetMaxWidth
         Layout.fillWidth: true
         inputItem.inputMethodHints: Qt.ImhDigitsOnly
-        onTextChanged: root.valueBarWidgetMaxWidth = text
+        onTextChanged: {
+          root.valueBarWidgetMaxWidth = text;
+          saveDebounce.restart();
+        }
       }
 
       NToggle {
@@ -192,7 +202,10 @@ ColumnLayout {
         description: pluginApi?.tr("settings.bar-widget.use-fixed-width.description")
         checked: root.valueBarWidgetUseFixedWidth
         Layout.fillWidth: true
-        onToggled: checked => root.valueBarWidgetUseFixedWidth = checked
+        onToggled: checked => {
+                     root.valueBarWidgetUseFixedWidth = checked;
+                     saveSettings();
+                   }
       }
 
       NComboBox {
@@ -214,7 +227,10 @@ ColumnLayout {
           }
         ]
         currentKey: root.valueBarWidgetScrollingMode
-        onSelected: key => root.valueBarWidgetScrollingMode = key
+        onSelected: key => {
+                      root.valueBarWidgetScrollingMode = key;
+                      saveSettings();
+                    }
       }
 
       NDivider {
@@ -235,7 +251,10 @@ ColumnLayout {
         description: pluginApi?.tr("settings.show-volume-percentage.description")
         checked: root.valueShowVolumePercentage
         Layout.fillWidth: true
-        onToggled: checked => root.valueShowVolumePercentage = checked
+        onToggled: checked => {
+                     root.valueShowVolumePercentage = checked;
+                     saveSettings();
+                   }
       }
     }
 
@@ -266,6 +285,7 @@ ColumnLayout {
         Layout.fillWidth: true
         onTextChanged: {
           root.valueHaUrl = text;
+          saveDebounce.restart();
         }
       }
 
@@ -277,6 +297,7 @@ ColumnLayout {
         inputItem.echoMode: TextInput.Password
         onTextChanged: {
           root.valueHaToken = text;
+          saveDebounce.restart();
         }
       }
 
@@ -347,6 +368,7 @@ ColumnLayout {
 
         onSelected: key => {
                       root.valueDefaultMediaPlayer = key;
+                      saveSettings();
                     }
       }
     }
