@@ -1,6 +1,6 @@
 ---
 name: plugin-i18n
-description: Translation and localization guide for Noctalia plugin i18n files and runtime lookup. Use when adding translation keys, fallback behavior, or language-aware UI text.
+description: Translation and localization guide for Noctalia plugin i18n files and runtime lookup. Use when adding translation keys, interpolation, or language-aware UI text.
 ---
 
 # Noctalia Plugin Internationalization (i18n)
@@ -57,13 +57,13 @@ my-plugin/
 ### Basic Translation
 
 ```qml
-text: pluginApi?.tr("status.online") || "Connected"
+text: pluginApi?.tr("status.online")
 ```
 
-### With Fallback
+### Tooltip Translation
 
 ```qml
-tooltipText: pluginApi?.tr("tooltips.widget") || "Click to open"
+tooltipText: pluginApi?.tr("tooltips.widget")
 ```
 
 ### With Interpolation
@@ -101,7 +101,7 @@ visible: pluginApi?.hasTranslation("key") ?? false
 
 ## Best Practices
 
-1. **Always provide fallbacks** - `|| "Default"`
+1. **Do not append string fallbacks after `tr()`** - keep missing keys visible and fix `i18n/en.json`
 2. **Use dot notation** - `category.subcategory.key`
 3. **Keep keys descriptive** - `settings.refreshInterval` not `sri`
 4. **Include at least en.json** - Required baseline

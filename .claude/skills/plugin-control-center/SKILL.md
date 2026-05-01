@@ -42,7 +42,7 @@ NIconButtonHot {
 
   // Visual properties
   icon: "layout-dashboard"
-  tooltipText: pluginApi?.tr("widget.tooltip") || "Open Overview"
+  tooltipText: pluginApi?.tr("widget.tooltip")
 
   // Click handler - typically opens panel
   onClicked: {
@@ -63,7 +63,7 @@ NIconButton {
   property var pluginApi: null
 
   icon: "settings"
-  tooltipText: "Quick Action"
+  tooltipText: pluginApi?.tr("actions.quick")
 
   // Color theming
   colorBg: Color.mSurface
@@ -88,7 +88,7 @@ NIconButtonHot {
   readonly property bool isActive: pluginApi?.mainInstance?.isActive ?? false
 
   icon: isActive ? "check" : "x"
-  tooltipText: isActive ? "Turn Off" : "Turn On"
+  tooltipText: isActive ? pluginApi?.tr("actions.turnOff") : pluginApi?.tr("actions.turnOn")
 
   onClicked: {
     pluginApi?.mainInstance?.toggleState()
@@ -114,7 +114,7 @@ NIconButtonHot {
     }
   }
 
-  tooltipText: "Status: " + status
+  tooltipText: pluginApi?.tr("status.tooltip", { status: status })
 
   onClicked: pluginApi?.togglePanel(screen, this)
 }
@@ -128,11 +128,11 @@ NIconButtonHot {
   property ShellScreen screen
 
   icon: "refresh"
-  tooltipText: "Refresh Data"
+  tooltipText: pluginApi?.tr("actions.refresh")
 
   onClicked: {
     pluginApi?.mainInstance?.refresh()
-    ToastService.showNotice("Refreshed")
+    ToastService.showNotice(pluginApi?.tr("status.refreshed"))
   }
 }
 ```

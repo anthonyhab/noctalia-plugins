@@ -4,6 +4,8 @@ Curated plugins for [Noctalia Shell](https://github.com/noctalia-dev/noctalia-sh
 
 This repo focuses on stable, installable plugins with polished bar widgets, panels, and shell integrations.
 
+Work-in-progress plugins are developed on dedicated branches and merged into `main` when release-ready.
+
 ## Install
 
 Add this repo in the Noctalia plugin UI:
@@ -51,10 +53,6 @@ Add this repo in the Noctalia plugin UI:
 [![Hypr Overview](hypr-overview/preview.png)](hypr-overview/README.md)
 
 [Hypr Overview](hypr-overview/README.md) gives Hyprland a live workspace overview with previews, drag-and-drop window moves, keyboard navigation, and an optional Noctalia bar widget. Adapted from [quickshell-overview](https://github.com/Shanu-Kumawat/quickshell-overview) by [Shanu-Kumawat](https://github.com/Shanu-Kumawat).
-
-## Utilities
-
-- [Waybar to Noctalia Converter](waybar-converter/README.md) converts Waybar custom modules into Noctalia widget configs or starter plugin scaffolds.
 
 ## License
 

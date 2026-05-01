@@ -75,7 +75,7 @@ Item {
       }
 
       NText {
-        text: "Status"
+        text: pluginApi?.tr("status.label")
         color: Color.mOnSurface
         pointSize: barFontSize
       }
@@ -134,8 +134,8 @@ import qs.Services.UI
 NPopupContextMenu {
   id: contextMenu
   model: [
-    { "label": pluginApi?.tr("menu.refresh") || "Refresh", "action": "refresh", "icon": "refresh" },
-    { "label": pluginApi?.tr("menu.settings") || "Settings", "action": "settings", "icon": "settings" }
+    { "label": pluginApi?.tr("menu.refresh"), "action": "refresh", "icon": "refresh" },
+    { "label": pluginApi?.tr("menu.settings"), "action": "settings", "icon": "settings" }
   ]
   onTriggered: action => {
     contextMenu.close()

@@ -36,25 +36,25 @@
     },
     {
       "id": "swww-picker",
-      "name": "SWWW Wallpaper Picker",
-      "version": "0.2.3",
+      "name": "AWWW Wallpaper Picker",
+      "version": "0.2.4",
       "author": "habibe",
-      "description": "Wallpaper management with swww — manual cycling, auto-rotation, shuffle, and transition effects.",
+      "description": "Wallpaper management with awww — optimized for 160Hz VRR displays with snappy bezier transitions.",
       "repository": "https://github.com/anthonyhab/noctalia-plugins/",
       "minNoctaliaVersion": "3.6.0",
       "license": "MIT",
-      "lastUpdated": "2026-02-10T12:00:00Z"
+      "lastUpdated": "2026-05-01T12:00:00Z"
     },
     {
       "id": "hypr-overview",
       "name": "Hypr Overview",
-      "version": "0.1.2",
+      "version": "1.1.0",
       "author": "habibe",
       "description": "Visual workspace overview for Hyprland with live previews, drag-and-drop, keyboard navigation, and multi-layout support.",
       "repository": "https://github.com/anthonyhab/noctalia-plugins/",
       "minNoctaliaVersion": "3.6.0",
       "license": "MIT",
-      "lastUpdated": "2026-03-29T07:15:26Z"
+      "lastUpdated": "2026-05-01T12:00:00Z"
     }
   ]
 }

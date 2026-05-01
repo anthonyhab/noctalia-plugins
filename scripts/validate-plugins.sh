@@ -95,6 +95,13 @@ else
   echo "warning: node not found, skipping manifest compliance check"
 fi
 
+echo "[validate] checking registry consistency"
+if command -v node > /dev/null 2>&1; then
+  node "scripts/check-registry.js"
+else
+  echo "warning: node not found, skipping registry consistency check"
+fi
+
 echo "[validate] checking translation key coverage"
 if command -v node > /dev/null 2>&1; then
   node "scripts/check-i18n-keys.js"
