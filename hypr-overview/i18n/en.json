@@ -120,6 +120,21 @@
         },
         "appearance": {
             "title": "Appearance",
+            "section": {
+                "visualMode": "Visual Mode",
+                "visualMode.desc": "Choose how window previews are rendered and balanced for performance.",
+                "windowIcons": "Window Icons",
+                "windowIcons.desc": "Configure if and where application icons appear in previews.",
+                "titleStrip": "Title Strip",
+                "titleStrip.desc": "Tune title strip visibility, placement, and sizing.",
+                "windowBadges": "Window Badges",
+                "windowBadges.desc": "Control urgency, floating, fullscreen, and monitor indicator badges.",
+                "dimmingFocus": "Dimming and Focus",
+                "dimmingFocus.desc": "Adjust inactive workspace dimming and hover emphasis.",
+                "bordersCorners": "Borders and Corners",
+                "bordersCorners.desc": "Customize border gradients, widths, and preview corner behavior.",
+                "multiMonitor": "Multi-Monitor"
+            },
             "previewWorkspace": {
                 "label": "Preview workspace",
                 "no-windows": "Open windows in this workspace to preview styles"
@@ -220,6 +235,9 @@
         }
     },
     "overview": {
+        "title": {
+            "unknown": "Unknown"
+        },
         "tooltip": {
             "xwayland": "XWayland",
             "unknown": "Unknown",

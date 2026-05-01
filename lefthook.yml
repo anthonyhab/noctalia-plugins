@@ -23,6 +23,14 @@ pre-commit:
         - "*/manifest.json"
         - "manifest.json"
 
+    - name: shell-compat
+      run: node scripts/check-shell-compat.js
+      globs:
+        - "*.qml"
+        - "*/manifest.json"
+
     - name: i18n-keys
       run: node scripts/check-i18n-keys.js
-      glob: "*/i18n/*.json"
+      globs:
+        - "*.qml"
+        - "*/i18n/*.json"

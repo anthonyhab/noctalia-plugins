@@ -35,35 +35,25 @@ Item {
     return expandHome(defaultSettings.wallpapersDir || "~/Pictures/Wallpapers");
   }
 
-  readonly property bool autoCycleEnabled:
-    pluginApi?.pluginSettings?.autoCycleEnabled ?? defaultSettings.autoCycleEnabled ?? false
+  readonly property bool autoCycleEnabled: pluginApi?.pluginSettings?.autoCycleEnabled ?? defaultSettings.autoCycleEnabled ?? false
 
-  readonly property int autoCycleInterval:
-    ((pluginApi?.pluginSettings?.autoCycleInterval ?? defaultSettings.autoCycleInterval ?? 30) * 60000)
+  readonly property int autoCycleInterval: ((pluginApi?.pluginSettings?.autoCycleInterval ?? defaultSettings.autoCycleInterval ?? 30) * 60000)
 
-  readonly property string transitionType:
-    pluginApi?.pluginSettings?.transitionType ?? defaultSettings.transitionType ?? "grow"
+  readonly property string transitionType: pluginApi?.pluginSettings?.transitionType ?? defaultSettings.transitionType ?? "grow"
 
-  readonly property real transitionDuration:
-    pluginApi?.pluginSettings?.transitionDuration ?? defaultSettings.transitionDuration ?? 1
+  readonly property real transitionDuration: pluginApi?.pluginSettings?.transitionDuration ?? defaultSettings.transitionDuration ?? 1
 
-  readonly property int transitionFps:
-    pluginApi?.pluginSettings?.transitionFps ?? defaultSettings.transitionFps ?? 60
+  readonly property int transitionFps: pluginApi?.pluginSettings?.transitionFps ?? defaultSettings.transitionFps ?? 60
 
-  readonly property int transitionStep:
-    pluginApi?.pluginSettings?.transitionStep ?? defaultSettings.transitionStep ?? 90
+  readonly property int transitionStep: pluginApi?.pluginSettings?.transitionStep ?? defaultSettings.transitionStep ?? 90
 
-  readonly property string transitionBezier:
-    pluginApi?.pluginSettings?.transitionBezier ?? defaultSettings.transitionBezier ?? ".4,0,.2,1"
+  readonly property string transitionBezier: pluginApi?.pluginSettings?.transitionBezier ?? defaultSettings.transitionBezier ?? ".4,0,.2,1"
 
-  readonly property bool shuffleMode:
-    pluginApi?.pluginSettings?.shuffleMode ?? defaultSettings.shuffleMode ?? false
+  readonly property bool shuffleMode: pluginApi?.pluginSettings?.shuffleMode ?? defaultSettings.shuffleMode ?? false
 
-  readonly property bool showWallpaperName:
-    pluginApi?.pluginSettings?.showWallpaperName !== false
+  readonly property bool showWallpaperName: pluginApi?.pluginSettings?.showWallpaperName !== false
 
-  readonly property int gridColumns:
-    pluginApi?.pluginSettings?.gridColumns ?? defaultSettings.gridColumns ?? 2
+  readonly property int gridColumns: pluginApi?.pluginSettings?.gridColumns ?? defaultSettings.gridColumns ?? 2
 
   // Helper: expand ~ to $HOME
   function expandHome(path) {
@@ -116,10 +106,7 @@ Item {
 
   // Helper to get transition type (handles random exclusion of 'none')
   function getEffectiveTransition() {
-    const types = [
-      "simple", "fade", "grow", "center", "outer",
-      "wipe", "wave", "left", "right", "top", "bottom"
-    ];
+    const types = ["simple", "fade", "grow", "center", "outer", "wipe", "wave", "left", "right", "top", "bottom"];
 
     let selected;
     if (transitionType === "random") {
@@ -142,13 +129,13 @@ Item {
     // Verify file exists before trying to set it
     fileCheckProcess.command = ["test", "-f", imagePath];
     fileCheckProcess.running = true;
-    
+
     // Store the path for use after file check completes
     fileCheckProcess.targetPath = imagePath;
-    
+
     return true;
   }
-  
+
   // Internal: actually apply wallpaper after file check
   function applyWallpaperInternal(imagePath) {
     applying = true;
@@ -160,14 +147,7 @@ Item {
         historyStack.shift();
     }
 
-    awwwProcess.command = [
-      "awww", "img", imagePath,
-      "--transition-type", getEffectiveTransition(),
-      "--transition-duration", transitionDuration.toString(),
-      "--transition-fps", transitionFps.toString(),
-      "--transition-step", transitionStep.toString(),
-      "--transition-bezier", transitionBezier || ".4,0,.2,1"
-    ];
+    awwwProcess.command = ["awww", "img", imagePath, "--transition-type", getEffectiveTransition(), "--transition-duration", transitionDuration.toString(), "--transition-fps", transitionFps.toString(), "--transition-step", transitionStep.toString(), "--transition-bezier", transitionBezier || ".4,0,.2,1"];
     awwwProcess.running = true;
 
     currentWallpaper = imagePath;
@@ -216,7 +196,7 @@ Item {
     let randomIndex;
     do {
       randomIndex = Math.floor(Math.random() * wallpaperList.length);
-    } while (randomIndex === currentIndex && wallpaperList.length > 1);
+    } while (randomIndex === currentIndex && wallpaperList.length > 1)
 
     setWallpaper(wallpaperList[randomIndex]);
   }
@@ -256,9 +236,9 @@ Item {
   // Toggle grid columns
   function toggleGridColumns() {
     mutatePluginSettings(s => {
-      let current = s.gridColumns ?? 2;
-      s.gridColumns = (current % 3) + 1;
-    });
+                           let current = s.gridColumns ?? 2;
+                           s.gridColumns = (current % 3) + 1;
+                         });
     pluginApi.saveSettings();
   }
 
@@ -279,7 +259,7 @@ Item {
     running: !!wallpapersDir
     onTriggered: checkResolvedWallpapersDir()
   }
-  
+
   // NOTE: themeApplyTimer removed - theme-bg-next applies wallpaper directly now
   // Plugin only needs to track state for UI updates
 
@@ -288,7 +268,7 @@ Item {
     id: availabilityProcess
     running: false
     stdout: StdioCollector {}
-    onExited: function(code) {
+    onExited: function (code) {
       available = (code === 0);
       if (!available) {
         Logger.w("SwwwPicker", "awww daemon not running. Start with: awww-daemon");
@@ -303,7 +283,7 @@ Item {
     id: scanProcess
     running: false
     stdout: StdioCollector {}
-    onExited: function(code) {
+    onExited: function (code) {
       if (code !== 0) {
         Logger.e("SwwwPicker", "Failed to scan wallpapers directory");
         wallpaperList = [];
@@ -328,14 +308,14 @@ Item {
       // Filter wallpaper list to only include files that actually exist
       const allPaths = output.split("\n").filter(p => p.length > 0);
       const existingPaths = allPaths.filter(path => {
-        // Quick check - we'll do proper verification when setting wallpaper
-        return path.startsWith("/") && path.length > 0;
-      });
-      
+                                              // Quick check - we'll do proper verification when setting wallpaper
+                                              return path.startsWith("/") && path.length > 0;
+                                            });
+
       if (existingPaths.length !== allPaths.length) {
         Logger.w("SwwwPicker", "Filtered out " + (allPaths.length - existingPaths.length) + " non-existent files");
       }
-      
+
       wallpaperList = existingPaths;
       Logger.i("SwwwPicker", "Found " + wallpaperList.length + " wallpapers");
 
@@ -365,7 +345,7 @@ Item {
     id: resolveDirProcess
     running: false
     stdout: StdioCollector {}
-    onExited: function(code) {
+    onExited: function (code) {
       if (code !== 0)
         return;
       const resolved = (stdout.text || "").trim();
@@ -389,7 +369,7 @@ Item {
     id: fileCheckProcess
     property string targetPath: ""
     running: false
-    onExited: function(code) {
+    onExited: function (code) {
       if (code === 0) {
         // File exists, proceed with setting wallpaper
         applyWallpaperInternal(targetPath);
@@ -404,14 +384,11 @@ Item {
   Process {
     id: awwwProcess
     running: false
-    onExited: function(code) {
+    onExited: function (code) {
       applying = false;
       if (code !== 0) {
         Logger.e("SwwwPicker", "Failed to set wallpaper, exit code: " + code);
-        ToastService.showError(
-          "Awww Picker",
-          pluginApi?.tr("errors.failed-set") || "Failed to set wallpaper"
-        );
+        ToastService.showError("Awww Picker", pluginApi?.tr("errors.failed-set"));
       }
     }
   }
@@ -424,23 +401,22 @@ Item {
       // Wallpaper was already applied by theme-bg-next
       // Just refresh state asynchronously for UI updates
       Qt.callLater(() => {
-        root.refresh();
-      });
+                     root.refresh();
+                   });
     }
 
     function togglePanel() {
       if (!pluginApi)
-        return
-
+        return;
       pluginApi.withCurrentScreen(screen => {
-        if (pluginApi.panelOpenScreen) {
-          pluginApi.closePanel(pluginApi.panelOpenScreen)
-          return
-        }
+                                    if (pluginApi.panelOpenScreen) {
+                                      pluginApi.closePanel(pluginApi.panelOpenScreen);
+                                      return;
+                                    }
 
-        // No sourceItem provided => opens centered on the target screen.
-        pluginApi.openPanel(screen)
-      })
+                                    // No sourceItem provided => opens centered on the target screen.
+                                    pluginApi.openPanel(screen);
+                                  });
     }
   }
 
@@ -448,15 +424,15 @@ Item {
     refresh();
     checkResolvedWallpapersDir();
     lastWallpapersDirSetting = wallpapersDir;
-    
+
     // Restore last wallpaper after a brief delay to ensure daemon is ready
     Qt.callLater(() => {
-      const last = pluginApi?.pluginSettings?.lastWallpaper;
-      if (last && available) {
-        Logger.i("SwwwPicker", "Restoring last wallpaper: " + last);
-        setWallpaper(last);
-      }
-    });
+                   const last = pluginApi?.pluginSettings?.lastWallpaper;
+                   if (last && available) {
+                     Logger.i("SwwwPicker", "Restoring last wallpaper: " + last);
+                     setWallpaper(last);
+                   }
+                 });
   }
 
   Connections {

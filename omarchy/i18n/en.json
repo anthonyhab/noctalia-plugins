@@ -51,6 +51,11 @@
     "random-only": "Random theme only",
     "random-and-cycle": "Random and cycle"
   },
+  "filters": {
+    "all": "All",
+    "light": "Light",
+    "dark": "Dark"
+  },
   "tooltips": {
     "close": "Close",
     "inactive": "Omarchy (inactive)\nClick to open settings",

@@ -1,0 +1,27 @@
+name: Validate Plugins
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Validate script syntax
+        run: bash -n scripts/validate-plugins.sh
+
+      - name: Check registry consistency
+        run: node scripts/check-registry.js
+
+      - name: Run full validation
+        run: bash scripts/validate-plugins.sh

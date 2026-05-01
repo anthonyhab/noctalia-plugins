@@ -159,7 +159,7 @@ Item {
           fetchStates(true);
         } else if (xhr.status === 401) {
           connected = false;
-          connectionError = pluginApi?.tr("errors.auth-invalid") || "Invalid access token";
+          connectionError = pluginApi?.tr("errors.auth-invalid");
           Logger.e("HomeAssistant", "Authentication failed");
         } else {
           connected = false;
@@ -252,190 +252,185 @@ Item {
 
   function shouldRunDiscoveryPoll(forceDiscovery) {
     if (forceDiscovery)
-      return true
+      return true;
     if (!lastDiscoveryFetchAtMs)
-      return true
+      return true;
     if (!selectedMediaPlayer)
-      return true
+      return true;
     if (mediaPlayers.length === 0)
-      return true
+      return true;
     if (!currentState || !currentState[selectedMediaPlayer])
-      return true
-    return (Date.now() - lastDiscoveryFetchAtMs) >= discoveryPollIntervalMs
+      return true;
+    return (Date.now() - lastDiscoveryFetchAtMs) >= discoveryPollIntervalMs;
   }
 
   function fetchStates(forceDiscovery) {
     if (!connected)
-      return
+      return;
     if (forceDiscovery) {
-      fetchMediaPlayersDiscovery(true)
-      fetchSelectedPlayerState()
-      return
+      fetchMediaPlayersDiscovery(true);
+      fetchSelectedPlayerState();
+      return;
     }
-    fetchSelectedPlayerState()
+    fetchSelectedPlayerState();
     if (shouldRunDiscoveryPoll(false)) {
-      fetchMediaPlayersDiscovery(false)
+      fetchMediaPlayersDiscovery(false);
     }
   }
 
   function fetchSelectedPlayerState() {
     if (!connected)
-      return
+      return;
     if (!selectedMediaPlayer)
-      return
+      return;
     if (stateFetchInFlight || discoveryFetchInFlight)
-      return
-
-    stateFetchInFlight = true
-    const entityId = selectedMediaPlayer
+      return;
+    stateFetchInFlight = true;
+    const entityId = selectedMediaPlayer;
     sendHttpRequest("GET", "/api/states/" + encodeURIComponent(entityId), null, function (status, response) {
-      stateFetchInFlight = false
+      stateFetchInFlight = false;
       if (status === 200 && response && response.entity_id) {
-        processSelectedPlayerState(response)
-        lastSuccessfulFetchAtMs = Date.now()
-        markStateFetchResult(true)
+        processSelectedPlayerState(response);
+        lastSuccessfulFetchAtMs = Date.now();
+        markStateFetchResult(true);
       } else {
-        Logger.w("HomeAssistant", "Failed to fetch selected player state:", entityId, status)
-        markStateFetchResult(false)
+        Logger.w("HomeAssistant", "Failed to fetch selected player state:", entityId, status);
+        markStateFetchResult(false);
         if (status === 404) {
-          fetchMediaPlayersDiscovery(true)
+          fetchMediaPlayersDiscovery(true);
         }
       }
-    })
+    });
   }
 
   function fetchMediaPlayersDiscovery(forceDiscovery) {
     if (!connected)
-      return
+      return;
     if (!shouldRunDiscoveryPoll(!!forceDiscovery))
-      return
+      return;
     if (discoveryFetchInFlight || stateFetchInFlight)
-      return
-
-    discoveryFetchInFlight = true
+      return;
+    discoveryFetchInFlight = true;
     sendHttpRequest("GET", "/api/states", null, function (status, response) {
-      discoveryFetchInFlight = false
+      discoveryFetchInFlight = false;
       if (status === 200 && response && Array.isArray(response)) {
-        processDiscoveryStates(response)
-        lastDiscoveryFetchAtMs = Date.now()
-        lastSuccessfulFetchAtMs = lastDiscoveryFetchAtMs
-        markStateFetchResult(true)
+        processDiscoveryStates(response);
+        lastDiscoveryFetchAtMs = Date.now();
+        lastSuccessfulFetchAtMs = lastDiscoveryFetchAtMs;
+        markStateFetchResult(true);
       } else {
-        Logger.w("HomeAssistant", "Failed discovery fetch:", status)
-        markStateFetchResult(false)
+        Logger.w("HomeAssistant", "Failed discovery fetch:", status);
+        markStateFetchResult(false);
       }
-    })
+    });
   }
 
   function processSelectedPlayerState(entity) {
     if (!entity || !entity.entity_id || !entity.entity_id.startsWith("media_player."))
-      return
+      return;
+    const previousState = currentState || {};
+    const previousEntity = previousState[entity.entity_id] || null;
+    const mergedEntity = Object.assign({}, entity);
+    mergedEntity.attributes = mergePlayerAttributes(previousState, entity.entity_id, entity.attributes);
+    maybeStoreVolumeOverride(entity.entity_id, mergedEntity.attributes);
 
-    const previousState = currentState || {}
-    const previousEntity = previousState[entity.entity_id] || null
-    const mergedEntity = Object.assign({}, entity)
-    mergedEntity.attributes = mergePlayerAttributes(previousState, entity.entity_id, entity.attributes)
-    maybeStoreVolumeOverride(entity.entity_id, mergedEntity.attributes)
-
-    const stateChanged = !areEntityStatesEqual(previousEntity, mergedEntity)
+    const stateChanged = !areEntityStatesEqual(previousEntity, mergedEntity);
     if (stateChanged) {
-      const nextState = Object.assign({}, previousState)
-      nextState[entity.entity_id] = mergedEntity
-      currentState = nextState
+      const nextState = Object.assign({}, previousState);
+      nextState[entity.entity_id] = mergedEntity;
+      currentState = nextState;
     }
 
-    let selectionChanged = false
+    let selectionChanged = false;
     if (!selectedMediaPlayer) {
-      selectedMediaPlayer = entity.entity_id
-      selectionChanged = true
+      selectedMediaPlayer = entity.entity_id;
+      selectionChanged = true;
     }
 
-    const playersChanged = upsertMediaPlayerEntryFromEntity(mergedEntity)
-    const cacheChanged = didEntityChangeForCache(previousEntity, mergedEntity)
+    const playersChanged = upsertMediaPlayerEntryFromEntity(mergedEntity);
+    const cacheChanged = didEntityChangeForCache(previousEntity, mergedEntity);
 
     if (cacheChanged || playersChanged || selectionChanged)
-      scheduleCachedStateSave()
+      scheduleCachedStateSave();
   }
 
   function processDiscoveryStates(states) {
-    const previousState = currentState || {}
-    const discoveredState = {}
-    const players = []
+    const previousState = currentState || {};
+    const discoveredState = {};
+    const players = [];
 
     for (const entity of states) {
       if (!entity || !entity.entity_id || !entity.entity_id.startsWith("media_player."))
-        continue
-      const mergedEntity = Object.assign({}, entity)
-      mergedEntity.attributes = mergePlayerAttributes(previousState, entity.entity_id, entity.attributes)
-      maybeStoreVolumeOverride(entity.entity_id, mergedEntity.attributes)
-      discoveredState[entity.entity_id] = mergedEntity
+        continue;
+      const mergedEntity = Object.assign({}, entity);
+      mergedEntity.attributes = mergePlayerAttributes(previousState, entity.entity_id, entity.attributes);
+      maybeStoreVolumeOverride(entity.entity_id, mergedEntity.attributes);
+      discoveredState[entity.entity_id] = mergedEntity;
       players.push({
                      entity_id: entity.entity_id,
                      friendly_name: entity.attributes?.friendly_name || entity.entity_id,
                      state: entity.state
-                   })
+                   });
     }
 
-    players.sort((a, b) => a.entity_id.localeCompare(b.entity_id))
+    players.sort((a, b) => a.entity_id.localeCompare(b.entity_id));
 
-    const stateChanged = !areEntityMapsEqual(previousState, discoveredState)
-    const playersChanged = !areMediaPlayerListsEqual(mediaPlayers, players)
+    const stateChanged = !areEntityMapsEqual(previousState, discoveredState);
+    const playersChanged = !areMediaPlayerListsEqual(mediaPlayers, players);
 
     if (stateChanged)
-      currentState = discoveredState
+      currentState = discoveredState;
     if (playersChanged)
-      mediaPlayers = players
+      mediaPlayers = players;
 
-    let selectionChanged = false
+    let selectionChanged = false;
     if (players.length === 0) {
       if (selectedMediaPlayer !== "") {
-        selectedMediaPlayer = ""
-        selectionChanged = true
+        selectedMediaPlayer = "";
+        selectionChanged = true;
       }
     } else if (!selectedMediaPlayer || !discoveredState[selectedMediaPlayer]) {
-      const preferred = (defaultMediaPlayer && discoveredState[defaultMediaPlayer]) ? defaultMediaPlayer : players[0].entity_id
+      const preferred = (defaultMediaPlayer && discoveredState[defaultMediaPlayer]) ? defaultMediaPlayer : players[0].entity_id;
       if (selectedMediaPlayer !== preferred) {
-        selectedMediaPlayer = preferred
-        selectionChanged = true
+        selectedMediaPlayer = preferred;
+        selectionChanged = true;
       }
     }
 
     if (selectionChanged)
-      Qt.callLater(fetchSelectedPlayerState)
+      Qt.callLater(fetchSelectedPlayerState);
 
-    const cacheChanged = !areCachedEntityMapsEqual(previousState, discoveredState)
+    const cacheChanged = !areCachedEntityMapsEqual(previousState, discoveredState);
     if (cacheChanged || playersChanged || selectionChanged)
-      scheduleCachedStateSave()
+      scheduleCachedStateSave();
   }
 
   function processStates(states) {
-    processDiscoveryStates(states)
+    processDiscoveryStates(states);
   }
 
   function handleStateChange(data) {
     if (!data.entity_id?.startsWith("media_player."))
-      return
-
+      return;
     if (data.new_state) {
-      processSelectedPlayerState(data.new_state)
-      return
+      processSelectedPlayerState(data.new_state);
+      return;
     }
 
     if (!currentState || !currentState[data.entity_id])
-      return
+      return;
+    const nextState = Object.assign({}, currentState);
+    delete nextState[data.entity_id];
+    currentState = nextState;
 
-    const nextState = Object.assign({}, currentState)
-    delete nextState[data.entity_id]
-    currentState = nextState
-
-    const nextPlayers = mediaPlayers.filter(p => p.entity_id !== data.entity_id)
+    const nextPlayers = mediaPlayers.filter(p => p.entity_id !== data.entity_id);
     if (!areMediaPlayerListsEqual(mediaPlayers, nextPlayers))
-      mediaPlayers = nextPlayers
+      mediaPlayers = nextPlayers;
 
     if (selectedMediaPlayer === data.entity_id) {
-      selectedMediaPlayer = nextPlayers.length > 0 ? nextPlayers[0].entity_id : ""
+      selectedMediaPlayer = nextPlayers.length > 0 ? nextPlayers[0].entity_id : "";
     }
-    scheduleCachedStateSave()
+    scheduleCachedStateSave();
   }
 
   function callService(domain, service, entityId, serviceData) {
@@ -447,7 +442,7 @@ Item {
     sendHttpRequest("POST", endpoint, data, function (status, response) {
       if (status < 200 || status >= 300) {
         Logger.e("HomeAssistant", "Service call failed:", domain, service, status);
-        ToastService.showError(friendlyName, pluginApi?.tr("errors.service-failed") || "Service call failed");
+        ToastService.showError(friendlyName, pluginApi?.tr("errors.service-failed"));
       } else {
         Logger.d("HomeAssistant", "Service call successful:", domain, service);
         // REST service calls return updated entity states - merge them immediately
@@ -461,45 +456,43 @@ Item {
   // Merge states returned from service calls (instant UI updates)
   function mergeServiceResponseStates(entities) {
     if (!entities || !Array.isArray(entities) || entities.length === 0)
-      return
-
-    const previousState = currentState || {}
-    let nextState = previousState
-    let stateChanged = false
-    let playersChanged = false
-    let cacheChanged = false
-    let updatedCount = 0
+      return;
+    const previousState = currentState || {};
+    let nextState = previousState;
+    let stateChanged = false;
+    let playersChanged = false;
+    let cacheChanged = false;
+    let updatedCount = 0;
 
     for (const entity of entities) {
       if (!entity || !entity.entity_id || !entity.entity_id.startsWith("media_player."))
-        continue
-
-      const previousEntity = (stateChanged ? nextState : previousState)[entity.entity_id] || null
-      const mergedEntity = Object.assign({}, entity)
-      mergedEntity.attributes = mergePlayerAttributes(previousState, entity.entity_id, entity.attributes)
-      maybeStoreVolumeOverride(entity.entity_id, mergedEntity.attributes)
+        continue;
+      const previousEntity = (stateChanged ? nextState : previousState)[entity.entity_id] || null;
+      const mergedEntity = Object.assign({}, entity);
+      mergedEntity.attributes = mergePlayerAttributes(previousState, entity.entity_id, entity.attributes);
+      maybeStoreVolumeOverride(entity.entity_id, mergedEntity.attributes);
 
       if (!areEntityStatesEqual(previousEntity, mergedEntity)) {
         if (!stateChanged) {
-          nextState = Object.assign({}, previousState)
+          nextState = Object.assign({}, previousState);
         }
-        nextState[entity.entity_id] = mergedEntity
-        stateChanged = true
+        nextState[entity.entity_id] = mergedEntity;
+        stateChanged = true;
       }
 
       if (didEntityChangeForCache(previousEntity, mergedEntity))
-        cacheChanged = true
+        cacheChanged = true;
       if (upsertMediaPlayerEntryFromEntity(mergedEntity))
-        playersChanged = true
-      updatedCount++
+        playersChanged = true;
+      updatedCount++;
     }
 
     if (stateChanged)
-      currentState = nextState
+      currentState = nextState;
     if (cacheChanged || playersChanged)
-      scheduleCachedStateSave()
+      scheduleCachedStateSave();
     if (updatedCount > 0)
-      Logger.d("HomeAssistant", "Merged", updatedCount, "entities from service response")
+      Logger.d("HomeAssistant", "Merged", updatedCount, "entities from service response");
   }
 
   // Media player control functions
@@ -555,17 +548,17 @@ Item {
     } else if (typeof attrNameOrMap === "string") {
       updates[attrNameOrMap] = value;
     }
-    let changed = false
+    let changed = false;
     for (const key in updates) {
       if (updates.hasOwnProperty(key)) {
         if (newPlayerState.attributes[key] !== updates[key]) {
-          newPlayerState.attributes[key] = updates[key]
-          changed = true
+          newPlayerState.attributes[key] = updates[key];
+          changed = true;
         }
       }
     }
     if (!changed)
-      return
+      return;
     newState[selectedMediaPlayer] = newPlayerState;
     currentState = newState;
     scheduleCachedStateSave();
@@ -573,72 +566,70 @@ Item {
 
   function clampVolume(level) {
     if (level < 0)
-      return 0
+      return 0;
     if (level > 1)
-      return 1
-    return level
+      return 1;
+    return level;
   }
 
   function sendVolumeSet(entityId, level) {
     if (!entityId)
-      return
+      return;
     callService("media_player", "volume_set", entityId, {
                   volume_level: level
-                })
+                });
   }
 
   function applyVolumeLocally(entityId, level) {
     maybeStoreVolumeOverride(entityId, {
                                volume_level: level
-                             })
+                             });
     if (entityId === selectedMediaPlayer)
-      updateSelectedPlayerAttribute("volume_level", level)
+      updateSelectedPlayerAttribute("volume_level", level);
   }
 
   function setVolume(level) {
     if (!selectedMediaPlayer)
-      return
-    const clamped = clampVolume(level)
-    queuedVolumeEntityId = ""
-    queuedVolumeTarget = -1
-    volumeQueueTimer.stop()
-    applyVolumeLocally(selectedMediaPlayer, clamped)
-    sendVolumeSet(selectedMediaPlayer, clamped)
+      return;
+    const clamped = clampVolume(level);
+    queuedVolumeEntityId = "";
+    queuedVolumeTarget = -1;
+    volumeQueueTimer.stop();
+    applyVolumeLocally(selectedMediaPlayer, clamped);
+    sendVolumeSet(selectedMediaPlayer, clamped);
   }
 
   function volumeUp() {
-    queueVolumeStep(wheelVolumeStep)
+    queueVolumeStep(wheelVolumeStep);
   }
 
   function volumeDown() {
-    queueVolumeStep(-wheelVolumeStep)
+    queueVolumeStep(-wheelVolumeStep);
   }
 
   function queueVolumeStep(step) {
     if (!selectedMediaPlayer)
-      return
+      return;
     if (!canVolumeSet)
-      return
-
+      return;
     if (queuedVolumeEntityId !== selectedMediaPlayer) {
-      queuedVolumeEntityId = selectedMediaPlayer
-      queuedVolumeTarget = clampVolume(volumeLevel)
+      queuedVolumeEntityId = selectedMediaPlayer;
+      queuedVolumeTarget = clampVolume(volumeLevel);
     }
 
-    queuedVolumeTarget = clampVolume(queuedVolumeTarget + step)
-    applyVolumeLocally(queuedVolumeEntityId, queuedVolumeTarget)
-    volumeQueueTimer.restart()
+    queuedVolumeTarget = clampVolume(queuedVolumeTarget + step);
+    applyVolumeLocally(queuedVolumeEntityId, queuedVolumeTarget);
+    volumeQueueTimer.restart();
   }
 
   function flushQueuedVolumeStep() {
     if (!queuedVolumeEntityId || queuedVolumeTarget < 0)
-      return
-
-    const entityId = queuedVolumeEntityId
-    const target = clampVolume(queuedVolumeTarget)
-    queuedVolumeEntityId = ""
-    queuedVolumeTarget = -1
-    sendVolumeSet(entityId, target)
+      return;
+    const entityId = queuedVolumeEntityId;
+    const target = clampVolume(queuedVolumeTarget);
+    queuedVolumeEntityId = "";
+    queuedVolumeTarget = -1;
+    sendVolumeSet(entityId, target);
   }
 
   function toggleMute() {
@@ -690,81 +681,81 @@ Item {
 
   function selectMediaPlayer(entityId) {
     if (selectedMediaPlayer === entityId)
-      return
-    queuedVolumeEntityId = ""
-    queuedVolumeTarget = -1
-    volumeQueueTimer.stop()
-    selectedMediaPlayer = entityId
-    scheduleCachedStateSave()
-    Qt.callLater(fetchSelectedPlayerState)
+      return;
+    queuedVolumeEntityId = "";
+    queuedVolumeTarget = -1;
+    volumeQueueTimer.stop();
+    selectedMediaPlayer = entityId;
+    scheduleCachedStateSave();
+    Qt.callLater(fetchSelectedPlayerState);
   }
 
   function disconnect() {
-    flushCachedState()
-    connected = false
-    connecting = false
-    stateFetchInFlight = false
-    discoveryFetchInFlight = false
-    queuedVolumeEntityId = ""
-    queuedVolumeTarget = -1
-    volumeQueueTimer.stop()
-    pollTimer.stop()
+    flushCachedState();
+    connected = false;
+    connecting = false;
+    stateFetchInFlight = false;
+    discoveryFetchInFlight = false;
+    queuedVolumeEntityId = "";
+    queuedVolumeTarget = -1;
+    volumeQueueTimer.stop();
+    pollTimer.stop();
   }
 
   function reconnect() {
-    disconnect()
+    disconnect();
     Qt.callLater(() => {
-                   testConnection()
-                 })
+                   testConnection();
+                 });
   }
 
   function refresh() {
     if (connected) {
-      fetchStates(true)
+      fetchStates(true);
     } else {
-      reconnect()
+      reconnect();
     }
   }
 
   function refreshIfStale(maxAgeMs) {
-    const threshold = (maxAgeMs === undefined || maxAgeMs === null) ? 4000 : maxAgeMs
+    const threshold = (maxAgeMs === undefined || maxAgeMs === null) ? 4000 : maxAgeMs;
     if (!connected) {
-      reconnect()
-      return
+      reconnect();
+      return;
     }
     if (!lastSuccessfulFetchAtMs || (Date.now() - lastSuccessfulFetchAtMs) >= threshold) {
-      fetchStates(false)
+      fetchStates(false);
     }
   }
 
   function loadCachedStateIfAvailable() {
     if (cacheHydrated)
-      return
+      return;
     if (!pluginApi || !pluginApi.pluginSettings)
-      return
-    settingsReady = true
-    const cache = pluginApi.pluginSettings.stateCache
+      return;
+    settingsReady = true;
+    const cache = pluginApi.pluginSettings.stateCache;
     if (cache) {
-      const cachedEntities = cache.entities || cache.currentState
+      const cachedEntities = cache.entities || cache.currentState;
       if (cachedEntities)
-        currentState = cachedEntities
+        currentState = cachedEntities;
       if (cache.mediaPlayers)
-        mediaPlayers = [...cache.mediaPlayers].sort((a, b) => a.entity_id.localeCompare(b.entity_id))
+        mediaPlayers = [...cache.mediaPlayers].sort((a, b) => a.entity_id.localeCompare(b.entity_id));
       if (cache.selectedMediaPlayer)
-        selectedMediaPlayer = cache.selectedMediaPlayer
-      Logger.d("HomeAssistant", "Loaded cached Home Assistant player state from settings")
+        selectedMediaPlayer = cache.selectedMediaPlayer;
+      Logger.d("HomeAssistant", "Loaded cached Home Assistant player state from settings");
     }
     if (pluginApi.pluginSettings.volumeOverrides)
-      volumeOverrides = pluginApi.pluginSettings.volumeOverrides
+      volumeOverrides = pluginApi.pluginSettings.volumeOverrides;
     else if (cache?.volumeOverrides)
-      volumeOverrides = cache.volumeOverrides
+      volumeOverrides = cache.volumeOverrides;
     if (pluginApi.pluginSettings.preMuteVolumeLevel !== undefined)
-      preMuteVolumeLevel = pluginApi.pluginSettings.preMuteVolumeLevel
+      preMuteVolumeLevel = pluginApi.pluginSettings.preMuteVolumeLevel;
     else if (cache && cache.preMuteVolumeLevel !== undefined)
-      preMuteVolumeLevel = cache.preMuteVolumeLevel
-    lastSavedCacheSnapshot = JSON.stringify(buildCachePayload())
-    cacheDirty = false
-    cacheHydrated = true
+      preMuteVolumeLevel = cache.preMuteVolumeLevel;
+    lastSavedCacheSnapshot = JSON.stringify(buildCachePayload());
+    cacheDirty = false;
+    cacheHydrated = true;
   }
 
   function buildCachePayload() {
@@ -774,46 +765,46 @@ Item {
       selectedMediaPlayer: selectedMediaPlayer,
       volumeOverrides: buildSortedObject(volumeOverrides),
       preMuteVolumeLevel: preMuteVolumeLevel
-    }
+    };
   }
 
   function scheduleCachedStateSave() {
     if (!settingsReady || !pluginApi) {
-      cacheDirty = true
-      return
+      cacheDirty = true;
+      return;
     }
-    const snapshot = JSON.stringify(buildCachePayload())
+    const snapshot = JSON.stringify(buildCachePayload());
     if (snapshot === lastSavedCacheSnapshot) {
-      cacheDirty = false
-      return
+      cacheDirty = false;
+      return;
     }
-    cacheDirty = true
-    cacheSaveTimer.restart()
+    cacheDirty = true;
+    cacheSaveTimer.restart();
   }
 
   function flushCachedState() {
     if (!settingsReady || !pluginApi)
-      return
+      return;
     if (!cacheDirty)
-      return
+      return;
     if (!pluginApi.pluginSettings) {
-      pluginApi.pluginSettings = {}
+      pluginApi.pluginSettings = {};
     }
-    const payload = buildCachePayload()
-    const snapshot = JSON.stringify(payload)
+    const payload = buildCachePayload();
+    const snapshot = JSON.stringify(payload);
     if (snapshot === lastSavedCacheSnapshot) {
-      cacheDirty = false
-      return
+      cacheDirty = false;
+      return;
     }
 
     pluginApi.pluginSettings.stateCache = Object.assign({}, payload, {
-      timestamp: Date.now()
-    })
-    pluginApi.pluginSettings.volumeOverrides = volumeOverrides || {}
-    pluginApi.pluginSettings.preMuteVolumeLevel = preMuteVolumeLevel
-    pluginApi.saveSettings()
-    lastSavedCacheSnapshot = snapshot
-    cacheDirty = false
+                                                          timestamp: Date.now()
+                                                        });
+    pluginApi.pluginSettings.volumeOverrides = volumeOverrides || {};
+    pluginApi.pluginSettings.preMuteVolumeLevel = preMuteVolumeLevel;
+    pluginApi.saveSettings();
+    lastSavedCacheSnapshot = snapshot;
+    cacheDirty = false;
   }
 
   // Auto-connect when URL/token are configured
@@ -858,138 +849,136 @@ Item {
       entity_id: entity.entity_id,
       friendly_name: entity.attributes?.friendly_name || entity.entity_id,
       state: entity.state
-    }
+    };
   }
 
   function areMediaPlayerEntriesEqual(left, right) {
     if (!left || !right)
-      return false
-    return left.entity_id === right.entity_id
-        && left.friendly_name === right.friendly_name
-        && left.state === right.state
+      return false;
+    return left.entity_id === right.entity_id && left.friendly_name === right.friendly_name && left.state === right.state;
   }
 
   function areMediaPlayerListsEqual(left, right) {
-    const leftList = left || []
-    const rightList = right || []
+    const leftList = left || [];
+    const rightList = right || [];
     if (leftList.length !== rightList.length)
-      return false
+      return false;
     for (let i = 0; i < leftList.length; i++) {
       if (!areMediaPlayerEntriesEqual(leftList[i], rightList[i]))
-        return false
+        return false;
     }
-    return true
+    return true;
   }
 
   function upsertMediaPlayerEntryFromEntity(entity) {
     if (!entity || !entity.entity_id)
-      return false
-    const nextEntry = buildMediaPlayerEntry(entity)
-    const index = mediaPlayers.findIndex(p => p.entity_id === nextEntry.entity_id)
+      return false;
+    const nextEntry = buildMediaPlayerEntry(entity);
+    const index = mediaPlayers.findIndex(p => p.entity_id === nextEntry.entity_id);
     if (index < 0) {
-      const nextPlayers = [...mediaPlayers, nextEntry]
-      nextPlayers.sort((a, b) => a.entity_id.localeCompare(b.entity_id))
-      mediaPlayers = nextPlayers
-      return true
+      const nextPlayers = [...mediaPlayers, nextEntry];
+      nextPlayers.sort((a, b) => a.entity_id.localeCompare(b.entity_id));
+      mediaPlayers = nextPlayers;
+      return true;
     }
 
-    const previous = mediaPlayers[index]
+    const previous = mediaPlayers[index];
     if (areMediaPlayerEntriesEqual(previous, nextEntry))
-      return false
+      return false;
 
-    const nextPlayers = [...mediaPlayers]
-    nextPlayers[index] = nextEntry
-    mediaPlayers = nextPlayers
-    return true
+    const nextPlayers = [...mediaPlayers];
+    nextPlayers[index] = nextEntry;
+    mediaPlayers = nextPlayers;
+    return true;
   }
 
   function areEntityStatesEqual(left, right) {
     if (left === right)
-      return true
+      return true;
     if (!left || !right)
-      return false
+      return false;
     if (left.entity_id !== right.entity_id)
-      return false
+      return false;
     if (left.state !== right.state)
-      return false
-    return JSON.stringify(left.attributes || {}) === JSON.stringify(right.attributes || {})
+      return false;
+    return JSON.stringify(left.attributes || {}) === JSON.stringify(right.attributes || {});
   }
 
   function areEntityMapsEqual(leftMap, rightMap) {
-    const left = leftMap || {}
-    const right = rightMap || {}
-    const leftKeys = Object.keys(left)
-    const rightKeys = Object.keys(right)
+    const left = leftMap || {};
+    const right = rightMap || {};
+    const leftKeys = Object.keys(left);
+    const rightKeys = Object.keys(right);
     if (leftKeys.length !== rightKeys.length)
-      return false
+      return false;
     for (let i = 0; i < leftKeys.length; i++) {
-      const key = leftKeys[i]
+      const key = leftKeys[i];
       if (!Object.prototype.hasOwnProperty.call(right, key))
-        return false
+        return false;
       if (!areEntityStatesEqual(left[key], right[key]))
-        return false
+        return false;
     }
-    return true
+    return true;
   }
 
   function buildCachedEntitiesFromState(stateMap) {
-    const cache = {}
+    const cache = {};
     if (!stateMap)
-      return cache
-    const entityIds = Object.keys(stateMap).sort()
+      return cache;
+    const entityIds = Object.keys(stateMap).sort();
     for (let i = 0; i < entityIds.length; i++) {
-      const entityId = entityIds[i]
-      const entity = stateMap[entityId]
+      const entityId = entityIds[i];
+      const entity = stateMap[entityId];
       if (!entity)
-        continue
+        continue;
       cache[entityId] = {
         entity_id: entity.entity_id || entityId,
         state: entity.state || "unknown",
         attributes: pickCachedAttributes(entity.attributes || {})
-      }
+      };
     }
-    return cache
+    return cache;
   }
 
   function buildSortedObject(source) {
-    const sorted = {}
-    const keys = Object.keys(source || {}).sort()
+    const sorted = {};
+    const keys = Object.keys(source || {}).sort();
     for (let i = 0; i < keys.length; i++) {
-      const key = keys[i]
-      sorted[key] = source[key]
+      const key = keys[i];
+      sorted[key] = source[key];
     }
-    return sorted
+    return sorted;
   }
 
   function areCachedEntityMapsEqual(leftMap, rightMap) {
-    const left = buildCachedEntitiesFromState(leftMap)
-    const right = buildCachedEntitiesFromState(rightMap)
-    const leftKeys = Object.keys(left).sort()
-    const rightKeys = Object.keys(right).sort()
+    const left = buildCachedEntitiesFromState(leftMap);
+    const right = buildCachedEntitiesFromState(rightMap);
+    const leftKeys = Object.keys(left).sort();
+    const rightKeys = Object.keys(right).sort();
     if (leftKeys.length !== rightKeys.length)
-      return false
+      return false;
     for (let i = 0; i < leftKeys.length; i++) {
       if (leftKeys[i] !== rightKeys[i])
-        return false
-      const key = leftKeys[i]
+        return false;
+      const key = leftKeys[i];
       if (JSON.stringify(left[key]) !== JSON.stringify(right[key]))
-        return false
+        return false;
     }
-    return true
+    return true;
   }
 
   function didEntityChangeForCache(previousEntity, nextEntity) {
     const previousPayload = previousEntity ? {
-      entity_id: previousEntity.entity_id || "",
-      state: previousEntity.state || "unknown",
-      attributes: pickCachedAttributes(previousEntity.attributes || {})
-    } : null
+                                               entity_id: previousEntity.entity_id || "",
+                                               state: previousEntity.state || "unknown",
+                                               attributes: pickCachedAttributes(previousEntity.attributes || {})
+                                             } : null;
     const nextPayload = nextEntity ? {
-      entity_id: nextEntity.entity_id || "",
-      state: nextEntity.state || "unknown",
-      attributes: pickCachedAttributes(nextEntity.attributes || {})
-    } : null
-    return JSON.stringify(previousPayload) !== JSON.stringify(nextPayload)
+                                       entity_id: nextEntity.entity_id || "",
+                                       state: nextEntity.state || "unknown",
+                                       attributes: pickCachedAttributes(nextEntity.attributes || {})
+                                     } : null;
+    return JSON.stringify(previousPayload) !== JSON.stringify(nextPayload);
   }
 
   function hasValidAttribute(attributes, key) {
@@ -1034,7 +1023,7 @@ Item {
   }
 
   function buildCachedEntities() {
-    return buildCachedEntitiesFromState(currentState)
+    return buildCachedEntitiesFromState(currentState);
   }
 
   function getVolumeOverride(entityId) {
@@ -1060,51 +1049,101 @@ Item {
 
   IpcHandler {
     target: "homeassistant"
-    function volumeUp()                  { root.volumeUp() }
-    function volumeDown()                { root.volumeDown() }
-    function setVolume(level: string)    { root.setVolume(parseFloat(level)) }
-    function toggleMute()                { root.toggleMute() }
-    function playPause()                 { root.mediaPlayPause() }
-    function next()                      { root.mediaNext() }
-    function previous()                  { root.mediaPrevious() }
-    function stop()                      { root.mediaStop() }
-    function toggleShuffle()             { root.toggleShuffle() }
-    function cycleRepeat()               { root.cycleRepeat() }
-    function selectPlayer(id: string)    { root.selectMediaPlayer(id) }
-    function refresh()                   { root.refresh() }
+    function volumeUp() {
+      root.volumeUp();
+    }
+    function volumeDown() {
+      root.volumeDown();
+    }
+    function setVolume(level: string) {
+      root.setVolume(parseFloat(level));
+    }
+    function toggleMute() {
+      root.toggleMute();
+    }
+    function playPause() {
+      root.mediaPlayPause();
+    }
+    function next() {
+      root.mediaNext();
+    }
+    function previous() {
+      root.mediaPrevious();
+    }
+    function stop() {
+      root.mediaStop();
+    }
+    function toggleShuffle() {
+      root.toggleShuffle();
+    }
+    function cycleRepeat() {
+      root.cycleRepeat();
+    }
+    function selectPlayer(id: string) {
+      root.selectMediaPlayer(id);
+    }
+    function refresh() {
+      root.refresh();
+    }
     function togglePanel() {
-      if (!pluginApi) return
+      if (!pluginApi)
+        return;
       pluginApi.withCurrentScreen(screen => {
-        if (pluginApi.panelOpenScreen)
-          pluginApi.closePanel(pluginApi.panelOpenScreen)
-        else
-          pluginApi.openPanel(screen)
-      })
+                                    if (pluginApi.panelOpenScreen)
+                                    pluginApi.closePanel(pluginApi.panelOpenScreen);
+                                    else
+                                    pluginApi.openPanel(screen);
+                                  });
     }
   }
 
   IpcHandler {
     target: "plugin:homeassistant"
-    function volumeUp()                  { root.volumeUp() }
-    function volumeDown()                { root.volumeDown() }
-    function setVolume(level: string)    { root.setVolume(parseFloat(level)) }
-    function toggleMute()                { root.toggleMute() }
-    function playPause()                 { root.mediaPlayPause() }
-    function next()                      { root.mediaNext() }
-    function previous()                  { root.mediaPrevious() }
-    function stop()                      { root.mediaStop() }
-    function toggleShuffle()             { root.toggleShuffle() }
-    function cycleRepeat()               { root.cycleRepeat() }
-    function selectPlayer(id: string)    { root.selectMediaPlayer(id) }
-    function refresh()                   { root.refresh() }
+    function volumeUp() {
+      root.volumeUp();
+    }
+    function volumeDown() {
+      root.volumeDown();
+    }
+    function setVolume(level: string) {
+      root.setVolume(parseFloat(level));
+    }
+    function toggleMute() {
+      root.toggleMute();
+    }
+    function playPause() {
+      root.mediaPlayPause();
+    }
+    function next() {
+      root.mediaNext();
+    }
+    function previous() {
+      root.mediaPrevious();
+    }
+    function stop() {
+      root.mediaStop();
+    }
+    function toggleShuffle() {
+      root.toggleShuffle();
+    }
+    function cycleRepeat() {
+      root.cycleRepeat();
+    }
+    function selectPlayer(id: string) {
+      root.selectMediaPlayer(id);
+    }
+    function refresh() {
+      root.refresh();
+    }
     function togglePanel() {
-      if (!pluginApi) return
+      if (!pluginApi)
+        return;
       pluginApi.withCurrentScreen(screen => {
-        if (pluginApi.panelOpenScreen)
-          pluginApi.closePanel(pluginApi.panelOpenScreen)
-        else
-          pluginApi.openPanel(screen)
-      })
+                                    if (pluginApi.panelOpenScreen)
+                                    pluginApi.closePanel(pluginApi.panelOpenScreen);
+                                    else
+                                    pluginApi.openPanel(screen);
+                                  });
     }
   }
 }

@@ -1,7 +1,6 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
-import Qt5Compat.GraphicalEffects
 import qs.Commons
 import qs.Services.UI
 import qs.Widgets
@@ -52,7 +51,7 @@ Item {
   onVisibleChanged: {
     if (visible) {
       searchQuery = "";
-      selectedThemeIndex = -1
+      selectedThemeIndex = -1;
       if (searchInput) {
         searchInput.text = "";
         if (showSearchInput) {
@@ -66,74 +65,62 @@ Item {
   property string searchQuery: ""
   property int selectedThemeIndex: -1
 
-  readonly property bool selectionEnabled: showSearchInput
-                                         && searchInput
-                                         && searchInput.activeFocus
-                                         && filteredThemes
-                                         && filteredThemes.length > 0
-                                         && searchQuery.trim() !== ""
+  readonly property bool selectionEnabled: showSearchInput && searchInput && searchInput.activeFocus && filteredThemes && filteredThemes.length > 0 && searchQuery.trim() !== ""
 
   function clampSelection() {
     if (!filteredThemes || filteredThemes.length === 0) {
-      selectedThemeIndex = -1
-      return
+      selectedThemeIndex = -1;
+      return;
     }
 
     if (selectedThemeIndex < 0 || selectedThemeIndex >= filteredThemes.length) {
-      selectedThemeIndex = 0
+      selectedThemeIndex = 0;
     }
   }
 
   function moveSelection(delta) {
     if (!filteredThemes || filteredThemes.length === 0)
-      return
+      return;
+    clampSelection();
 
-    clampSelection()
-
-    const count = filteredThemes.length
-    selectedThemeIndex = (selectedThemeIndex + delta + count) % count
+    const count = filteredThemes.length;
+    selectedThemeIndex = (selectedThemeIndex + delta + count) % count;
   }
 
   function selectedThemeName() {
     if (!filteredThemes || filteredThemes.length === 0)
-      return ""
+      return "";
 
-    clampSelection()
+    clampSelection();
 
-    const selected = filteredThemes[selectedThemeIndex]
-    return typeof selected === "string" ? selected : selected.name
+    const selected = filteredThemes[selectedThemeIndex];
+    return typeof selected === "string" ? selected : selected.name;
   }
 
   function selectedThemeDirName() {
     if (!filteredThemes || filteredThemes.length === 0)
-      return ""
+      return "";
 
-    clampSelection()
+    clampSelection();
 
-    const selected = filteredThemes[selectedThemeIndex]
+    const selected = filteredThemes[selectedThemeIndex];
     // Use dirName for operations, fallback to name for backward compatibility
-    return typeof selected === "string" ? selected : (selected.dirName || selected.name)
+    return typeof selected === "string" ? selected : (selected.dirName || selected.name);
   }
 
   function applySelectedTheme() {
     if (!selectionEnabled)
-      return
-
-    const dirName = selectedThemeDirName()
+      return;
+    const dirName = selectedThemeDirName();
     if (!dirName)
-      return
-
-    pluginMain?.setTheme(dirName)
+      return;
+    pluginMain?.setTheme(dirName);
     if (pluginApi) {
-      pluginApi.closePanel(root.screen)
+      pluginApi.closePanel(root.screen);
     }
   }
 
-  readonly property string themeFilterLabel: themeFilter === "dark"
-                                          ? trOrDefault("filters.dark", "Dark")
-                                          : (themeFilter === "light"
-                                             ? trOrDefault("filters.light", "Light")
-                                             : trOrDefault("filters.all", "All"))
+  readonly property string themeFilterLabel: themeFilter === "dark" ? trOrDefault("filters.dark", "Dark") : (themeFilter === "light" ? trOrDefault("filters.light", "Light") : trOrDefault("filters.all", "All"))
 
   readonly property var filteredThemes: {
     const themes = pluginMain?.availableThemes || [];
@@ -141,17 +128,17 @@ Item {
 
     if (themeFilter !== "all") {
       filtered = filtered.filter(theme => {
-        const mode = typeof theme === "object" ? theme.mode : "";
-        return mode === themeFilter;
-      });
+                                   const mode = typeof theme === "object" ? theme.mode : "";
+                                   return mode === themeFilter;
+                                 });
     }
 
     if (searchQuery.trim() !== "") {
       const query = searchQuery.toLowerCase().trim();
       filtered = filtered.filter(theme => {
-        const name = (typeof theme === "string" ? theme : theme.name).toLowerCase();
-        return name.includes(query);
-      });
+                                   const name = (typeof theme === "string" ? theme : theme.name).toLowerCase();
+                                   return name.includes(query);
+                                 });
     }
 
     return filtered;
@@ -166,7 +153,8 @@ Item {
 
   function cycleThemeFilter() {
     searchQuery = "";
-    if (searchInput) searchInput.text = "";
+    if (searchInput)
+      searchInput.text = "";
 
     if (themeFilter === "all") {
       themeFilter = preferredThemeFilter();
@@ -290,33 +278,32 @@ Item {
 
           onTextChanged: {
             if (searchQuery !== text)
-              searchQuery = text
+              searchQuery = text;
 
             if (text.trim() === "") {
-              selectedThemeIndex = -1
+              selectedThemeIndex = -1;
             } else {
-              selectedThemeIndex = 0
+              selectedThemeIndex = 0;
             }
           }
 
           onAccepted: {
-            applySelectedTheme()
+            applySelectedTheme();
           }
 
-          Keys.onPressed: function(event) {
+          Keys.onPressed: function (event) {
             if (!selectionEnabled)
-              return
-
+              return;
             if (event.key === Qt.Key_Down || event.key === Qt.Key_Tab) {
-              moveSelection(1)
-              event.accepted = true
-              return
+              moveSelection(1);
+              event.accepted = true;
+              return;
             }
 
             if (event.key === Qt.Key_Up || event.key === Qt.Key_Backtab) {
-              moveSelection(-1)
-              event.accepted = true
-              return
+              moveSelection(-1);
+              event.accepted = true;
+              return;
             }
           }
 
@@ -372,15 +359,15 @@ Item {
               required property var modelData
               required property int index
 
-               readonly property var theme: modelData
-               readonly property string themeName: typeof theme === 'string' ? theme : theme.name
-               readonly property string themeDirName: typeof theme === 'object' ? theme.dirName : themeName
-               readonly property var themeColors: typeof theme === 'object' ? theme.colors : []
-               readonly property bool isCurrentTheme: themeDirName === pluginMain?.themeName
-               readonly property bool isLoadingTheme: themeDirName === root.loadingThemeName && root.isLoading
-               readonly property bool hovered: hoverArea.containsMouse
-               readonly property bool selected: root.selectionEnabled && root.selectedThemeIndex === entry.index
-               readonly property bool highlighted: hovered || selected
+              readonly property var theme: modelData
+              readonly property string themeName: typeof theme === 'string' ? theme : theme.name
+              readonly property string themeDirName: typeof theme === 'object' ? theme.dirName : themeName
+              readonly property var themeColors: typeof theme === 'object' ? theme.colors : []
+              readonly property bool isCurrentTheme: themeDirName === pluginMain?.themeName
+              readonly property bool isLoadingTheme: themeDirName === root.loadingThemeName && root.isLoading
+              readonly property bool hovered: hoverArea.containsMouse
+              readonly property bool selected: root.selectionEnabled && root.selectedThemeIndex === entry.index
+              readonly property bool highlighted: hovered || selected
 
               Layout.fillWidth: true
               implicitHeight: rowLayout.implicitHeight + (Style.marginS * 2)
@@ -398,32 +385,32 @@ Item {
                 anchors.bottomMargin: Style.marginS
                 spacing: Style.marginM
 
-                 NText {
-                   Layout.fillWidth: true
-                   color: Color.mOnSurface
-                   text: entry.themeName
-                   pointSize: Style.fontSizeM
-                   font.weight: isCurrentTheme ? Style.fontWeightBold : Style.fontWeightMedium
-                   verticalAlignment: Text.AlignVCenter
-                   elide: Text.ElideRight
-                 }
+                NText {
+                  Layout.fillWidth: true
+                  color: Color.mOnSurface
+                  text: entry.themeName
+                  pointSize: Style.fontSizeM
+                  font.weight: isCurrentTheme ? Style.fontWeightBold : Style.fontWeightMedium
+                  verticalAlignment: Text.AlignVCenter
+                  elide: Text.ElideRight
+                }
 
-                 NIcon {
-                   id: loadingIcon
-                   visible: entry.isLoadingTheme
-                   icon: "refresh"
-                   color: Color.mPrimary
-                   pointSize: Style.fontSizeM
-                   Layout.alignment: Qt.AlignVCenter
+                NIcon {
+                  id: loadingIcon
+                  visible: entry.isLoadingTheme
+                  icon: "refresh"
+                  color: Color.mPrimary
+                  pointSize: Style.fontSizeM
+                  Layout.alignment: Qt.AlignVCenter
 
-                   RotationAnimator on rotation {
-                     running: entry.isLoadingTheme
-                     loops: Animation.Infinite
-                     from: 0
-                     to: 360
-                     duration: 1000
-                   }
-                 }
+                  RotationAnimator on rotation {
+                    running: entry.isLoadingTheme
+                    loops: Animation.Infinite
+                    from: 0
+                    to: 360
+                    duration: 1000
+                  }
+                }
 
                 Row {
                   spacing: Style.marginXS / 2
@@ -462,25 +449,26 @@ Item {
                 }
               }
 
-               MouseArea {
-                 id: hoverArea
-                 anchors.fill: parent
-                 hoverEnabled: true
-                 enabled: !root.isLoading
-                 onEntered: {
-                   if (root.selectionEnabled) {
-                     root.selectedThemeIndex = entry.index
-                   }
-                 }
-                  onClicked: {
-                    if (root.isLoading) return
-                    // Use dirName for setTheme operation, not display name
-                    pluginMain?.setTheme(entry.themeDirName);
-                    if (pluginApi) {
-                      pluginApi.closePanel(root.screen);
-                    }
+              MouseArea {
+                id: hoverArea
+                anchors.fill: parent
+                hoverEnabled: true
+                enabled: !root.isLoading
+                onEntered: {
+                  if (root.selectionEnabled) {
+                    root.selectedThemeIndex = entry.index;
                   }
-               }
+                }
+                onClicked: {
+                  if (root.isLoading)
+                    return;
+                  // Use dirName for setTheme operation, not display name
+                  pluginMain?.setTheme(entry.themeDirName);
+                  if (pluginApi) {
+                    pluginApi.closePanel(root.screen);
+                  }
+                }
+              }
             }
           }
 
@@ -498,6 +486,5 @@ Item {
         }
       }
     }
-
   }
 }

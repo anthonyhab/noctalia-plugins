@@ -109,6 +109,31 @@ else
   echo "warning: node not found, skipping translation key coverage check"
 fi
 
+echo "[validate] checking shell compatibility"
+if command -v node > /dev/null 2>&1; then
+  node "scripts/check-shell-compat.js"
+else
+  echo "warning: node not found, skipping shell compatibility check"
+fi
+
+echo "[validate] checking QML anti-patterns"
+if [[ -f "scripts/dev/check-anti-patterns.sh" ]]; then
+  qml_files=()
+  for plugin in "${plugins[@]}"; do
+    while IFS= read -r -d '' qml_file; do
+      qml_files+=("$qml_file")
+    done < <(find "$plugin" -name "*.qml" -not -path "*/.worktrees/*" -print0 2>/dev/null || true)
+  done
+
+  if [[ ${#qml_files[@]} -gt 0 ]]; then
+    bash "scripts/dev/check-anti-patterns.sh" "${qml_files[@]}"
+  else
+    echo "warning: no QML files found for anti-pattern checks"
+  fi
+else
+  echo "warning: scripts/dev/check-anti-patterns.sh not found, skipping anti-pattern checks"
+fi
+
 echo "[validate] checking shell script syntax"
 shell_files=(
   scripts/validate-plugins.sh
@@ -133,7 +158,7 @@ if [[ -n "$tracked_settings" ]]; then
   exit 1
 fi
 
-echo "[validate] checking release hygiene warnings"
+echo "[validate] checking release hygiene"
 dev_artifacts=(
   omarchy/benchmark-theme-set.sh
   omarchy/qs-dev
@@ -143,22 +168,19 @@ dev_artifacts=(
   omarchy/convert-legacy-themes.js
 )
 
-dev_warnings=()
+dev_hygiene_errors=()
 for file in "${dev_artifacts[@]}"; do
-  if [[ -f "$file" ]]; then
-    if git ls-files --error-unmatch "$file" > /dev/null 2>&1; then
-      dev_warnings+=("$file is tracked; keep only if intentionally shipped")
-    else
-      dev_warnings+=("$file is local artifact; ensure it stays untracked")
-    fi
+  if git ls-files --error-unmatch "$file" > /dev/null 2>&1; then
+    dev_hygiene_errors+=("$file is tracked; remove from stable distribution")
   fi
 done
 
-if [[ ${#dev_warnings[@]} -gt 0 ]]; then
-  echo "[validate] release hygiene warnings:"
-  for warning in "${dev_warnings[@]}"; do
-    echo "  - $warning"
+if [[ ${#dev_hygiene_errors[@]} -gt 0 ]]; then
+  echo "error: release hygiene check failed:"
+  for message in "${dev_hygiene_errors[@]}"; do
+    echo "  - $message"
   done
+  exit 1
 fi
 
 echo "[validate] checking omarchy cache consistency"

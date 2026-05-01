@@ -17,10 +17,16 @@
     "authenticated": "Authenticated",
     "submitted": "Submitted",
     "unlocked": "Unlocked",
+    "verified": "Verified",
     "timed-out": "Request Timed Out",
     "timed-out-detail": "This authentication request is no longer valid.",
     "fingerprint-or": "or",
-    "fingerprint-hint": "Touch fingerprint sensor"
+    "fingerprint-hint": "Touch fingerprint sensor",
+    "disconnected": "Disconnected from auth daemon",
+    "negotiating": "Negotiating with auth daemon",
+    "active": "Active - ready to handle requests",
+    "standby": "Standby - another agent is active",
+    "conflict-policy": "Conflict policy: "
   },
   "warnings": {
     "caps-lock": "Caps Lock is on"
@@ -81,13 +87,6 @@
     "about": {
       "title": "About"
     }
-  },
-  "status": {
-    "disconnected": "Disconnected from auth daemon",
-    "negotiating": "Negotiating with auth daemon",
-    "active": "Active — ready to handle requests",
-    "standby": "Standby — another agent is active",
-    "conflict-policy": "Conflict policy: "
   },
   "widget": {
     "tooltip-ready": "Authentication agent ready",

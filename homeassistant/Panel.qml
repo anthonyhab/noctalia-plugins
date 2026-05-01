@@ -47,8 +47,8 @@ Item {
       localVolumeLevel = volumeLevel;
   }
   Component.onCompleted: {
-    pluginMain?.refreshIfStale(4000)
-    Qt.callLater(updateCalculatedPosition)
+    pluginMain?.refreshIfStale(4000);
+    Qt.callLater(updateCalculatedPosition);
   }
   property real calculatedPosition: mediaPosition
 
@@ -79,7 +79,7 @@ Item {
   readonly property string headerLabelText: {
     const players = pluginMain?.mediaPlayers || [];
     if (players.length === 0)
-      return pluginApi?.tr("title") || "Home Assistant";
+      return pluginApi?.tr("title");
     const selected = pluginMain?.selectedMediaPlayer || "";
     for (var i = 0; i < players.length; i++) {
       if (players[i].entity_id === selected)
@@ -280,7 +280,7 @@ Item {
 
           NText {
             Layout.fillWidth: true
-            text: mediaTitle || (pluginApi?.tr("media.no-media") || "Nothing playing")
+            text: mediaTitle || pluginApi?.tr("media.no-media")
             font.weight: Style.fontWeightBold
             pointSize: Style.fontSizeL
             color: Color.mOnSurface
@@ -469,7 +469,7 @@ Item {
     NText {
       Layout.fillWidth: true
       visible: !isConnected
-      text: connectionError !== "" ? connectionError : (pluginApi?.tr("panel.settings-hint") || "Configure connection in Settings > Plugins > Home Assistant")
+      text: connectionError !== "" ? connectionError : pluginApi?.tr("panel.settings-hint")
       color: connectionError !== "" ? Color.mError : Color.mOnSurfaceVariant
       wrapMode: Text.WordWrap
       pointSize: Style.fontSizeS

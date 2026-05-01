@@ -3,6 +3,8 @@
 const fs = require("fs")
 const path = require("path")
 
+const SKIP_DIRS = new Set([".git", ".worktrees", "node_modules"])
+
 function readText(filePath) {
   return fs.readFileSync(filePath, "utf8")
 }
@@ -22,6 +24,22 @@ function getPluginDirs(repoRoot) {
 
 function parseManifest(manifestPath) {
   return JSON.parse(readText(manifestPath))
+}
+
+function collectQmlFiles(dirPath) {
+  const files = []
+  const entries = fs.readdirSync(dirPath, { "withFileTypes": true })
+  for (const entry of entries) {
+    const fullPath = path.join(dirPath, entry.name)
+    if (entry.isDirectory()) {
+      if (SKIP_DIRS.has(entry.name) || entry.name.startsWith("."))
+        continue
+      files.push(...collectQmlFiles(fullPath))
+    } else if (entry.isFile() && entry.name.endsWith(".qml")) {
+      files.push(fullPath)
+    }
+  }
+  return files
 }
 
 function checkBarWidgetRequiredProps(pluginDir, manifest, errors) {
@@ -159,11 +177,8 @@ function checkNButtonInternals(filePath, text, errors) {
 }
 
 function checkPluginQmlInternals(pluginDir, errors) {
-  const entries = fs.readdirSync(pluginDir)
-  for (const entry of entries) {
-    if (!entry.endsWith(".qml"))
-      continue
-    const filePath = path.join(pluginDir, entry)
+  const qmlFiles = collectQmlFiles(pluginDir)
+  for (const filePath of qmlFiles) {
     const text = readText(filePath)
     checkNButtonInternals(filePath, text, errors)
   }
