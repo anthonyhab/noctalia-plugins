@@ -2,7 +2,7 @@
 
 # Omarchy Integration
 
-Sync Noctalia colors from Omarchy themes with fast precomputed palettes and a runtime fallback when the cache is missing or stale.
+Sync Noctalia colors from your active Omarchy theme and switch themes directly from Noctalia.
 
 ## Availability
 
@@ -14,124 +14,36 @@ Install and update through the Noctalia plugin directory:
 
 ## What It Does
 
-- Syncs Noctalia theme colors from Omarchy themes
-- Prefers precomputed palettes for instant theme switches
-- Falls back to live conversion when the cache is stale or missing
-- Exposes theme controls through Noctalia settings, panel, and optional bar widget
+- syncs Noctalia color schemes from Omarchy themes
+- ships cached palettes for instant theme switches
+- falls back to live conversion if a cached palette is unavailable
+- exposes theme controls through Settings, Panel, Bar Widget, and Control Center entry points
+- supports search plus light/dark theme filtering in the panel
 
-## Quick Start
+## Requirements
 
-1. Install the plugin from the custom repository source.
+- Omarchy installed on the same user session
+- your Omarchy config directory available at `~/.config/omarchy/` or a custom path
+- a working theme-set command, usually `~/.local/share/omarchy/bin/omarchy-theme-set`
+
+## Setup
+
+1. Install the plugin from this repository.
 2. Open **Noctalia Settings -> Plugins -> Omarchy Integration**.
-3. Enable the plugin and confirm your Omarchy config path if you do not use the default location.
-4. Optionally add the bar widget if you want quick theme access in the shell.
+3. Enable the plugin.
+4. Confirm the Omarchy config directory if you do not use the default location.
+5. If needed, set **Theme-set command** to your local `omarchy-theme-set` path.
+6. Optionally add the bar widget or control center button for quick access.
 
-## Architecture
+## Usage
 
-### Runtime (QuickShell)
-- **SchemeCache.js** - Pre-computed Noctalia palettes (instant lookup)
-- **ThemePipeline.js** - Fast fallback when cache is missing or stale
-- **ColorsConvert.js** - Lightweight HSL utilities used by the pipeline
+- Open the panel from the bar widget or control center button.
+- Search for a theme or cycle between all, light, and dark filters.
+- Apply a theme to switch Omarchy and sync Noctalia colors together.
+- Disable the plugin to restore the saved Noctalia color preferences that were active before Omarchy sync.
 
-### Development (Node.js CLI)
-- **ColorAnalysis.js** - Advanced CIELAB color science for perceptual analysis
-- **generate-scheme-cache.js** - Generates the runtime scheme cache
-- **update-scheme-cache-embedded.js** - Embeds the cache + pipeline version
-- **color_analysis_report.js** - Analyzes color relationships between themes
+## Notes
 
-## The Magic: CIELAB Color Science
-
-All cached themes use **CIELAB color space** for:
-- Perceptually uniform lightness adjustments
-- Better color harmony
-- More accurate contrast calculations
-- Professional-grade color conversions
-
-**Runtime** prefers pre-computed schemes and only falls back to live conversion if the cache is missing or stale.
-
-## Development Workflow
-
-### Using Themes at Runtime (QuickShell)
-```javascript
-.import "SchemeCache.js" as SchemeCache
-
-const cached = SchemeCache.getScheme("catppuccin");
-console.log(cached?.palette?.mSurface);
-```
-
-### Developing Color Algorithm
-
-When you want to improve the color conversion:
-
-1. **Analyze color relationships:**
-   ```bash
-   node color_analysis_report.js
-   ```
-   Shows how different themes handle color relationships
-
-2. **Modify the algorithm:**
-   - Edit `ThemePipeline.js` to improve runtime conversion
-   - Uses fast HSL operations for instant response
-
-3. **Regenerate cache:**
-   ```bash
-   node generate-scheme-cache.js --scope builtins
-   node update-scheme-cache-embedded.js
-   node check-cache-consistency.js
-   ```
-   First command generates JSON, second embeds it in the QML file
-   and the third verifies version/key consistency.
-
-4. **Test in QuickShell:**
-   - The updated CIELAB-optimized colors are immediately available
-   - No runtime performance impact - just better colors!
-
-## Adding New Themes
-
-Just add your theme to `~/.config/omarchy/themes/my-theme/` with a `colors.toml` file!
-
-The script can automatically:
-- Scan built-in themes only (default release mode):
-  `node generate-scheme-cache.js --scope builtins`
-- Scan built-in + user themes:
-  `node generate-scheme-cache.js --scope all`
-- Parses `colors.toml` for colors (simple TOML format: `key = "#hexvalue"`)
-- Converts to CIELAB-optimized noctalia format
-
-**Required colors.toml keys:**
-- `background` - Main background color
-- `foreground` - Main foreground color
-
-**Optional keys (fallbacks provided):**
-- `accent` or `color4` (blue) - Primary accent color
-- `color1` (red), `color2` (green), `color3` (yellow), etc. - Terminal colors 0-15
-
-Then regenerate:
-```bash
-node generate-scheme-cache.js --scope all
-node update-scheme-cache-embedded.js
-node check-cache-consistency.js
-```
-
-**Note: New omarchy versions include default themes bundled with omarchy, no need to install them separately!**
-
-## Files
-
-- **ColorAnalysis.js** - Node.js only, CIELAB color space conversions
-- **SchemeCache.js** - QuickShell runtime, pre-computed Noctalia palettes
-- **ThemePipeline.js** - Runtime conversion pipeline
-- **ColorsConvert.js** - Runtime HSL utilities
-- **generate-scheme-cache.js** - CLI tool to generate scheme cache
-- **update-scheme-cache-embedded.js** - CLI tool to embed cache + version
-- **check-cache-consistency.js** - Validates embedded cache keys/version against source files
-- **scheme-cache.json** - Generated cache (auto-updated, don't edit)
-- **color_analysis_report.js** - CLI tool for analyzing themes
-
-## Why This Architecture?
-
-✅ **Performance**: Color switching is instant (just array lookup)  
-✅ **Quality**: Full CIELAB color science for professional results  
-✅ **Development**: Iterate on algorithm without affecting runtime  
-✅ **Best of Both**: Advanced science offline, instant results online  
-
-You get **perceptually accurate, beautiful colors** with **zero runtime cost**!
+- Cached palettes keep theme switching fast during normal use.
+- The plugin stores its user preference backup under the Noctalia config directory, not inside the plugin directory.
+- If your Omarchy install lives in a nonstandard location, update the settings fields instead of editing plugin files.

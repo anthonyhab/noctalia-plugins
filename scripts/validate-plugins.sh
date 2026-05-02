@@ -152,6 +152,12 @@ done
 
 echo "[validate] ensuring runtime settings are not tracked"
 tracked_settings="$(git ls-files '*/settings.json' || true)"
+tracked_runtime_outputs="$(git ls-files '*/omarchy-color-preferences.json' || true)"
+if [[ -n "$tracked_runtime_outputs" ]]; then
+  echo "error: tracked runtime output detected:"
+  echo "$tracked_runtime_outputs"
+  exit 1
+fi
 if [[ -n "$tracked_settings" ]]; then
   echo "error: tracked runtime settings detected:"
   echo "$tracked_settings"
@@ -160,12 +166,37 @@ fi
 
 echo "[validate] checking release hygiene"
 dev_artifacts=(
+  bb-auth/test-auth.sh
+  hypr-overview/.gitignore
+  hypr-overview/0.54-plan.md
+  hypr-overview/docs/superpowers/plans/2026-04-20-multi-monitor-workspace.md
+  hypr-overview/docs/superpowers/specs/2026-04-20-multi-monitor-workspace-design.md
+  hypr-overview/scripts/rebuild-shaders.sh
+  hypr-overview/shaders/README.md
+  hypr-overview/shaders/frag/window_mac_classic.frag
+  hypr-overview/shaders/frag/window_simplify.frag
+  omarchy/.gitignore
   omarchy/benchmark-theme-set.sh
-  omarchy/qs-dev
-  omarchy/IMPLEMENTATION_SUMMARY.md
-  omarchy/FileCacheManager.qml
-  omarchy/ThemeOperationManager.qml
+  omarchy/check-cache-consistency.js
+  omarchy/color_analysis_report.js
+  omarchy/ColorAnalysis.js
   omarchy/convert-legacy-themes.js
+  omarchy/execute-hooks.sh
+  omarchy/FileCacheManager.qml
+  omarchy/generate-scheme-cache.js
+  omarchy/IMPLEMENTATION_SUMMARY.md
+  omarchy/keyboard-return.svg
+  omarchy/omarchy-hook-async
+  omarchy/omarchy-hook-processor
+  omarchy/omarchy-theme-set-fast
+  omarchy/qs-dev
+  omarchy/scheme-cache.json
+  omarchy/ThemeOperationManager.qml
+  omarchy/theme_comparison_analysis.js
+  omarchy/update-scheme-cache-embedded.js
+  omarchy/omarchy-color-preferences.json
+  omarchy/test-conversion.js
+  omarchy/test-golden-themes.js
 )
 
 dev_hygiene_errors=()
@@ -183,11 +214,19 @@ if [[ ${#dev_hygiene_errors[@]} -gt 0 ]]; then
   exit 1
 fi
 
-echo "[validate] checking omarchy cache consistency"
-if command -v node > /dev/null 2>&1 && [[ -f "omarchy/check-cache-consistency.js" ]]; then
-  node "omarchy/check-cache-consistency.js"
-else
-  echo "warning: node not found or script missing, skipping omarchy cache consistency check"
-fi
+echo "[validate] checking omarchy runtime cache artifacts"
+omarchy_runtime_files=(
+  omarchy/AsyncThemeSetter.qml
+  omarchy/ColorsConvert.js
+  omarchy/InstantSchemeApplier.qml
+  omarchy/SchemeCache.js
+  omarchy/ThemePipeline.js
+)
+for file in "${omarchy_runtime_files[@]}"; do
+  if [[ ! -f "$file" ]]; then
+    echo "error: missing omarchy runtime artifact: $file"
+    exit 1
+  fi
+done
 
 echo "[validate] all checks passed"
