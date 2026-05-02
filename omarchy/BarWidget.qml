@@ -47,9 +47,9 @@ Item {
       return pluginApi?.tr("tooltips.inactive");
     if (!isAvailable)
       return pluginApi?.tr("tooltips.not-available");
-    return pluginApi?.tr("tooltips.active", {
-                           "theme": themeDisplayName
-                         });
+
+    const template = pluginApi?.tr("tooltips.active") || "";
+    return template.replace("{theme}", themeDisplayName || "");
   }
 
   readonly property int iconSize: Style.toOdd(capsuleHeight * 0.48)

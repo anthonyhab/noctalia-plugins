@@ -14,13 +14,15 @@ NIconButtonHot {
   colorFg: (!isActive || !isAvailable) ? Color.mOnSurface : Color.mPrimary
   tooltipText: {
     if (!isActive)
-      return pluginApi?.tr("tooltips.inactive")
+      return pluginApi?.tr("tooltips.inactive");
     if (!isAvailable)
-      return pluginApi?.tr("tooltips.not-available")
-    return pluginApi?.tr("tooltips.active", { "theme": pluginMain?.themeDisplayName || "" })
+      return pluginApi?.tr("tooltips.not-available");
+
+    const template = pluginApi?.tr("tooltips.active") || "";
+    return template.replace("{theme}", pluginMain?.themeDisplayName || "");
   }
 
   onClicked: {
-    pluginApi?.togglePanel(screen, this)
+    pluginApi?.togglePanel(screen, this);
   }
 }

@@ -864,12 +864,11 @@ Item {
       }
 
       Logger.i("Omarchy", "Scheme file written successfully to:", schemeOutputPath);
+      // Store scheme identity before applying so the shell treats this as a predefined
+      // scheme transition instead of remaining in wallpaper-color mode.
+      Settings.data.colorSchemes.predefinedScheme = schemeKey;
+      Settings.data.colorSchemes.useWallpaperColors = false;
       ColorSchemeService.applyScheme(schemeOutputPath);
-      // Store scheme identity (key) not full path for better Noctalia integration
-      if (Settings.data.colorSchemes.useWallpaperColors) {
-        Settings.data.colorSchemes.predefinedScheme = schemeKey;
-        Settings.data.colorSchemes.useWallpaperColors = false;
-      }
 
       if (pendingApplyAfterCurrent) {
         pendingApplyAfterCurrent = false;
