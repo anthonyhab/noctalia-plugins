@@ -18,11 +18,19 @@ NIconButtonHot {
     if (!isAvailable)
       return pluginApi?.tr("tooltips.not-available");
 
-    const template = pluginApi?.tr("tooltips.active") || "";
-    return template.replace("{theme}", pluginMain?.themeDisplayName || "");
+    const template = pluginApi?.tr("tooltips.active");
+    return (typeof template === "string" ? template : "").replace("{theme}", pluginMain?.themeDisplayName || "");
   }
 
   onClicked: {
+    if (!isActive) {
+      if (isAvailable)
+        pluginMain?.activate();
+      else
+        pluginApi?.togglePanel(screen, this);
+      return;
+    }
+
     pluginApi?.togglePanel(screen, this);
   }
 }

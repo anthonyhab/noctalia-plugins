@@ -48,13 +48,43 @@ Item {
     if (!isAvailable)
       return pluginApi?.tr("tooltips.not-available");
 
-    const template = pluginApi?.tr("tooltips.active") || "";
-    return template.replace("{theme}", themeDisplayName || "");
+    const template = pluginApi?.tr("tooltips.active");
+    return (typeof template === "string" ? template : "").replace("{theme}", themeDisplayName || "");
   }
 
   readonly property int iconSize: Style.toOdd(capsuleHeight * 0.48)
   readonly property int verticalSize: Style.toOdd(capsuleHeight * 0.85)
   readonly property int maxWidth: 150
+
+  readonly property var contextMenuModel: {
+    if (!isActive) {
+      return [
+            {
+              "label": pluginApi?.tr("actions.activate"),
+              "action": "activate",
+              "icon": "player-play"
+            },
+            {
+              "label": pluginApi?.tr("tooltips.widget-settings"),
+              "action": "settings",
+              "icon": "settings"
+            }
+          ];
+    }
+
+    return [
+          {
+            "label": pluginApi?.tr("tooltips.random-theme"),
+            "action": "random",
+            "icon": "dice-3"
+          },
+          {
+            "label": pluginApi?.tr("tooltips.widget-settings"),
+            "action": "settings",
+            "icon": "settings"
+          }
+        ];
+  }
 
   readonly property bool shouldShowText: showThemeName && isActive && isAvailable && themeDisplayName !== ""
 
@@ -94,24 +124,15 @@ Item {
   NPopupContextMenu {
     id: contextMenu
 
-    model: [
-      {
-        "label": pluginApi?.tr("tooltips.random-theme"),
-        "action": "random",
-        "icon": "dice-3"
-      },
-      {
-        "label": pluginApi?.tr("tooltips.widget-settings"),
-        "action": "settings",
-        "icon": "settings"
-      }
-    ]
+    model: contextMenuModel
 
     onTriggered: action => {
                    contextMenu.close();
                    PanelService.closeContextMenu(screen);
 
-                   if (action === "random") {
+                   if (action === "activate") {
+                     pluginMain?.activate();
+                   } else if (action === "random") {
                      selectRandomTheme();
                    } else if (action === "settings") {
                      openPluginSettings();
@@ -236,7 +257,14 @@ Item {
     onClicked: mouse => {
                  TooltipService.hide();
                  if (mouse.button === Qt.LeftButton) {
-                   pluginApi?.togglePanel(root.screen, container);
+                   if (!isActive) {
+                     if (isAvailable)
+                     pluginMain?.activate();
+                     else
+                     pluginApi?.togglePanel(root.screen, container);
+                   } else {
+                     pluginApi?.togglePanel(root.screen, container);
+                   }
                  } else if (mouse.button === Qt.RightButton) {
                    PanelService.showContextMenu(contextMenu, container, screen);
                  } else if (mouse.button === Qt.MiddleButton) {

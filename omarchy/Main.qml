@@ -424,6 +424,26 @@ Item {
     return applyCurrentTheme();
   }
 
+  function activateAndSetTheme(nextThemeName) {
+    if (!nextThemeName)
+      return false;
+    if (!pluginApi)
+      return false;
+    if (!available) {
+      ToastService.showError("Omarchy", pluginApi?.tr("errors.missing-config"));
+      return false;
+    }
+
+    if (!pluginApi?.pluginSettings?.active) {
+      rememberColorPreferences();
+      mutatePluginSettings(s => s.active = true);
+      ignoreNextPluginSettingsChanged = true;
+      pluginApi.saveSettings();
+    }
+
+    return setTheme(nextThemeName);
+  }
+
   function deactivate() {
     if (!pluginApi)
       return;

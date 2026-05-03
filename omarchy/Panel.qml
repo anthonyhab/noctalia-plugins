@@ -42,6 +42,8 @@ Item {
   readonly property string titleText: trOrDefault("title", "Omarchy")
   readonly property string settingsHintText: trOrDefault("panel.settings-hint", "Configure Omarchy paths from Settings → Plugins → Omarchy.")
   readonly property string noThemesText: trOrDefault("errors.no-themes", "No themes found")
+  readonly property string inactiveTitleText: trOrDefault("panel.inactive-title", "Omarchy sync is off")
+  readonly property string inactiveDescriptionText: trOrDefault("panel.inactive-description", "Activate the plugin to apply Omarchy themes from this panel.")
 
   readonly property bool isActive: pluginApi?.pluginSettings?.active || false
   readonly property bool showSearchInput: pluginApi?.pluginSettings?.showSearchInput !== false
@@ -112,12 +114,27 @@ Item {
     if (!selectionEnabled)
       return;
     const dirName = selectedThemeDirName();
+    handleThemeSelection(dirName);
+  }
+
+  function activatePlugin() {
+    return pluginMain?.activate() ?? false;
+  }
+
+  function handleThemeSelection(dirName) {
     if (!dirName)
-      return;
-    pluginMain?.setTheme(dirName);
-    if (pluginApi) {
+      return false;
+
+    let started = false;
+    if (!isActive)
+      started = pluginMain?.activateAndSetTheme(dirName) ?? false;
+    else
+      started = pluginMain?.setTheme(dirName) ?? false;
+
+    if (started && pluginApi)
       pluginApi.closePanel(root.screen);
-    }
+
+    return started;
   }
 
   readonly property string themeFilterLabel: themeFilter === "dark" ? trOrDefault("filters.dark", "Dark") : (themeFilter === "light" ? trOrDefault("filters.light", "Light") : trOrDefault("filters.all", "All"))
@@ -232,6 +249,53 @@ Item {
           baseSize: Style.baseWidgetSize * 0.8
           tooltipText: trOrDefault("tooltips.close", "Close")
           onClicked: pluginApi?.closePanel(root.screen)
+        }
+      }
+    }
+
+    NBox {
+      visible: !isActive
+      Layout.fillWidth: true
+      color: Qt.rgba(Color.mPrimary.r, Color.mPrimary.g, Color.mPrimary.b, 0.08)
+      border.width: Style.borderS
+      border.color: Qt.rgba(Color.mPrimary.r, Color.mPrimary.g, Color.mPrimary.b, 0.35)
+
+      ColumnLayout {
+        anchors.fill: parent
+        anchors.margins: Style.marginM
+        spacing: Style.marginS
+
+        NText {
+          Layout.fillWidth: true
+          text: inactiveTitleText
+          pointSize: Style.fontSizeM
+          font.weight: Style.fontWeightBold
+          color: Color.mOnSurface
+          wrapMode: Text.WordWrap
+        }
+
+        NText {
+          Layout.fillWidth: true
+          text: isAvailable ? inactiveDescriptionText : settingsHintText
+          pointSize: Style.fontSizeS
+          color: Color.mOnSurfaceVariant
+          wrapMode: Text.WordWrap
+        }
+
+        RowLayout {
+          Layout.fillWidth: true
+          spacing: Style.marginS
+
+          NButton {
+            text: trOrDefault("actions.activate", "Activate")
+            enabled: !!pluginMain && isAvailable && !isLoading
+            onClicked: activatePlugin()
+          }
+
+          NButton {
+            text: trOrDefault("tooltips.close", "Close")
+            onClicked: pluginApi?.closePanel(root.screen)
+          }
         }
       }
     }
@@ -463,10 +527,7 @@ Item {
                   if (root.isLoading)
                     return;
                   // Use dirName for setTheme operation, not display name
-                  pluginMain?.setTheme(entry.themeDirName);
-                  if (pluginApi) {
-                    pluginApi.closePanel(root.screen);
-                  }
+                  handleThemeSelection(entry.themeDirName);
                 }
               }
             }

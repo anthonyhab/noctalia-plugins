@@ -58,7 +58,7 @@
   },
   "tooltips": {
     "close": "Close",
-    "inactive": "Omarchy (inactive)\nClick to open settings",
+    "inactive": "Omarchy is inactive\nLeft: Activate | Right: Settings",
     "not-available": "Omarchy not available\nInstall omarchy and configure themes",
     "active": "Theme: {theme}\nLeft: Panel | Right: Settings | Middle: Random",
     "random-theme": "Random theme",
@@ -79,7 +79,9 @@
   },
   "panel": {
     "settings-hint": "Configure Omarchy paths via Settings -> Plugins -> Omarchy.",
-    "search-placeholder": "Search themes..."
+    "search-placeholder": "Search themes...",
+    "inactive-title": "Omarchy sync is off",
+    "inactive-description": "Activate the plugin to apply Omarchy themes from this panel."
   },
   "settings": {
     "description": "Set how Noctalia locates Omarchy and manage the plugin state.",
