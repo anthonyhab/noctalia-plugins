@@ -49,6 +49,22 @@ function getMonitorLogicalSize(monitorObj) {
     }
 }
 
+function getMonitorWorkArea(monitorObj) {
+    var logicalSize = getMonitorLogicalSize(monitorObj)
+    var reserved = (monitorObj && monitorObj.reserved) || []
+    var left = Math.max(0, toNumber(reserved[0], 0))
+    var top = Math.max(0, toNumber(reserved[1], 0))
+    var right = Math.max(0, toNumber(reserved[2], 0))
+    var bottom = Math.max(0, toNumber(reserved[3], 0))
+
+    return {
+        "x": left,
+        "y": top,
+        "width": Math.max(1, logicalSize.width - left - right),
+        "height": Math.max(1, logicalSize.height - top - bottom)
+    }
+}
+
 function getHyprlandPreviewInset(args) {
     args = args || {}
 
@@ -72,9 +88,15 @@ function buildWorkspaceContext(args) {
 
     var workspaceWidth = Math.max(1, toNumber(args.workspaceWidth, 100))
     var workspaceHeight = Math.max(1, toNumber(args.workspaceHeight, 100))
-    var logicalSize = getMonitorLogicalSize(args.monitorData)
-    var positionScaleX = toNumber(args.positionScaleX, workspaceWidth / Math.max(1, logicalSize.width))
-    var positionScaleY = toNumber(args.positionScaleY, workspaceHeight / Math.max(1, logicalSize.height))
+    var workArea = getMonitorWorkArea(args.monitorData)
+    var workAreaX = toNumber(args.workAreaX, workArea.x)
+    var workAreaY = toNumber(args.workAreaY, workArea.y)
+    var suppliedWorkAreaWidth = toNumber(args.workAreaWidth, workArea.width)
+    var suppliedWorkAreaHeight = toNumber(args.workAreaHeight, workArea.height)
+    var workAreaWidth = Math.max(1, suppliedWorkAreaWidth > 0 ? suppliedWorkAreaWidth : workArea.width)
+    var workAreaHeight = Math.max(1, suppliedWorkAreaHeight > 0 ? suppliedWorkAreaHeight : workArea.height)
+    var positionScaleX = toNumber(args.positionScaleX, workspaceWidth / workAreaWidth)
+    var positionScaleY = toNumber(args.positionScaleY, workspaceHeight / workAreaHeight)
     var windowScale = toNumber(args.windowScale, Math.min(positionScaleX, positionScaleY))
     var centeringX = toNumber(args.centeringX, 0)
     var centeringY = toNumber(args.centeringY, 0)
@@ -90,8 +112,12 @@ function buildWorkspaceContext(args) {
     return {
         "workspaceWidth": workspaceWidth,
         "workspaceHeight": workspaceHeight,
-        "logicalMonitorWidth": logicalSize.width,
-        "logicalMonitorHeight": logicalSize.height,
+        "logicalMonitorWidth": workAreaWidth,
+        "logicalMonitorHeight": workAreaHeight,
+        "workAreaX": workAreaX,
+        "workAreaY": workAreaY,
+        "workAreaWidth": workAreaWidth,
+        "workAreaHeight": workAreaHeight,
         "positionScaleX": positionScaleX,
         "positionScaleY": positionScaleY,
         "windowScale": windowScale,
@@ -114,8 +140,8 @@ function mapWindowToPreviewFrame(args) {
     var monitorX = toNumber(monitorData.x, 0)
     var monitorY = toNumber(monitorData.y, 0)
 
-    var rawPosX = toNumber(windowData.at && windowData.at[0], 0) - monitorX
-    var rawPosY = toNumber(windowData.at && windowData.at[1], 0) - monitorY
+    var rawPosX = toNumber(windowData.at && windowData.at[0], 0) - monitorX - context.workAreaX
+    var rawPosY = toNumber(windowData.at && windowData.at[1], 0) - monitorY - context.workAreaY
     var windowWidthRaw = Math.max(1, toNumber(windowData.size && windowData.size[0], 1))
     var windowHeightRaw = Math.max(1, toNumber(windowData.size && windowData.size[1], 1))
 
@@ -135,15 +161,17 @@ function mapWindowToPreviewFrame(args) {
     var insetScaleY = safeWorkspaceHeight / Math.max(1, context.workspaceHeight)
     var effectivePositionScaleX = context.positionScaleX * insetScaleX
     var effectivePositionScaleY = context.positionScaleY * insetScaleY
-    var effectiveWindowScale = context.windowScale * Math.min(insetScaleX, insetScaleY)
+    var effectiveWindowScaleX = context.positionScaleX * insetScaleX
+    var effectiveWindowScaleY = context.positionScaleY * insetScaleY
+    var effectiveWindowScale = Math.min(effectiveWindowScaleX, effectiveWindowScaleY)
 
     var scaledPosX = (rawPosX + context.centeringX) * effectivePositionScaleX
     var scaledPosY = (rawPosY + context.centeringY) * effectivePositionScaleY
 
-    var maxFrameWidth = Math.max(1, Math.round(context.workspaceWidth - (frameInset * 2)))
-    var maxFrameHeight = Math.max(1, Math.round(context.workspaceHeight - (frameInset * 2)))
-    var frameWidth = isTreatedAsFullscreen ? maxFrameWidth : Math.max(1, Math.round(Math.min(windowWidthRaw * effectiveWindowScale, maxFrameWidth)))
-    var frameHeight = isTreatedAsFullscreen ? maxFrameHeight : Math.max(1, Math.round(Math.min(windowHeightRaw * effectiveWindowScale, maxFrameHeight)))
+    var maxFrameWidth = Math.max(1, context.workspaceWidth - (frameInset * 2))
+    var maxFrameHeight = Math.max(1, context.workspaceHeight - (frameInset * 2))
+    var frameWidth = isTreatedAsFullscreen ? maxFrameWidth : Math.max(1, Math.min(windowWidthRaw * effectiveWindowScaleX, maxFrameWidth))
+    var frameHeight = isTreatedAsFullscreen ? maxFrameHeight : Math.max(1, Math.min(windowHeightRaw * effectiveWindowScaleY, maxFrameHeight))
 
     var frameTargetX = scaledPosX + frameInset
     var frameTargetY = scaledPosY + frameInset
@@ -174,10 +202,16 @@ function mapWindowToPreviewFrame(args) {
         "effectivePositionScaleX": effectivePositionScaleX,
         "effectivePositionScaleY": effectivePositionScaleY,
         "effectiveWindowScale": effectiveWindowScale,
+        "effectiveWindowScaleX": effectiveWindowScaleX,
+        "effectiveWindowScaleY": effectiveWindowScaleY,
         "centeringX": context.centeringX,
         "centeringY": context.centeringY,
         "monitorX": monitorX,
         "monitorY": monitorY,
+        "workAreaX": context.workAreaX,
+        "workAreaY": context.workAreaY,
+        "workAreaWidth": context.workAreaWidth,
+        "workAreaHeight": context.workAreaHeight,
         "windowWidthRaw": windowWidthRaw,
         "windowHeightRaw": windowHeightRaw,
         "isFullscreen": isFullscreen,

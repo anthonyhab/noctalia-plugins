@@ -1,7 +1,4 @@
 import QtQuick
-import Quickshell
-import Quickshell.Hyprland
-import Quickshell.Io
 import "../helpers/LayoutStrategy.js" as LayoutStrategy
 import qs.Commons
 import qs.Widgets
@@ -53,10 +50,10 @@ Item {
       anchors.fill: parent
       acceptedButtons: Qt.LeftButton
       onClicked: mouse => {
-                   // Emit badge position in switcher-local coordinates so parent can mapToItem
-                   switcher.badgeClicked(switcher.workspaceId, switcher.currentLayout, badge.x, badge.y + badge.height + 3, badge.width, badge.height);
-                   mouse.accepted = true;
-                 }
+        // Emit badge position in switcher-local coordinates so parent can mapToItem
+        switcher.badgeClicked(switcher.workspaceId, switcher.currentLayout, badge.x, badge.y + badge.height + 3, badge.width, badge.height);
+        mouse.accepted = true;
+      }
     }
   }
 
@@ -68,16 +65,20 @@ Item {
 
     var activeWsId = (pluginMain && pluginMain.activeWorkspace && pluginMain.activeWorkspace.id) || -1;
 
-    var cmd;
+    var commands = [];
     if (wsId == activeWsId) {
-      cmd = "hyprctl keyword general:layout " + layoutName;
+      commands.push("keyword general:layout " + layoutName);
     } else {
-      cmd = "hyprctl dispatch workspace " + wsId + " && hyprctl keyword general:layout " + layoutName + " && hyprctl dispatch workspace " + activeWsId;
+      commands.push("workspace " + wsId);
+      commands.push("keyword general:layout " + layoutName);
+      if (activeWsId >= 0)
+        commands.push("workspace " + activeWsId);
     }
 
-    layoutProcessComponent.createObject(switcher, {
-                                          "command": ["bash", "-c", cmd]
-                                        }).running = true;
+    if (pluginMain && pluginMain.runOverviewDispatch)
+      pluginMain.runOverviewDispatch(commands, {
+                                       "reason": "layout-switcher"
+                                     });
 
     // Optimistic update
     if (pluginMain) {
@@ -91,30 +92,5 @@ Item {
     }
 
     switcher.layoutChanged(wsId, layoutName);
-  }
-
-  Component {
-    id: layoutProcessComponent
-
-    Process {
-      stderr: StdioCollector {
-        onStreamFinished: {
-          if (text.trim())
-            Logger.w("HyprOverview", "switchLayout stderr:", text.trim());
-        }
-      }
-
-      stdout: StdioCollector {
-        onStreamFinished: {
-          if (text.trim())
-            Logger.i("HyprOverview", "switchLayout:", text.trim());
-        }
-      }
-
-      onRunningChanged: {
-        if (!running)
-          destroy();
-      }
-    }
   }
 }

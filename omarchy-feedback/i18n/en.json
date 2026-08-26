@@ -1,0 +1,23 @@
+{
+   "menu": {
+      "refresh": "Refresh indicators",
+      "settings": "Open plugin settings"
+   },
+   "tooltips": {
+      "voxtype-recording": "Voxtype recording",
+      "voxtype-transcribing": "Voxtype transcribing",
+      "screen-recording": "Screen recording active",
+      "idle-disabled": "Idle lock disabled",
+      "update-available": "Omarchy update available"
+   },
+   "settings": {
+      "status-title": "Status",
+      "omarchy-detected": "Omarchy detected",
+      "omarchy-missing": "Omarchy not found via OMARCHY_PATH, ~/.local/share/omarchy, or `omarchy` on PATH",
+      "indicators-title": "Indicators",
+      "show-voxtype": "Show Voxtype indicator",
+      "show-screen-recording": "Show screen recording indicator",
+      "show-idle-disabled": "Show idle disabled indicator",
+      "show-update-available": "Show update available indicator"
+   }
+}

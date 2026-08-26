@@ -3,33 +3,24 @@ import QtQuick.Effects
 import QtQuick.Layouts
 import Quickshell
 import Quickshell.Hyprland
-import Quickshell.Io
 import Quickshell.Wayland
+import "../helpers/DragDecision.js" as DragDecision
+import "../helpers/DropIntent.js" as DropIntent
+import "../helpers/HyprlandState.js" as HyprlandState
 import "../helpers/LayoutStrategy.js" as LayoutStrategy
+import "../helpers/RetileBlueprint.js" as RetileBlueprint
 import "../helpers/WorkspaceDragMapping.js" as WorkspaceDragMapping
 import "../helpers/WorkspaceGeometry.js" as WorkspaceGeometry
-import "../helpers"
 import "."
 import qs.Commons
 import qs.Commons as Commons
-import qs.Services.Power
 import qs.Widgets
 
 Item {
-  // 20px padding each side
-
   id: root
 
   required property var pluginMain
   required property var panelWindow
-  property real simplifiedPixelDensity: (pluginMain && pluginMain.simplifiedPixelDensity) || 0.5
-  property real simplifiedColorDepth: (pluginMain && pluginMain.simplifiedColorDepth) || 6
-  property real simplifiedSaturation: (pluginMain && pluginMain.simplifiedSaturation) || 1.1
-  property real simplifiedContrast: (pluginMain && pluginMain.simplifiedContrast) || 1.1
-  property string visualMode: (pluginMain && pluginMain.visualMode) || "live"
-  property string shaderPreset: (pluginMain && pluginMain.shaderPreset) || "classic"
-  property real shaderPresetStrength: (pluginMain && pluginMain.shaderPresetStrength) || 0.7
-  property bool useSimplifiedPreview: (pluginMain && pluginMain.useSimplifiedPreview) || false
   property real backgroundOpacityRatio: 1
   property var hyprConfig
   readonly property HyprlandMonitor monitor: (panelWindow && panelWindow.screen) ? Hyprland.monitorFor(panelWindow.screen) : null
@@ -68,10 +59,15 @@ Item {
   property var windows: pluginMain.windowList
   property var windowByAddress: pluginMain.windowByAddress
   property var windowAddresses: pluginMain.addresses
+  readonly property int overlayCaptureRevision: pluginMain ? pluginMain.overlayCaptureRevision : 0
+  readonly property var overlayCaptureRevisionsByAddress: pluginMain ? pluginMain.overlayCaptureRevisionsByAddress : ({})
+  readonly property int clientRefreshRevision: pluginMain ? pluginMain.clientRefreshRevision : 0
   property var monitorData: pluginMain.monitors.find(function (m) {
     return m.id === (root.monitor && root.monitor.id);
   })
   property real cellScale: pluginMain.gridScale
+  implicitWidth: surfaceWidth
+  implicitHeight: surfaceHeight
   // Cross-monitor drag state
   property bool draggingCrossMonitor: false
   property int draggingTargetMonitorId: -1
@@ -100,9 +96,9 @@ Item {
   }
   readonly property real availableWidth: (monitorData && monitorData.transform % 2 === 1) ? ((monitor && monitor.height ? monitor.height : 1080) / (monitor && monitor.scale ? monitor.scale : 1)) - barAwareMargin * 2 : ((monitor && monitor.width ? monitor.width : 1920) / (monitor && monitor.scale ? monitor.scale : 1)) - barAwareMargin * 2
   readonly property real availableHeight: (monitorData && monitorData.transform % 2 === 1) ? ((monitor && monitor.width ? monitor.width : 1920) / (monitor && monitor.scale ? monitor.scale : 1)) - barAwareMargin * 2 : ((monitor && monitor.height ? monitor.height : 1080) / (monitor && monitor.scale ? monitor.scale : 1)) - barAwareMargin * 2
+  readonly property real surfacePadding: Math.max(4, root.workspaceSpacing)
   // Grid's natural size (without fit scaling)
-  readonly property real gridNaturalWidth: (pluginMain ? pluginMain.gridColumns : 5) * workspaceImplicitWidth + ((pluginMain ? pluginMain.gridColumns : 5) - 1) * workspaceSpacing + 40
-  // 20px padding each side
+  readonly property real gridNaturalWidth: (pluginMain ? pluginMain.gridColumns : 5) * workspaceImplicitWidth + ((pluginMain ? pluginMain.gridColumns : 5) - 1) * workspaceSpacing + surfacePadding * 2
   readonly property real gridNaturalHeight: {
     var rows = pluginMain ? pluginMain.gridRows : 2;
     var hideRows = pluginMain ? pluginMain.hideEmptyRows : false;
@@ -111,22 +107,26 @@ Item {
       visibleRows = 1;
 
     // At least one row
-    return visibleRows * workspaceImplicitHeight + (visibleRows - 1) * workspaceSpacing + 40;
+    return visibleRows * workspaceImplicitHeight + (visibleRows - 1) * workspaceSpacing + surfacePadding * 2;
   }
   // Fit scale to ensure grid stays on screen (never upscale, only downscale if needed)
   readonly property real fitScale: Math.min(1, Math.min(availableWidth / Math.max(1, gridNaturalWidth), availableHeight / Math.max(1, gridNaturalHeight)))
-  // Workspace cell dimensions (accounting for rotated monitors)
-  property real workspaceImplicitWidth: (monitorData && monitorData.transform % 2 === 1) ? ((monitor && monitor.height ? monitor.height : 1080) / (monitor && monitor.scale ? monitor.scale : 1) * root.cellScale) : ((monitor && monitor.width ? monitor.width : 1920) / (monitor && monitor.scale ? monitor.scale : 1) * root.cellScale)
-  property real workspaceImplicitHeight: (monitorData && monitorData.transform % 2 === 1) ? ((monitor && monitor.width ? monitor.width : 1920) / (monitor && monitor.scale ? monitor.scale : 1) * root.cellScale) : ((monitor && monitor.height ? monitor.height : 1080) / (monitor && monitor.scale ? monitor.scale : 1) * root.cellScale)
-  // Calculate centering offsets to "split the difference" of reserved space (bars)
-  // reserved: [left, top, right, bottom]
-  property real reservedLeft: (monitorData && monitorData.reserved && monitorData.reserved[0]) || 0
-  property real reservedTop: (monitorData && monitorData.reserved && monitorData.reserved[1]) || 0
-  property real reservedRight: (monitorData && monitorData.reserved && monitorData.reserved[2]) || 0
-  property real reservedBottom: (monitorData && monitorData.reserved && monitorData.reserved[3]) || 0
-  // Offset to apply to window positions to center the work area
-  property real centeringXOffset: (reservedRight - reservedLeft) / 2
-  property real centeringYOffset: (reservedBottom - reservedTop) / 2
+  readonly property var monitorWorkArea: WorkspaceGeometry.getMonitorWorkArea(monitorData || {
+                                                                                "width": (monitor && monitor.width) || 1920,
+                                                                                "height": (monitor && monitor.height) || 1080,
+                                                                                "scale": (monitor && monitor.scale) || 1,
+                                                                                "transform": (monitorData && monitorData.transform) || 0,
+                                                                                "reserved": [0, 0, 0, 0]
+                                                                              })
+  property real workspaceImplicitWidth: monitorWorkArea.width * root.cellScale
+  property real workspaceImplicitHeight: monitorWorkArea.height * root.cellScale
+  property real centeringXOffset: 0
+  property real centeringYOffset: 0
+  readonly property real surfaceX: scaledContainer.x + scaledContainer.width * (1 - root.fitScale) / 2
+  readonly property real surfaceY: scaledContainer.y + scaledContainer.height * (1 - root.fitScale) / 2
+  readonly property real surfaceWidth: scaledContainer.width * root.fitScale
+  readonly property real surfaceHeight: scaledContainer.height * root.fitScale
+  readonly property real surfaceRadius: root.workspaceCellRadius * root.fitScale
   // Z-ordering
   property int workspaceZ: 0
   property int windowZ: 1
@@ -153,25 +153,21 @@ Item {
   property string draggingTargetAddress: ""
   // Address of window being dragged
   readonly property real zoneEdgeSize: Math.max(0.15, Math.min(0.5, pluginMain.dragSnapThreshold || 0.33))
-  readonly property real zoneDeadzone: 0.04
-  readonly property real directionSwitchConfidenceMargin: 0.12
-  readonly property real directionFastCommitConfidence: 0.85
+  readonly property real minimumSplitZoneRatio: 0.42
   readonly property real noopGeometryEpsilonPx: 2
-  // iOS-style retiling state
   property var retilingTarget: null
-  property var pendingRetileTarget: null
-  // { targetAddress, targetX/Y/W/H, previewX/Y/W/H, targetNewX/Y/W/H, direction, confidence }
+  // { targetAddress, targetX/Y/W/H, direction, previewModel }
+  property var retileTransitionRecords: ({})
+  readonly property bool retileTransitionActive: Object.keys(retileTransitionRecords || ({})).length > 0
+  property var retilePendingFinalizedAddressMap: ({})
+  property var retileSettledRecaptureAddresses: []
+  property var retileFinalizedAddressMap: ({})
+  property int retileFinalizedPositionRevision: 0
   property string retilingDirection: ""
-  property real retilingConfidence: 0
   property string dragInteractionState: "idle"
   // "idle", "targeting", "lockedDirection"
-  property string pendingRetileDirection: ""
-  property real pendingRetileConfidence: 0
-  readonly property int floatingDropMaxOffsetSteps: 6
-  readonly property real floatingDropMinStepPx: 28
-  readonly property real floatingOverlapThresholdRatio: 0.32
-  readonly property real floatingDropSnapBasePx: 42
-  readonly property real floatingDropSnapRatio: 0.1
+  property var currentDropIntent: null
+  property int debugReleaseCounter: 0
   // === LAYOUT DATA (0.54+) ===
   // Map of workspaceId → layout name ("dwindle", "master", "scroll", "monocle")
   readonly property var workspaceLayouts: (pluginMain && pluginMain.workspaceLayouts) || ({})
@@ -180,29 +176,30 @@ Item {
     return root.workspaceLayouts[wsId] || "dwindle";
   }
 
-  // === GLASS EFFECT HELPERS ===
-  function applyGlassEffect(baseColor, isHovered) {
-    if (!pluginMain || !pluginMain.enableGlassMode)
-      return baseColor;
-
-    var tint = pluginMain.glassTintStrength || 0.55;
-    var bg = isHovered ? Color.mix(baseColor, Color.mLayer0, 0.46) : baseColor;
-    return Color.applyAlpha(bg, 1 - tint);
-  }
-
-  function applyGlassBorderOpacity(baseOpacity) {
-    if (!pluginMain || !pluginMain.enableGlassMode)
-      return baseOpacity;
-
-    var glassOpacity = pluginMain.glassBorderOpacity || 0.75;
-    return baseOpacity * glassOpacity;
-  }
-
   // Scroll layout: sorted window order per workspace (delegated to LayoutStrategy).
   readonly property var scrollWindowOrder: LayoutStrategy.get("scroll").computeWindowOrder(root.windowByAddress, root.workspaceLayouts, (pluginMain && pluginMain.workspaceScrollDirections) || ({}))
 
   // Monocle layout: deck position per window (delegated to LayoutStrategy).
   readonly property var monocleWindowOrder: LayoutStrategy.get("monocle").computeWindowOrder(root.windowByAddress, root.workspaceLayouts, null)
+
+  function tr(key) {
+    if (!pluginMain || !pluginMain.pluginApi || !pluginMain.pluginApi.tr)
+      return key;
+
+    return pluginMain.pluginApi.tr(key);
+  }
+
+  function retileLabels() {
+    return {
+      "l": root.tr("dropIntent.splitLeft"),
+      "r": root.tr("dropIntent.splitRight"),
+      "u": root.tr("dropIntent.splitTop"),
+      "d": root.tr("dropIntent.splitBottom"),
+      "swap": root.tr("dropIntent.tiledSwap"),
+      "draggedSlot": root.tr("dropIntent.draggedSlot"),
+      "targetSlot": root.tr("dropIntent.targetSlot")
+    };
+  }
 
   // Reserve a minimum inset so window borders don't visually merge with workspace borders.
   // Use half the indicator stroke, since the indicator border is drawn fully inside the workspace cell.
@@ -252,6 +249,41 @@ Item {
       return maxValue;
 
     return value;
+  }
+
+  function debugLog(tag, message) {
+    Logger.i("WorkspaceOverview", "[hypr-overview-debug:" + tag + "] " + message);
+  }
+
+  function debugStringify(value) {
+    try {
+      return JSON.stringify(value);
+    } catch (e) {
+      return "" + value;
+    }
+  }
+
+  function debugWindowState(win) {
+    if (!win)
+      return null;
+
+    return {
+      "address": win.address || "",
+      "workspace": win.workspace ? {
+                                     "id": win.workspace.id,
+                                     "name": win.workspace.name || ""
+                                   } : null,
+      "monitor": win.monitor,
+      "layout": win.workspace ? root.getWorkspaceLayout(win.workspace.id) : "",
+      "floating": !!win.floating,
+      "fullscreen": !!win.fullscreen,
+      "maximized": !!win.maximized
+    };
+  }
+
+  function nextDebugReleaseId() {
+    debugReleaseCounter += 1;
+    return debugReleaseCounter;
   }
 
   // === SPECIAL WORKSPACES ===
@@ -370,28 +402,6 @@ Item {
     return false;
   }
 
-  function getWallpaperSource(workspaceId) {
-    if (!pluginMain || !pluginMain.showEmptyWorkspaceWallpaper)
-      return "";
-
-    // Use special wallpaper path for special workspaces
-    var isSpecial = workspaceId < 0 || workspaceId > root.lastNumericWorkspaceId;
-    var path = isSpecial ? pluginMain.specialEmptyWorkspaceWallpaperPath : "";
-
-    // Fall back to regular path or detected wallpaper
-    if (!path || path === "")
-      path = pluginMain.emptyWorkspaceWallpaperPath || pluginMain.detectedWallpaper || "";
-
-    if (!path || path === "")
-      return "";
-
-    // Ensure proper file:// prefix
-    if (path.startsWith("/"))
-      return "file://" + path;
-
-    return path;
-  }
-
   function getActiveWorkspaceValueForGrid() {
     // Use the _activeWs property from the indicator to ensure proper binding updates
     var ws = root._activeWsForIndicator || pluginMain.activeWorkspace || (monitor && monitor.activeWorkspace);
@@ -470,17 +480,22 @@ Item {
     if (!win || !winMonitor)
       return null;
 
+    var workArea = WorkspaceGeometry.getMonitorWorkArea(winMonitor);
     return WorkspaceGeometry.mapWindowToPreviewFrame({
                                                        "windowData": win,
                                                        "monitorData": winMonitor,
                                                        "workspaceWidth": root.workspaceImplicitWidth,
                                                        "workspaceHeight": root.workspaceImplicitHeight,
+                                                       "workAreaX": workArea.x,
+                                                       "workAreaY": workArea.y,
+                                                       "workAreaWidth": workArea.width,
+                                                       "workAreaHeight": workArea.height,
                                                        "centeringX": root.centeringXOffset,
                                                        "centeringY": root.centeringYOffset,
                                                        "hyprGapsIn": (hyprConfig && hyprConfig.gapsIn) || 0,
                                                        "hyprBorderSize": (hyprConfig && hyprConfig.borderSize) || 0,
                                                        "fallbackInset": root.workspaceExclusiveGap,
-                                                       "useSimplifiedPreview": root.useSimplifiedPreview
+                                                       "useSimplifiedPreview": pluginMain && pluginMain.useSimplifiedPreview
                                                      });
   }
 
@@ -498,14 +513,24 @@ Item {
     return root.getScaledWindowFrameRect(win, winMonitor);
   }
 
-  function resolveFloatingDropPosition(delegateItem) {
+  function resolveFloatingDropPosition(delegateItem, targetWorkspaceId) {
     if (!delegateItem || !delegateItem.windowData || !delegateItem.windowData.workspace)
       return null;
 
-    var monitorObj = delegateItem.windowMonitor || null;
-    var logicalSize = WorkspaceGeometry.getMonitorLogicalSize(monitorObj);
-    var localX = delegateItem.x - delegateItem.xOffset;
-    var localY = delegateItem.y - delegateItem.yOffset;
+    var resolvedWorkspaceId = targetWorkspaceId !== undefined && targetWorkspaceId !== -1 ? targetWorkspaceId : delegateItem.windowData.workspace.id;
+    var targetMonitorId = root.getMonitorIdForWorkspace(resolvedWorkspaceId);
+    if (targetMonitorId < 0)
+      targetMonitorId = delegateItem.monitorId;
+    var monitorObj = ((pluginMain && pluginMain.monitors) || []).find(function (m) {
+      return m.id === targetMonitorId;
+    }) || delegateItem.windowMonitor || null;
+    var logicalSize = WorkspaceGeometry.getMonitorWorkArea(monitorObj);
+    var displayWorkspaceValue = resolvedWorkspaceId < 0 ? root.getEffectiveWorkspaceValueForWindow(delegateItem.rawWindowData || delegateItem.windowData) : resolvedWorkspaceId;
+    if (displayWorkspaceValue === null)
+      displayWorkspaceValue = resolvedWorkspaceId;
+    var workspaceOffsets = root.getWorkspaceOffsets(displayWorkspaceValue);
+    var localX = delegateItem.x - workspaceOffsets.x;
+    var localY = delegateItem.y - workspaceOffsets.y;
     return WorkspaceDragMapping.resolveFloatingDropPosition({
                                                               "frameX": localX,
                                                               "frameY": localY,
@@ -524,17 +549,12 @@ Item {
                                                               "monitorY": (monitorObj && monitorObj.y) || 0,
                                                               "monitorLogicalWidth": logicalSize.width,
                                                               "monitorLogicalHeight": logicalSize.height,
+                                                              "workAreaX": logicalSize.x,
+                                                              "workAreaY": logicalSize.y,
+                                                              "workAreaWidth": logicalSize.width,
+                                                              "workAreaHeight": logicalSize.height,
                                                               "windowWidthRaw": ((delegateItem.windowData.size && delegateItem.windowData.size[0]) || 1),
-                                                              "windowHeightRaw": ((delegateItem.windowData.size && delegateItem.windowData.size[1]) || 1),
-                                                              "workspaceId": delegateItem.windowData.workspace.id,
-                                                              "monitorId": ((delegateItem.windowData && delegateItem.windowData.monitor) || -1),
-                                                              "draggedAddress": delegateItem.address,
-                                                              "windowByAddress": root.windowByAddress,
-                                                              "overlapThresholdRatio": root.floatingOverlapThresholdRatio,
-                                                              "snapBasePx": root.floatingDropSnapBasePx,
-                                                              "snapRatio": root.floatingDropSnapRatio,
-                                                              "minStepPx": root.floatingDropMinStepPx,
-                                                              "maxOffsetSteps": root.floatingDropMaxOffsetSteps
+                                                              "windowHeightRaw": ((delegateItem.windowData.size && delegateItem.windowData.size[1]) || 1)
                                                             });
   }
 
@@ -604,33 +624,277 @@ Item {
     return true;
   }
 
-  function runHyprBatch(commands) {
+  function runHyprBatch(commands, options) {
     if (!commands || commands.length === 0)
       return;
 
-    var payload = "";
-    for (var i = 0; i < commands.length; i++) {
-      if (i > 0)
-        payload += "; ";
+    var opts = options || {};
+    if (!opts.reason)
+      opts.reason = "overview-grid";
+    root.debugLog("dispatch", "commands=" + root.debugStringify(commands) + " options=" + root.debugStringify(opts));
+    if (pluginMain && pluginMain.runOverviewDispatch)
+      pluginMain.runOverviewDispatch(commands, opts);
+  }
 
-      payload += "dispatch " + commands[i];
-    }
-    hyprBatchDispatch.payload = payload;
-    hyprBatchDispatch.running = true;
+  function dispatchWorkspace(target) {
+    if (target !== undefined && target !== null)
+      runHyprBatch(["workspace " + target]);
+  }
+
+  function toggleSpecialWorkspace(name) {
+    if (name !== undefined && name !== null && name !== "")
+      runHyprBatch(["togglespecialworkspace " + name]);
+  }
+
+  function focusWindowAddress(address) {
+    if (address !== undefined && address !== null && address !== "")
+      runHyprBatch(["focuswindow address:" + address]);
+  }
+
+  function closeWindowAddress(address) {
+    if (address !== undefined && address !== null && address !== "")
+      runHyprBatch(["closewindow address:" + address]);
+  }
+
+  function buildDropIntentForDelegate(delegateItem, retilingOverride) {
+    if (!delegateItem || !delegateItem.windowData)
+      return DropIntent.resolve({});
+
+    var targetWorkspace = root.draggingTargetWorkspace;
+    var currentWsId = (delegateItem.windowData && delegateItem.windowData.workspace && delegateItem.windowData.workspace.id) || -1;
+    var currentWsName = (delegateItem.windowData && delegateItem.windowData.workspace && delegateItem.windowData.workspace.name) || "";
+    var windowAddress = (delegateItem.windowData && delegateItem.windowData.address) || "";
+    var isFloating = (delegateItem.windowData && delegateItem.windowData.floating) || false;
+    var wsLayout = root.getWorkspaceLayout(currentWsId);
+    var retilingForIntent = retilingOverride || null;
+    if (retilingForIntent && retilingForIntent.direction === "swap" && !root.isValidSwapTarget(retilingForIntent, windowAddress, currentWsId))
+      retilingForIntent = null;
+    else if (retilingForIntent && retilingForIntent.direction !== "swap" && !root.isValidSplitTarget(retilingForIntent, currentWsId))
+      retilingForIntent = null;
+
+    var floatingDropPos = isFloating ? root.resolveFloatingDropPosition(delegateItem, targetWorkspace !== -1 ? targetWorkspace : currentWsId) : null;
+    return DropIntent.resolve({
+                                "windowAddress": windowAddress,
+                                "currentWorkspaceId": currentWsId,
+                                "currentSpecialName": root.normalizeSpecialName(currentWsName),
+                                "targetWorkspace": targetWorkspace,
+                                "targetSpecial": root.draggingTargetSpecial,
+                                "isFloating": isFloating,
+                                "isFullscreen": (delegateItem.windowData && delegateItem.windowData.fullscreen) || false,
+                                "isMaximized": (delegateItem.windowData && delegateItem.windowData.maximized) || false,
+                                "dragPreviewMode": pluginMain.dragPreviewMode || "smart",
+                                "sourceMonitorId": root.draggingSourceMonitorId,
+                                "targetMonitorId": root.draggingTargetMonitorId,
+                                "enableCrossMonitorDrag": pluginMain.enableCrossMonitorDrag,
+                                "crossMonitorDrag": root.draggingCrossMonitor,
+                                "layoutName": wsLayout,
+                                "scrollDirection": (pluginMain && pluginMain.workspaceScrollDirections && pluginMain.workspaceScrollDirections[currentWsId]) || "right",
+                                "dragDeltaX": delegateItem.x - delegateItem.initX,
+                                "dragDeltaY": delegateItem.y - delegateItem.initY,
+                                "retilingInfo": retilingForIntent,
+                                "floatingDropPosition": floatingDropPos
+                              });
   }
 
   function resetRetileState() {
-    directionDebounce.stop();
     root.retilingTarget = null;
-    root.pendingRetileTarget = null;
     root.retilingDirection = "";
-    root.retilingConfidence = 0;
-    root.pendingRetileDirection = "";
-    root.pendingRetileConfidence = 0;
     if (root.draggingTargetAddress !== "")
       root.dragInteractionState = "targeting";
     else
       root.dragInteractionState = "idle";
+  }
+
+  function cloneFrameRect(rect) {
+    if (!rect || !isFinite(Number(rect.x)) || !isFinite(Number(rect.y)) || !isFinite(Number(rect.w)) || !isFinite(Number(rect.h)) || Number(rect.w) <= 0 || Number(rect.h) <= 0)
+      return null;
+
+    return {
+      "x": Number(rect.x),
+      "y": Number(rect.y),
+      "w": Number(rect.w),
+      "h": Number(rect.h)
+    };
+  }
+
+  function clearRetileTransitionRecords() {
+    retileTransitionTimeout.stop();
+    root.retileTransitionRecords = ({});
+    root.retilePendingFinalizedAddressMap = ({});
+    root.retileSettledRecaptureAddresses = [];
+  }
+
+  function overlayCaptureRevisionForAddress(address) {
+    if (!address || !root.overlayCaptureRevisionsByAddress)
+      return 0;
+
+    return Number(root.overlayCaptureRevisionsByAddress[address]) || 0;
+  }
+
+  function workspaceWindowAddresses(workspaceId) {
+    var addresses = [];
+    var seen = {};
+    for (var addr in root.windowByAddress) {
+      var win = root.windowByAddress[addr];
+      if (!win || !win.workspace || win.workspace.id !== workspaceId)
+        continue;
+
+      var address = win.address || addr;
+      if (address && !seen[address]) {
+        seen[address] = true;
+        addresses.push(address);
+      }
+    }
+    return addresses;
+  }
+
+  function rememberRetileFinalizedAddresses(addresses) {
+    if (!addresses || addresses.length === 0)
+      return;
+
+    var next = {};
+    var old = root.retilePendingFinalizedAddressMap || {};
+    for (var key in old)
+      next[key] = true;
+    for (var i = 0; i < addresses.length; i++) {
+      if (addresses[i])
+        next[addresses[i]] = true;
+    }
+    root.retilePendingFinalizedAddressMap = next;
+  }
+
+  function allRetileFinalizedAddresses(addresses) {
+    var map = {};
+    var old = root.retilePendingFinalizedAddressMap || {};
+    for (var key in old)
+      map[key] = true;
+    if (addresses) {
+      for (var i = 0; i < addresses.length; i++) {
+        if (addresses[i])
+          map[addresses[i]] = true;
+      }
+    }
+    return Object.keys(map);
+  }
+
+  function markRetileFinalizedAddresses(addresses, reason) {
+    if (!addresses || addresses.length === 0)
+      return;
+
+    var next = {};
+    for (var i = 0; i < addresses.length; i++) {
+      if (addresses[i])
+        next[addresses[i]] = true;
+    }
+    root.retileFinalizedAddressMap = next;
+    root.retileFinalizedPositionRevision += 1;
+    root.debugLog("retile", "finalize reason=" + (reason || "") + " addresses=" + root.debugStringify(addresses) + " revision=" + root.retileFinalizedPositionRevision);
+    if (pluginMain && pluginMain.requestSettledRetileOverlayRecapture)
+      pluginMain.requestSettledRetileOverlayRecapture(reason || "retile-settled", root.retileSettledRecaptureAddresses.length > 0 ? root.retileSettledRecaptureAddresses : addresses);
+  }
+
+  function finishRetileTransitionRecords(addresses, reason) {
+    var recaptureAddresses = root.retileSettledRecaptureAddresses;
+    root.clearRetileTransitionRecords();
+    root.retileSettledRecaptureAddresses = recaptureAddresses;
+    root.markRetileFinalizedAddresses(addresses, reason);
+    root.retileSettledRecaptureAddresses = [];
+  }
+
+  function scheduleRetileTransitionReconcile(nextWakeAt) {
+    var delay = Math.max(1, Math.round(Number(nextWakeAt || 0) - Date.now()));
+    if (!isFinite(delay) || delay <= 0)
+      delay = 16;
+    retileTransitionTimeout.interval = Math.min(450, delay);
+    retileTransitionTimeout.restart();
+  }
+
+  function setRetileTransitionRecords(records, recaptureAddresses) {
+    if (!records || Object.keys(records).length === 0) {
+      root.clearRetileTransitionRecords();
+      return;
+    }
+
+    root.retileTransitionRecords = records;
+    root.retilePendingFinalizedAddressMap = ({});
+    root.retileSettledRecaptureAddresses = recaptureAddresses || [];
+    root.debugLog("retile", "transition start addresses=" + root.debugStringify(Object.keys(records)) + " durationMs=140 settleCapMs=450");
+    root.scheduleRetileTransitionReconcile(Date.now() + 140);
+  }
+
+  function buildRetileTransitionRecords(sourceAddress, retilingInfo, releaseType) {
+    return RetileBlueprint.buildTransitionRecords({
+                                                    "sourceAddress": sourceAddress,
+                                                    "retilingInfo": retilingInfo,
+                                                    "releaseType": releaseType,
+                                                    durationMs: 140,
+                                                    settleTimeoutMs: 450,
+                                                    nowMs: Date.now()
+                                                  });
+  }
+
+  function retileTransitionFrameForDelegate(address, workspaceValue) {
+    var record = root.retileTransitionRecords && root.retileTransitionRecords[address];
+    if (!record || !record.toFrame)
+      return null;
+
+    var offsets = root.getWorkspaceOffsets(workspaceValue);
+    return {
+      "x": record.toFrame.x - offsets.x,
+      "y": record.toFrame.y - offsets.y,
+      "w": record.toFrame.w,
+      "h": record.toFrame.h
+    };
+  }
+
+  function absolutePreviewFrameForWindow(win) {
+    if (!win || !win.workspace)
+      return null;
+
+    var workspaceId = win.workspace.id;
+    var localFrame = root.getScaledWindowRectForWorkspace(win, workspaceId);
+    if (!localFrame)
+      return null;
+
+    var offsets = root.getWorkspaceOffsets(workspaceId);
+    return {
+      "x": localFrame.x + offsets.x,
+      "y": localFrame.y + offsets.y,
+      "w": localFrame.w,
+      "h": localFrame.h
+    };
+  }
+
+  function reconcileRetileTransitionRecords() {
+    var records = root.retileTransitionRecords || {};
+    var keys = Object.keys(records);
+    if (keys.length === 0)
+      return;
+
+    var actualFrames = {};
+    for (var i = 0; i < keys.length; i++) {
+      var address = keys[i];
+      var actual = root.absolutePreviewFrameForWindow(root.windowByAddress && root.windowByAddress[address]);
+      if (actual)
+        actualFrames[address] = actual;
+    }
+
+    var transitionResult = RetileBlueprint.reconcileTransitionRecords({
+                                                                        "records": records,
+                                                                        "actualFrames": actualFrames,
+                                                                        "epsilonPx": root.noopGeometryEpsilonPx,
+                                                                        "nowMs": Date.now()
+                                                                      });
+    root.debugLog("retile", "reconcile statuses=" + root.debugStringify(transitionResult.statuses || {}) + " retargeted=" + !!transitionResult.retargeted + " cleared=" + !!transitionResult.cleared);
+    if (transitionResult.cleared) {
+      root.finishRetileTransitionRecords(root.allRetileFinalizedAddresses(transitionResult.finalizedAddresses || keys), "settled");
+    } else {
+      root.rememberRetileFinalizedAddresses(transitionResult.finalizedAddresses || []);
+      root.retileTransitionRecords = transitionResult.records;
+      if (transitionResult.retargeted)
+        root.debugLog("retile", "retarget actual geometry addresses=" + root.debugStringify(Object.keys(transitionResult.records || {})));
+      root.scheduleRetileTransitionReconcile(transitionResult.nextWakeAt || (Date.now() + 16));
+    }
   }
 
   function retileTargetWithDirection(targetInfo, direction) {
@@ -679,10 +943,10 @@ Item {
     return {
       "targetAddress": targetInfo.targetAddress,
       "direction": direction,
+      "confidence": targetInfo.confidence === undefined ? 1 : targetInfo.confidence,
       "operationType": direction === "swap" ? "swap" : "split",
       "isNoop": !!targetInfo.isNoop,
       "noopReason": targetInfo.noopReason || "",
-      "confidence": targetInfo.confidence || 0,
       "targetX": targetX,
       "targetY": targetY,
       "targetW": targetW,
@@ -696,7 +960,8 @@ Item {
       "targetNewW": targetNewW,
       "targetNewH": targetNewH,
       "draggedCurrentRect": draggedCurrentRect,
-      "predictedDraggedRect": predictedDraggedRect
+      "predictedDraggedRect": predictedDraggedRect,
+      "previewModel": RetileBlueprint.buildPreviewModel(targetInfo, direction, root.retileLabels())
     };
   }
 
@@ -705,13 +970,8 @@ Item {
       resetRetileState();
       return;
     }
-    directionDebounce.stop();
     root.retilingDirection = candidate.direction;
-    root.retilingConfidence = candidate.confidence || 0;
-    root.retilingTarget = root.retileTargetWithDirection(candidate, candidate.direction);
-    root.pendingRetileDirection = "";
-    root.pendingRetileConfidence = 0;
-    root.pendingRetileTarget = null;
+    root.retilingTarget = candidate;
     root.dragInteractionState = "lockedDirection";
   }
 
@@ -722,261 +982,73 @@ Item {
       return;
     }
     if (!candidate || candidate.direction === "" || candidate.isNoop) {
-      if (root.retilingDirection !== "") {
-        root.pendingRetileDirection = "";
-        root.pendingRetileConfidence = 0;
-        root.pendingRetileTarget = null;
-        directionDebounce.stop();
-        root.retilingDirection = "";
-        root.retilingConfidence = 0;
-        root.retilingTarget = null;
-        root.dragInteractionState = "targeting";
-      } else {
-        root.retilingTarget = null;
-      }
+      root.retilingDirection = "";
+      root.retilingTarget = null;
+      root.dragInteractionState = root.draggingTargetAddress !== "" ? "targeting" : "idle";
       return;
     }
     if (dragMode === "basic") {
-      directionDebounce.stop();
       root.retilingDirection = candidate.direction;
-      root.retilingConfidence = candidate.confidence || 0;
-      root.retilingTarget = root.retileTargetWithDirection(candidate, candidate.direction);
-      root.pendingRetileDirection = "";
-      root.pendingRetileConfidence = 0;
-      root.pendingRetileTarget = null;
+      root.retilingTarget = candidate;
       root.dragInteractionState = "targeting";
       return;
     }
-    root.dragInteractionState = "targeting";
-    // First candidate or same direction: update immediately for a responsive feel.
-    if (root.retilingDirection === "" || candidate.direction === root.retilingDirection) {
-      commitRetileCandidate(candidate);
-      return;
-    }
-    // New direction: switch only if confidence meaningfully beats current.
-    if ((candidate.confidence || 0) >= root.directionFastCommitConfidence) {
-      commitRetileCandidate(candidate);
-      return;
-    }
-    if ((candidate.confidence || 0) >= (root.retilingConfidence + root.directionSwitchConfidenceMargin)) {
-      root.pendingRetileDirection = candidate.direction;
-      root.pendingRetileConfidence = candidate.confidence || 0;
-      root.pendingRetileTarget = candidate;
-      directionDebounce.restart();
-      return;
-    }
-    // Keep locked direction but update geometry when hovering a different target.
-    root.retilingTarget = root.retileTargetWithDirection(candidate, root.retilingDirection);
+    commitRetileCandidate(candidate);
   }
 
-  // iOS-style spatial target detection - finds target window and determines split direction
-  // Returns: { targetAddress, direction, targetX, targetY, targetW, targetH, previewX, previewY, previewW, previewH, targetNewX, targetNewY, targetNewW, targetNewH }
-  // dragX, dragY are coordinates within windowSpace (already include workspace offset)
-  function calculateRetileTarget(workspaceId, dragX, dragY, dragWidth, dragHeight) {
-    // Guard: don't process if dragged window is fullscreen/maximized
-    var draggedWin = root.windowByAddress[root.draggingTargetAddress];
-    if (draggedWin && (draggedWin.fullscreen || draggedWin.maximized))
-      return null;
+  function dragHotspotInWindowSpace(workspaceItem, drag, dragSource) {
+    if (workspaceItem && drag && isFinite(Number(drag.x)) && isFinite(Number(drag.y)))
+      return workspaceItem.mapToItem(windowSpace, drag.x, drag.y);
 
-    var dragCenterX = dragX + dragWidth / 2;
-    var dragCenterY = dragY + dragHeight / 2;
-    var workspaceOffsets = root.getWorkspaceOffsets(workspaceId);
-    var wsOffsetX = workspaceOffsets.x;
-    var wsOffsetY = workspaceOffsets.y;
-    // Convert drag center to local workspace coordinates (0,0 at top-left of workspace cell)
-    var localDragX = dragCenterX - wsOffsetX;
-    var localDragY = dragCenterY - wsOffsetY;
-    var draggedRectLocal = root.getScaledWindowRectForWorkspace(draggedWin, workspaceId);
-    var draggedRectAbsolute = draggedRectLocal ? {
-                                                   "x": draggedRectLocal.x + wsOffsetX,
-                                                   "y": draggedRectLocal.y + wsOffsetY,
-                                                   "w": draggedRectLocal.w,
-                                                   "h": draggedRectLocal.h
-                                                 } : null;
-    // Collect candidates with distance scoring
-    var candidates = [];
+    if (dragSource)
+      return {
+        "x": dragSource.x + dragSource.dragOriginX,
+        "y": dragSource.y + dragSource.dragOriginY
+      };
+
+    return null;
+  }
+
+  function buildRetileWindowRecords(workspaceId) {
+    var records = [];
     for (var addr in root.windowByAddress) {
       var win = root.windowByAddress[addr];
-      if (!win || !win.workspace || win.workspace.id !== workspaceId)
+      if (!win || !win.workspace)
         continue;
 
-      if (win.address === root.draggingTargetAddress)
-        continue;
-
-      if (win.floating)
-        continue;
-
-      var rect = root.getScaledWindowRectForWorkspace(win, workspaceId);
-      if (!rect)
-        continue;
-
-      var scaledPosX = rect.x;
-      var scaledPosY = rect.y;
-      var winW = rect.w;
-      var winH = rect.h;
-      // Calculate distance from drag center to window center
-      var winCenterX = scaledPosX + winW / 2;
-      var winCenterY = scaledPosY + winH / 2;
-      var distance = Math.sqrt(Math.pow(localDragX - winCenterX, 2) + Math.pow(localDragY - winCenterY, 2));
-      // Check if in bounds or within 14px proximity
-      var inBounds = (localDragX >= scaledPosX && localDragX <= scaledPosX + winW && localDragY >= scaledPosY && localDragY <= scaledPosY + winH);
-      var proximityBuffer = 28 * root.cellScale;
-      var inProximity = distance < Math.max(winW, winH) / 2 + proximityBuffer;
-      if (inBounds || inProximity)
-        candidates.push({
-                          "address": win.address,
-                          "x": scaledPosX,
-                          "y": scaledPosY,
-                          "w": winW,
-                          "h": winH,
-                          "distance": distance,
-                          "inBounds": inBounds,
-                          "currentRect": rect,
-                          "score": inBounds ? 0 : distance
-                        });
-    }
-    // Sort by score (lower = better)
-    candidates.sort(function (a, b) {
-      return a.score - b.score;
-    });
-    if (candidates.length === 0)
-      return null;
-
-    var target = candidates[0];
-    // Calculate relative position within target window
-    var relX = (localDragX - target.x) / target.w;
-    var relY = (localDragY - target.y) / target.h;
-    // Clamp to [0, 1]
-    relX = Math.max(0, Math.min(1, relX));
-    relY = Math.max(0, Math.min(1, relY));
-    // Minimum absolute zone sizes
-    var minEdgeZone = 32;
-    // pixels
-    var minCenterZone = 20;
-    // pixels
-    // Calculate effective zone boundaries (ensuring minimum sizes)
-    var effectiveLeftZone = Math.max(zoneEdgeSize, minEdgeZone / target.w);
-    var effectiveRightZone = Math.max(zoneEdgeSize, minEdgeZone / target.w);
-    var effectiveTopZone = Math.max(zoneEdgeSize, minEdgeZone / target.h);
-    var effectiveBottomZone = Math.max(zoneEdgeSize, minEdgeZone / target.h);
-    // Determine which zone we're in
-    var direction = "";
-    var confidence = 0;
-    var inLeftZone = relX < effectiveLeftZone;
-    var inRightZone = relX > (1 - effectiveRightZone);
-    var inTopZone = relY < effectiveTopZone;
-    var inBottomZone = relY > (1 - effectiveBottomZone);
-    var inCenterZone = !inLeftZone && !inRightZone && !inTopZone && !inBottomZone;
-    // Check if center zone meets minimum size requirement
-    var centerZoneW = target.w * (1 - effectiveLeftZone - effectiveRightZone);
-    var centerZoneH = target.h * (1 - effectiveTopZone - effectiveBottomZone);
-    var centerTooSmall = centerZoneW < minCenterZone || centerZoneH < minCenterZone;
-    if (inCenterZone && !centerTooSmall) {
-      var centerBoundaryX = Math.min(relX - effectiveLeftZone, (1 - effectiveRightZone) - relX);
-      var centerBoundaryY = Math.min(relY - effectiveTopZone, (1 - effectiveBottomZone) - relY);
-      var centerBoundaryDistance = Math.max(0, Math.min(centerBoundaryX, centerBoundaryY));
-      if (centerBoundaryDistance > root.zoneDeadzone) {
-        direction = "swap";
-        var centerDistanceX = Math.abs(relX - 0.5) / 0.5;
-        var centerDistanceY = Math.abs(relY - 0.5) / 0.5;
-        var centerDistance = Math.sqrt(centerDistanceX * centerDistanceX + centerDistanceY * centerDistanceY);
-        confidence = Math.max(0.3, 1 - Math.min(1, centerDistance));
-      }
-    } else {
-      // Corner case: in multiple zones - pick closest edge
-      var edges = [];
-      if (inLeftZone)
-        edges.push({
-                     "dir": "l",
-                     "dist": relX,
-                     "depth": effectiveLeftZone
+      var rect = win.workspace.id === workspaceId ? root.getScaledWindowRectForWorkspace(win, workspaceId) : null;
+      records.push({
+                     "address": win.address || addr,
+                     "workspaceId": win.workspace.id,
+                     "floating": !!win.floating,
+                     "fullscreen": !!win.fullscreen,
+                     "maximized": !!win.maximized,
+                     "rect": rect
                    });
-
-      if (inRightZone)
-        edges.push({
-                     "dir": "r",
-                     "dist": 1 - relX,
-                     "depth": effectiveRightZone
-                   });
-
-      if (inTopZone)
-        edges.push({
-                     "dir": "u",
-                     "dist": relY,
-                     "depth": effectiveTopZone
-                   });
-
-      if (inBottomZone)
-        edges.push({
-                     "dir": "d",
-                     "dist": 1 - relY,
-                     "depth": effectiveBottomZone
-                   });
-
-      edges.sort(function (a, b) {
-        return a.dist - b.dist;
-      });
-      if (edges.length > 0) {
-        var best = edges[0];
-        var boundaryDistance = Math.max(0, best.depth - best.dist);
-        if (boundaryDistance > root.zoneDeadzone) {
-          direction = best.dir;
-          confidence = Math.max(0.1, 1 - Math.min(1, best.dist / Math.max(0.001, best.depth)));
-        }
-      }
     }
-    var targetRectLocal = {
-      "x": target.x,
-      "y": target.y,
-      "w": target.w,
-      "h": target.h
-    };
-    var isNoop = false;
-    var noopReason = "";
-    if (direction !== "" && direction !== "swap" && draggedRectLocal) {
-      isNoop = root.isSplitNoop(direction, draggedRectLocal, targetRectLocal, root.noopGeometryEpsilonPx);
-      if (isNoop)
-        noopReason = "split-already-matches";
-    }
-    var targetInfo = {
-      "targetAddress": target.address,
-      "targetX": target.x + wsOffsetX,
-      "targetY": target.y + wsOffsetY,
-      "targetW": target.w,
-      "targetH": target.h,
-      "direction": direction,
-      "confidence": confidence,
-      "operationType": direction === "swap" ? "swap" : "split",
-      "isNoop": isNoop,
-      "noopReason": noopReason,
-      "draggedCurrentRect": draggedRectAbsolute
-    };
-    var resolvedTarget = root.retileTargetWithDirection(targetInfo, direction);
-    if (!resolvedTarget)
-      return null;
+    return records;
+  }
 
-    if (resolvedTarget.direction !== "" && resolvedTarget.direction !== "swap" && resolvedTarget.draggedCurrentRect && resolvedTarget.predictedDraggedRect) {
-      var currentTargetRect = {
-        "x": resolvedTarget.targetX,
-        "y": resolvedTarget.targetY,
-        "w": resolvedTarget.targetW,
-        "h": resolvedTarget.targetH
-      };
-      var predictedTargetRect = {
-        "x": resolvedTarget.targetNewX,
-        "y": resolvedTarget.targetNewY,
-        "w": resolvedTarget.targetNewW,
-        "h": resolvedTarget.targetNewH
-      };
-      var draggedUnchanged = root.rectNearlyEqual(resolvedTarget.draggedCurrentRect, resolvedTarget.predictedDraggedRect, root.noopGeometryEpsilonPx);
-      var targetUnchanged = root.rectNearlyEqual(currentTargetRect, predictedTargetRect, root.noopGeometryEpsilonPx);
-      if (draggedUnchanged && targetUnchanged) {
-        resolvedTarget.isNoop = true;
-        if (!resolvedTarget.noopReason || resolvedTarget.noopReason === "")
-          resolvedTarget.noopReason = "geometry-identical";
-      }
-    }
-    return resolvedTarget;
+  // aimX, aimY are cursor hotspot coordinates within windowSpace.
+  function calculateRetileTarget(workspaceId, aimX, aimY) {
+    var draggedWin = root.windowByAddress[root.draggingTargetAddress];
+    var workspaceOffsets = root.getWorkspaceOffsets(workspaceId);
+    return RetileBlueprint.resolveTarget({
+                                           "workspaceId": workspaceId,
+                                           "hotspotX": aimX,
+                                           "hotspotY": aimY,
+                                           "workspaceOffset": workspaceOffsets,
+                                           "draggedAddress": root.draggingTargetAddress,
+                                           "draggedWindow": draggedWin,
+                                           "windows": root.buildRetileWindowRecords(workspaceId),
+                                           "edgeRatio": root.zoneEdgeSize,
+                                           "minSplitRatio": root.minimumSplitZoneRatio,
+                                           "minEdgePx": 32,
+                                           "deadzonePx": 6,
+                                           "previousDirection": root.retilingDirection,
+                                           "noopGeometryEpsilonPx": root.noopGeometryEpsilonPx,
+                                           "labels": root.retileLabels()
+                                         });
   }
 
   // Update pluginMain with the minimum fit scale across all screens (for Settings UI warning)
@@ -984,34 +1056,14 @@ Item {
     if (pluginMain && pluginMain.reportFitScale)
       pluginMain.reportFitScale(fitScale);
   }
-  implicitWidth: (overviewBackground.implicitWidth + 20) * fitScale
-  implicitHeight: (overviewBackground.implicitHeight + 20) * fitScale
 
+  onClientRefreshRevisionChanged: reconcileRetileTransitionRecords()
   Timer {
-    id: directionDebounce
+    id: retileTransitionTimeout
 
-    interval: 85
+    interval: 140
     repeat: false
-    onTriggered: {
-      if (!root.pendingRetileTarget || root.pendingRetileDirection === "")
-        return;
-
-      root.retilingDirection = root.pendingRetileDirection;
-      root.retilingConfidence = root.pendingRetileConfidence;
-      root.retilingTarget = root.retileTargetWithDirection(root.pendingRetileTarget, root.retilingDirection);
-      root.dragInteractionState = "lockedDirection";
-      root.pendingRetileDirection = "";
-      root.pendingRetileConfidence = 0;
-      root.pendingRetileTarget = null;
-    }
-  }
-
-  Process {
-    id: hyprBatchDispatch
-
-    property string payload: ""
-
-    command: ["hyprctl", "--batch", payload]
+    onTriggered: root.reconcileRetileTransitionRecords()
   }
 
   // Scaled container for fit-to-screen
@@ -1019,27 +1071,40 @@ Item {
     id: scaledContainer
 
     anchors.centerIn: parent
-    width: overviewBackground.implicitWidth + 20
-    height: overviewBackground.implicitHeight + 20
+    width: overviewBackground.implicitWidth
+    height: overviewBackground.implicitHeight
     scale: root.fitScale
 
-    // Background container properly styled directly
-    Rectangle {
+    NDropShadow {
+      anchors.fill: overviewBackground
+      source: overviewSurface
+      shadowEnabled: true
+      z: -1
+    }
+
+    Item {
       id: overviewBackground
 
-      property real padding: Math.max(0, root.workspaceSpacing)
+      readonly property real padding: root.surfacePadding
 
       anchors.fill: parent
-      anchors.margins: 10
       implicitWidth: workspaceColumnLayout.implicitWidth + padding * 2
       implicitHeight: workspaceColumnLayout.implicitHeight + padding * 2
+
+      // Surface layer follows Noctalia's shell panel model without fading child content.
+      Rectangle {
+        id: overviewSurface
+
+        anchors.fill: parent
+        radius: root.workspaceCellRadius
+        antialiasing: radius > 0
+        color: Color.mSurface
+        opacity: root.clamp((Color.panelBackgroundOpacity || Commons.Settings.data.ui.panelBackgroundOpacity || 0.8) * root.backgroundOpacityRatio, 0, 1)
+        border.width: root.containerBorderWidth
+        border.color: Qt.rgba(Color.mOutline.r, Color.mOutline.g, Color.mOutline.b, 0.52)
+      }
+
       // Keep outer container shape aligned with workspace/indicator corners.
-      radius: root.workspaceCellRadius
-      antialiasing: radius > 0
-      color: Qt.alpha(Color.mSurface, (pluginMain && pluginMain.enableGlassMode ? 0.65 : (Commons.Settings.data.ui.panelBackgroundOpacity || 0.8)))
-      border.width: root.containerBorderWidth
-      border.color: Qt.rgba(Color.mOutline.r, Color.mOutline.g, Color.mOutline.b, root.applyGlassBorderOpacity(0.52))
-      layer.enabled: Commons.Settings.data.general.enableShadows && !PowerProfileService.noctaliaPerformanceMode
 
       // === WORKSPACE GRID ===
       ColumnLayout {
@@ -1081,36 +1146,13 @@ Item {
 
                 implicitWidth: root.workspaceImplicitWidth
                 implicitHeight: root.workspaceImplicitHeight
-                color: root.applyGlassEffect(hoveredWhileDragging ? Qt.lighter(Color.mSurfaceVariant, 1.05) : Color.mSurfaceVariant, hoveredWhileDragging)
+                color: hoveredWhileDragging ? Qt.lighter(Color.mSurfaceVariant, 1.05) : Color.mSurfaceVariant
                 opacity: baseOpacity
                 // Use scaled screen radius for the workspace preview
                 radius: root.workspaceCellRadius
                 antialiasing: radius > 0
                 border.width: hoveredWhileDragging ? Math.max(1, Style.borderS) : (isActiveCell ? 0 : Math.max(1, Style.borderS))
-                border.color: hoveredWhileDragging ? Qt.lighter(root.accentColor, 1.1) : Qt.rgba(Color.mOutline.r, Color.mOutline.g, Color.mOutline.b, root.applyGlassBorderOpacity(0.15))
-
-                // Wallpaper image (only shown when enabled and no windows)
-                Image {
-                  id: workspaceWallpaper
-
-                  property string wallpaperSource: root.getWallpaperSource(workspace.workspaceValue)
-
-                  visible: pluginMain.showEmptyWorkspaceWallpaper && !root.workspaceHasWindows(workspace.workspaceValue) && wallpaperSource !== ""
-                  anchors.fill: parent
-                  source: wallpaperSource
-                  fillMode: Image.PreserveAspectCrop
-                  asynchronous: true
-                  cache: true
-                  smooth: true
-                  mipmap: true
-
-                  // Overlay to tint the wallpaper
-                  Rectangle {
-                    anchors.fill: parent
-                    color: Qt.alpha(workspace.color, pluginMain?.emptyWorkspaceWallpaperOpacity ?? 0.18)
-                    radius: 0
-                  }
-                }
+                border.color: hoveredWhileDragging ? Qt.lighter(root.accentColor, 1.1) : Qt.rgba(Color.mOutline.r, Color.mOutline.g, Color.mOutline.b, 0.15)
 
                 Rectangle {
                   visible: pluginMain.showRowColumnGuides
@@ -1159,12 +1201,12 @@ Item {
                       return "transparent";
 
                     if (workspace.isSpecialSlot)
-                      return root.applyGlassEffect(Qt.rgba(root.accentColor.r, root.accentColor.g, root.accentColor.b, workspace.isActiveCell ? 0.3 : 0.2), false);
+                      return Qt.rgba(root.accentColor.r, root.accentColor.g, root.accentColor.b, workspace.isActiveCell ? 0.3 : 0.2);
 
-                    return root.applyGlassEffect(Qt.rgba(Color.mSurface.r, Color.mSurface.g, Color.mSurface.b, workspace.isActiveCell ? 0.85 : 0.5), false);
+                    return Qt.rgba(Color.mSurface.r, Color.mSurface.g, Color.mSurface.b, workspace.isActiveCell ? 0.85 : 0.5);
                   }
                   border.width: pluginMain.specialWorkspaceStyle === "plain" ? 0 : 1
-                  border.color: workspace.isSpecialSlot ? Qt.rgba(root.accentColor.r, root.accentColor.g, root.accentColor.b, workspace.isActiveCell ? 0.8 : 0.4) : Qt.rgba(Color.mOutline.r, Color.mOutline.g, Color.mOutline.b, root.applyGlassBorderOpacity(workspace.isActiveCell ? 0.6 : 0.2))
+                  border.color: workspace.isSpecialSlot ? Qt.rgba(root.accentColor.r, root.accentColor.g, root.accentColor.b, workspace.isActiveCell ? 0.8 : 0.4) : Qt.rgba(Color.mOutline.r, Color.mOutline.g, Color.mOutline.b, workspace.isActiveCell ? 0.6 : 0.2)
                   width: Math.min(parent.width * 0.86, labelText.implicitWidth + 16)
                   height: Math.max(20, Math.min(30, parent.height * 0.2))
 
@@ -1187,7 +1229,7 @@ Item {
                   id: migrationIndicator
 
                   anchors.fill: parent
-                  visible: root.draggingCrossMonitor && !workspace.isSpecialSlot && root.draggingTargetWorkspace === workspace.workspaceValue
+                  visible: pluginMain.enableCrossMonitorDrag && root.draggingCrossMonitor && !workspace.isSpecialSlot && root.draggingTargetWorkspace === workspace.workspaceValue
                   color: "transparent"
                   border.width: 3
                   border.color: {
@@ -1215,20 +1257,20 @@ Item {
                   z: 10
 
                   onBadgeClicked: (wsId, layout, gx, gy, bw, bh) => {
-                                    if (layoutSwitcherPopup.visible && layoutSwitcherPopup.targetWorkspaceId === wsId) {
-                                      layoutSwitcherPopup.visible = false;
-                                    } else {
-                                      var pos = layoutBadge.mapToItem(overviewBackground, gx, gy);
-                                      var px = Math.min(pos.x + bw - layoutSwitcherPopup.width, overviewBackground.width - layoutSwitcherPopup.width - 4);
-                                      var py = Math.min(pos.y, overviewBackground.height - layoutSwitcherPopup.height - 4);
-                                      layoutSwitcherPopup.x = Math.max(4, px);
-                                      layoutSwitcherPopup.y = Math.max(4, py);
-                                      layoutSwitcherPopup.targetWorkspaceId = wsId;
-                                      layoutSwitcherPopup.currentLayout = layout;
-                                      layoutSwitcherPopup.targetSwitcher = layoutBadge;
-                                      layoutSwitcherPopup.visible = true;
-                                    }
-                                  }
+                    if (layoutSwitcherPopup.visible && layoutSwitcherPopup.targetWorkspaceId === wsId) {
+                      layoutSwitcherPopup.visible = false;
+                    } else {
+                      var pos = layoutBadge.mapToItem(overviewBackground, gx, gy);
+                      var px = Math.min(pos.x + bw - layoutSwitcherPopup.width, overviewBackground.width - layoutSwitcherPopup.width - 4);
+                      var py = Math.min(pos.y, overviewBackground.height - layoutSwitcherPopup.height - 4);
+                      layoutSwitcherPopup.x = Math.max(4, px);
+                      layoutSwitcherPopup.y = Math.max(4, py);
+                      layoutSwitcherPopup.targetWorkspaceId = wsId;
+                      layoutSwitcherPopup.currentLayout = layout;
+                      layoutSwitcherPopup.targetSwitcher = layoutBadge;
+                      layoutSwitcherPopup.visible = true;
+                    }
+                  }
                 }
 
                 MouseArea {
@@ -1243,11 +1285,14 @@ Item {
                       return;
                     }
 
-                    pluginMain.close();
                     if (workspace.isSpecialSlot && workspace.specialWorkspace)
-                      Hyprland.dispatch("togglespecialworkspace " + workspace.specialWorkspace.name);
+                      root.runHyprBatch(["togglespecialworkspace " + workspace.specialWorkspace.name], {
+                                          "closeAfterDispatch": true
+                                        });
                     else
-                      Hyprland.dispatch("workspace " + workspace.workspaceValue);
+                      root.runHyprBatch(["workspace " + workspace.workspaceValue], {
+                                          "closeAfterDispatch": true
+                                        });
                   }
                 }
 
@@ -1255,6 +1300,21 @@ Item {
                 DropArea {
                   anchors.fill: parent
                   onEntered: {
+                    var targetWsId = workspace.isSpecialSlot ? (workspace.specialWorkspace ? workspace.specialWorkspace.id : -1) : workspace.workspaceValue;
+                    var targetMonitorId = root.getMonitorIdForWorkspace(targetWsId);
+                    root.draggingSourceMonitorId = root.monitor ? root.monitor.id : -1;
+                    var isCrossMonitorTarget = targetMonitorId !== -1 && targetMonitorId !== root.draggingSourceMonitorId;
+                    if (isCrossMonitorTarget && !pluginMain.enableCrossMonitorDrag) {
+                      root.draggingTargetWorkspace = -1;
+                      root.draggingTargetSpecial = null;
+                      root.draggingIntraWorkspace = -1;
+                      root.draggingCrossMonitor = false;
+                      root.draggingTargetMonitorId = -1;
+                      workspace.hoveredWhileDragging = false;
+                      root.resetRetileState();
+                      return;
+                    }
+
                     if (workspace.isSpecialSlot) {
                       root.draggingTargetWorkspace = -1;
                       root.draggingTargetSpecial = workspace.specialWorkspace;
@@ -1267,10 +1327,7 @@ Item {
                         root.draggingIntraWorkspace = root.draggingFromWorkspace;
                     }
                     // Cross-monitor detection
-                    var targetWsId = workspace.isSpecialSlot ? (workspace.specialWorkspace ? workspace.specialWorkspace.id : -1) : workspace.workspaceValue;
-                    var targetMonitorId = root.getMonitorIdForWorkspace(targetWsId);
-                    root.draggingSourceMonitorId = root.monitor ? root.monitor.id : -1;
-                    if (targetMonitorId !== -1 && targetMonitorId !== root.draggingSourceMonitorId) {
+                    if (isCrossMonitorTarget && pluginMain.enableCrossMonitorDrag) {
                       root.draggingCrossMonitor = true;
                       root.draggingTargetMonitorId = targetMonitorId;
                     } else {
@@ -1294,31 +1351,32 @@ Item {
                     root.resetRetileState();
                   }
                   onPositionChanged: drag => {
-                                       if (workspace.isSpecialSlot || root.draggingFromWorkspace != workspace.workspaceValue)
-                                       return;
+                    if (workspace.isSpecialSlot || root.draggingFromWorkspace != workspace.workspaceValue)
+                      return;
 
-                                       if ((pluginMain.dragPreviewMode || "smart") === "off") {
-                                         root.resetRetileState();
-                                         return;
-                                       }
-                                       var draggedWin = root.windowByAddress[root.draggingTargetAddress];
-                                       if (draggedWin && draggedWin.floating) {
-                                         root.resetRetileState();
-                                         return;
-                                       }
-                                       // Only show retile preview for layouts that support it (dwindle)
-                                       var wsLayout = root.getWorkspaceLayout(workspace.workspaceValue);
-                                       var strategy = LayoutStrategy.get(wsLayout);
-                                       if (!strategy.supportsRetilePreview) {
-                                         root.resetRetileState();
-                                         return;
-                                       }
-                                       var dragSource = drag.source;
-                                       if (dragSource) {
-                                         var candidate = root.calculateRetileTarget(workspace.workspaceValue, dragSource.x, dragSource.y, dragSource.width, dragSource.height);
-                                         root.updateRetileCandidate(candidate);
-                                       }
-                                     }
+                    if ((pluginMain.dragPreviewMode || "smart") === "off") {
+                      root.resetRetileState();
+                      return;
+                    }
+                    var draggedWin = root.windowByAddress[root.draggingTargetAddress];
+                    if (draggedWin && draggedWin.floating) {
+                      root.resetRetileState();
+                      return;
+                    }
+                    // Only show retile preview for layouts that support it (dwindle)
+                    var wsLayout = root.getWorkspaceLayout(workspace.workspaceValue);
+                    var strategy = LayoutStrategy.get(wsLayout);
+                    if (!strategy.supportsRetilePreview) {
+                      root.resetRetileState();
+                      return;
+                    }
+                    var dragSource = drag.source;
+                    if (dragSource) {
+                      var hotspot = root.dragHotspotInWindowSpace(workspace, drag, dragSource);
+                      var candidate = hotspot ? root.calculateRetileTarget(workspace.workspaceValue, hotspot.x, hotspot.y) : null;
+                      root.updateRetileCandidate(candidate);
+                    }
+                  }
                 }
               }
             }
@@ -1335,8 +1393,8 @@ Item {
         implicitHeight: workspaceColumnLayout.implicitHeight
         width: implicitWidth
         height: implicitHeight
-        // Keep indicator stroke geometry identical to workspace cells (no edge clipping).
-        // Window previews remain clipped per-item in WindowPreview.qml.
+        // Keep indicator stroke geometry identical to workspace cells while
+        // WindowPreview keeps its root frame stable for input and drag math.
         clip: false
 
         // Window repeater
@@ -1355,21 +1413,16 @@ Item {
                   return false;
 
                 return effectiveValue >= root.groupFirstWorkspaceId && effectiveValue <= root.groupLastWorkspaceId;
+              }).map(function (toplevel) {
+                var addr = "0x" + toplevel.HyprlandToplevel.address;
+                return {
+                  "toplevel": toplevel,
+                  "win": root.windowByAddress[addr]
+                };
               }).sort(function (a, b) {
-                var addrA = "0x" + a.HyprlandToplevel.address;
-                var addrB = "0x" + b.HyprlandToplevel.address;
-                var winA = root.windowByAddress[addrA];
-                var winB = root.windowByAddress[addrB];
-                // Pinned windows always on top
-                if ((winA && winA.pinned) !== (winB && winB.pinned))
-                  return (winA && winA.pinned) ? 1 : -1;
-
-                // Floating windows above tiled
-                if ((winA && winA.floating) !== (winB && winB.floating))
-                  return (winA && winA.floating) ? 1 : -1;
-
-                // Sort by focus history (lower = more recent = higher)
-                return ((winB && winB.focusHistoryID) || 0) - ((winA && winA.focusHistoryID) || 0);
+                return HyprlandState.compareWindowRecords(a, b);
+              }).map(function (record) {
+                return record.toplevel;
               });
             }
           }
@@ -1387,15 +1440,15 @@ Item {
               return m.id === monitorId;
             })
             property var address: "0x" + modelData.HyprlandToplevel.address
-            // Monitor dimensions (physical resolution / scale)
-            property real rawMonitorWidth: ((windowMonitor && windowMonitor.width) || 1920) / ((windowMonitor && windowMonitor.scale) || 1)
-            property real rawMonitorHeight: ((windowMonitor && windowMonitor.height) || 1080) / ((windowMonitor && windowMonitor.scale) || 1)
-            // For transformed monitors, swap dimensions
-            property real sourceMonitorWidth: (windowMonitor && windowMonitor.transform % 2 === 1) ? rawMonitorHeight : rawMonitorWidth
-            property real sourceMonitorHeight: (windowMonitor && windowMonitor.transform % 2 === 1) ? rawMonitorWidth : rawMonitorHeight
-            // Available area (minus reserved/bars) - for positioning windows correctly
-            property real availableMonitorWidth: sourceMonitorWidth - ((windowMonitor && windowMonitor.reserved && windowMonitor.reserved[0]) || 0) - ((windowMonitor && windowMonitor.reserved && windowMonitor.reserved[2]) || 0)
-            property real availableMonitorHeight: sourceMonitorHeight - ((windowMonitor && windowMonitor.reserved && windowMonitor.reserved[1]) || 0) - ((windowMonitor && windowMonitor.reserved && windowMonitor.reserved[3]) || 0)
+            property var sourceWorkArea: WorkspaceGeometry.getMonitorWorkArea(windowMonitor || {
+                                                                                "width": 1920,
+                                                                                "height": 1080,
+                                                                                "scale": 1,
+                                                                                "transform": 0,
+                                                                                "reserved": [0, 0, 0, 0]
+                                                                              })
+            property real sourceMonitorWidth: sourceWorkArea.width
+            property real sourceMonitorHeight: sourceWorkArea.height
             property bool atInitPosition: (initX == x && initY == y)
             property int rawWorkspaceId: (rawWindowData && rawWindowData.workspace && rawWindowData.workspace.id) || 1
             property int effectiveWorkspaceValue: root.getEffectiveWorkspaceValueForWindow(rawWindowData) || root.groupFirstWorkspaceId
@@ -1438,6 +1491,10 @@ Item {
             windowScale: Math.min(root.workspaceImplicitWidth / sourceMonitorWidth, root.workspaceImplicitHeight / sourceMonitorHeight)
             positionScaleX: root.workspaceImplicitWidth / sourceMonitorWidth
             positionScaleY: root.workspaceImplicitHeight / sourceMonitorHeight
+            workAreaX: sourceWorkArea.x
+            workAreaY: sourceWorkArea.y
+            workAreaWidth: sourceWorkArea.width
+            workAreaHeight: sourceWorkArea.height
             availableWorkspaceWidth: root.workspaceImplicitWidth
             availableWorkspaceHeight: root.workspaceImplicitHeight
             workspaceExclusiveGap: root.workspaceExclusiveGap
@@ -1445,14 +1502,18 @@ Item {
             centeringY: root.centeringYOffset
             widgetMonitorId: root.monitor ? root.monitor.id : 0
             overviewOpen: root.pluginMain.overviewOpen
-            useSimplifiedPreview: root.useSimplifiedPreview
-            visualMode: root.visualMode
-            shaderPreset: root.shaderPreset
-            shaderPresetStrength: root.shaderPresetStrength
-            simplifiedPixelDensity: root.simplifiedPixelDensity
-            simplifiedColorDepth: root.simplifiedColorDepth
-            simplifiedSaturation: root.simplifiedSaturation
-            simplifiedContrast: root.simplifiedContrast
+            captureRevision: root.overlayCaptureRevision + root.overlayCaptureRevisionForAddress(address)
+            retileTransitionFrame: root.retileTransitionFrameForDelegate(address, effectiveWorkspaceValue)
+            retileTransitionActive: root.retileTransitionActive
+            positionResyncRevision: (root.retileFinalizedAddressMap && root.retileFinalizedAddressMap[address]) ? root.retileFinalizedPositionRevision : 0
+            useSimplifiedPreview: root.pluginMain.useSimplifiedPreview
+            visualMode: root.pluginMain.visualMode
+            shaderPreset: root.pluginMain.shaderPreset
+            shaderPresetStrength: root.pluginMain.shaderPresetStrength
+            simplifiedPixelDensity: root.pluginMain.simplifiedPixelDensity
+            simplifiedColorDepth: root.pluginMain.simplifiedColorDepth
+            simplifiedSaturation: root.pluginMain.simplifiedSaturation
+            simplifiedContrast: root.pluginMain.simplifiedContrast
             hyprGapsIn: (hyprConfig && hyprConfig.gapsIn) || 0
             hyprBorderSize: (hyprConfig && hyprConfig.borderSize) || 2
             windowBorderSize: (hyprConfig && hyprConfig.borderSize) || 2
@@ -1467,7 +1528,7 @@ Item {
             showUrgencyBadge: root.pluginMain.showUrgencyBadge
             showFloatingBadge: root.pluginMain.showFloatingBadge
             showFullscreenBadge: root.pluginMain.showFullscreenBadge
-            showMonitorBadge: root.pluginMain.showMonitorBadge
+            showMonitorBadge: root.pluginMain.showMonitorIndicators
             inactiveWorkspaceDimAmount: root.pluginMain.dimInactiveWorkspaces
             inactiveWorkspaceSaturation: root.pluginMain.inactiveWorkspaceSaturation
             hoverLiftAmount: root.pluginMain.hoverLiftAmount
@@ -1496,6 +1557,7 @@ Item {
             retilingTarget: root.retilingTarget
             isRetileTarget: root.retilingTarget && root.retilingTarget.targetAddress === address
             retilingDirection: root.retilingDirection
+            dragFeedbackOpacity: (windowDelegate.isDragging && root.retilingTarget !== null && !(windowDelegate.windowData && windowDelegate.windowData.floating)) ? 0.42 : 1
 
             Timer {
               id: updateWindowPosition
@@ -1536,213 +1598,263 @@ Item {
               }
             }
 
-            MouseArea {
-              // Skip no-op previews/commits to avoid misleading split hints.
+            // Track drag velocity for tilt effect. DragHandler owns movement so
+            // scaled overview transforms do not distort manual pointer deltas.
+            property real dragPreviousX: 0
+            property real dragLastUpdateTime: 0
+            property real dragStartItemX: 0
+            property real dragStartItemY: 0
+            property bool dragMoved: false
+            property bool finishingDrag: false
 
-              id: dragArea
+            function beginWindowDrag(point) {
+              root.clearRetileTransitionRecords();
+              root.draggingFromWorkspace = ((windowDelegate.windowData && windowDelegate.windowData.workspace && windowDelegate.windowData.workspace.id) || -1);
+              root.draggingTargetAddress = (windowDelegate.windowData && windowDelegate.windowData.address) || "";
+              root.dragInteractionState = "targeting";
+              root.resetRetileState();
+              dragStartItemX = windowDelegate.x;
+              dragStartItemY = windowDelegate.y;
+              dragMoved = false;
+              windowDelegate.pressed = true;
+              windowDelegate.isDragging = true;
+              windowDelegate.dragOriginX = point ? point.x : windowDelegate.width / 2;
+              windowDelegate.dragOriginY = point ? point.y : windowDelegate.height / 2;
+              windowDelegate.Drag.source = windowDelegate;
+              windowDelegate.Drag.hotSpot.x = windowDelegate.dragOriginX;
+              windowDelegate.Drag.hotSpot.y = windowDelegate.dragOriginY;
+              windowDelegate.Drag.active = true;
+              dragPreviousX = windowDelegate.x;
+              dragLastUpdateTime = Date.now();
+            }
 
-              // Track drag velocity for tilt effect
-              property real previousX: 0
-              property real lastUpdateTime: 0
+            function updateWindowDragFeedback() {
+              if (!windowDelegate.isDragging || finishingDrag)
+                return;
 
-              anchors.fill: parent
-              hoverEnabled: true
-              onEntered: windowDelegate.hovered = true
-              onExited: windowDelegate.hovered = false
-              acceptedButtons: Qt.LeftButton | Qt.MiddleButton
-              drag.target: parent
-              drag.threshold: 0
-              drag.smoothed: false
-              onPressed: mouse => {
-                           root.draggingFromWorkspace = ((windowDelegate.windowData && windowDelegate.windowData.workspace && windowDelegate.windowData.workspace.id) || -1);
-                           root.draggingTargetAddress = (windowDelegate.windowData && windowDelegate.windowData.address) || "";
-                           root.dragInteractionState = "targeting";
-                           root.resetRetileState();
-                           windowDelegate.pressed = true;
-                           windowDelegate.isDragging = true;
-                           windowDelegate.Drag.active = true;
-                           windowDelegate.Drag.source = windowDelegate;
-                           windowDelegate.Drag.hotSpot.x = mouse.x;
-                           windowDelegate.Drag.hotSpot.y = mouse.y;
-                           previousX = parent.x;
-                           lastUpdateTime = Date.now();
-                         }
-              onPositionChanged: {
-                if (!windowDelegate.isDragging)
-                  return;
+              if (Math.abs(windowDelegate.x - dragStartItemX) > 2 || Math.abs(windowDelegate.y - dragStartItemY) > 2)
+                dragMoved = true;
 
-                var currentTime = Date.now();
-                var deltaTime = Math.max(1, currentTime - lastUpdateTime);
-                var deltaX = parent.x - previousX;
-                var velocity = deltaX / (deltaTime / 16);
-                windowDelegate.dragVelocity = velocity;
-                windowDelegate.dragTilt = Math.min(Math.max(velocity * 1.5, -3), 3);
-                previousX = parent.x;
-                lastUpdateTime = currentTime;
-              }
-              onReleased: {
-                var targetWorkspace = root.draggingTargetWorkspace;
-                var targetSpecial = root.draggingTargetSpecial;
-                var retilingInfo = root.retilingTarget;
-                windowDelegate.pressed = false;
-                windowDelegate.isDragging = false;
-                windowDelegate.dragTilt = 0;
-                windowDelegate.Drag.active = false;
-                var currentWsId = (windowDelegate.windowData && windowDelegate.windowData.workspace && windowDelegate.windowData.workspace.id) || -1;
-                var currentWsName = (windowDelegate.windowData && windowDelegate.windowData.workspace && windowDelegate.windowData.workspace.name) || "";
-                var currentSpecialName = root.normalizeSpecialName(currentWsName);
-                var windowAddress = (windowDelegate.windowData && windowDelegate.windowData.address) || "";
-                var isFloating = (windowDelegate.windowData && windowDelegate.windowData.floating) || false;
-                root.draggingFromWorkspace = -1;
-                root.draggingTargetWorkspace = -1;
-                root.draggingTargetSpecial = null;
-                root.draggingIntraWorkspace = -1;
-                root.draggingTargetAddress = "";
-                root.resetRetileState();
-                if (targetSpecial) {
-                  if (currentWsId >= 0 || currentSpecialName !== targetSpecial.name) {
-                    Hyprland.dispatch("movetoworkspacesilent special:" + targetSpecial.name + ", address:" + windowAddress);
-                    updateWindowPosition.restart();
-                  } else {
-                    windowDelegate.x = windowDelegate.initX;
-                    windowDelegate.y = windowDelegate.initY;
-                  }
-                } else if (targetWorkspace !== -1 && targetWorkspace !== currentWsId) {
-                  Hyprland.dispatch("movetoworkspacesilent " + targetWorkspace + ", address:" + windowAddress);
-                  updateWindowPosition.restart();
-                } else if (targetWorkspace !== -1 && targetWorkspace === currentWsId && !isFloating && (pluginMain.dragPreviewMode || "smart") !== "off") {
-                  // Layout-aware intra-workspace drag via strategy pattern
-                  var wsLayout = root.getWorkspaceLayout(currentWsId);
-                  var strategy = LayoutStrategy.get(wsLayout);
+              var currentTime = Date.now();
+              var deltaTime = Math.max(1, currentTime - dragLastUpdateTime);
+              var deltaX = windowDelegate.x - dragPreviousX;
+              var velocity = deltaX / (deltaTime / 16);
+              windowDelegate.dragVelocity = velocity;
+              windowDelegate.dragTilt = Math.min(Math.max(velocity * 1.5, -3), 3);
+              dragPreviousX = windowDelegate.x;
+              dragLastUpdateTime = currentTime;
+              root.currentDropIntent = root.buildDropIntentForDelegate(windowDelegate, root.retilingTarget);
+            }
 
-                  if (strategy.supportsRetilePreview && retilingInfo && retilingInfo.targetAddress) {
-                    // Dwindle: directional split / swap (uses retile preview data)
-                    if (retilingInfo.isNoop) {
-                      // no-op
-                    } else if (retilingInfo.direction === "swap") {
-                      if (root.isValidSwapTarget(retilingInfo, windowAddress, currentWsId))
-                        root.runHyprBatch(strategy.getDropAction({
-                                                                   sourceAddress: windowAddress,
-                                                                   retilingInfo: {
-                                                                     targetAddress: retilingInfo.targetAddress,
-                                                                     direction: "swap",
-                                                                     isNoop: false
-                                                                   },
-                                                                   wsId: currentWsId
-                                                                 }).commands);
-                    } else if (root.isValidSplitTarget(retilingInfo, currentWsId)) {
-                      root.runHyprBatch(strategy.getDropAction({
-                                                                 sourceAddress: windowAddress,
-                                                                 retilingInfo: retilingInfo,
-                                                                 wsId: currentWsId
-                                                               }).commands);
-                    }
-                  } else if (!strategy.supportsRetilePreview) {
-                    // Non-dwindle layouts: use strategy drop action based on drag delta
-                    var action = strategy.getDropAction({
-                                                          sourceAddress: windowAddress,
-                                                          retilingInfo: retilingInfo,
-                                                          wsId: currentWsId,
-                                                          dragDeltaX: windowDelegate.x - windowDelegate.initX,
-                                                          dragDeltaY: windowDelegate.y - windowDelegate.initY,
-                                                          scrollDirection: (pluginMain && pluginMain.workspaceScrollDirections && pluginMain.workspaceScrollDirections[currentWsId]) || "right"
-                                                        });
-                    if (action.type !== "noop" && action.commands.length > 0)
-                      root.runHyprBatch(action.commands);
-                  }
-
-                  windowDelegate.x = windowDelegate.initX;
-                  windowDelegate.y = windowDelegate.initY;
-                  updateWindowPosition.restart();
-                  if (pluginMain && pluginMain.refreshWindows)
-                    pluginMain.refreshWindows();
-                } else if (isFloating) {
-                  var dropPos = root.resolveFloatingDropPosition(windowDelegate);
-                  if (dropPos && windowAddress !== "") {
-                    if (pluginMain && pluginMain.applyOptimisticWindowMove)
-                      pluginMain.applyOptimisticWindowMove(windowAddress, dropPos.x, dropPos.y, currentWsId);
-
-                    root.runHyprBatch(["movewindowpixel exact " + dropPos.x + " " + dropPos.y + ",address:" + windowAddress]);
-                    updateWindowPosition.restart();
-                    if (pluginMain && pluginMain.refreshWindows) {
-                      pluginMain.refreshWindows();
-                      floatingReconcileRefresh.restart();
-                    }
-                  } else {
-                    windowDelegate.x = windowDelegate.initX;
-                    windowDelegate.y = windowDelegate.initY;
-                  }
-                } else {
-                  windowDelegate.x = windowDelegate.initX;
-                  windowDelegate.y = windowDelegate.initY;
-                }
-              }
-              onCanceled: {
-                windowDelegate.pressed = false;
-                windowDelegate.isDragging = false;
-                windowDelegate.dragTilt = 0;
-                windowDelegate.Drag.active = false;
-                root.draggingFromWorkspace = -1;
-                root.draggingTargetWorkspace = -1;
-                root.draggingTargetSpecial = null;
-                root.draggingIntraWorkspace = -1;
-                root.draggingTargetAddress = "";
-                root.resetRetileState();
+            function resetWindowDragState(cancelled) {
+              if (cancelled)
+                root.debugLog("drag", "reset/cancel address=" + ((windowDelegate.windowData && windowDelegate.windowData.address) || "") + " reason=cancelled");
+              windowDelegate.pressed = false;
+              windowDelegate.isDragging = false;
+              windowDelegate.dragTilt = 0;
+              windowDelegate.dragVelocity = 0;
+              windowDelegate.Drag.active = false;
+              root.draggingFromWorkspace = -1;
+              root.draggingTargetWorkspace = -1;
+              root.draggingTargetSpecial = null;
+              root.draggingIntraWorkspace = -1;
+              root.draggingTargetAddress = "";
+              root.draggingCrossMonitor = false;
+              root.draggingTargetMonitorId = -1;
+              root.currentDropIntent = null;
+              root.resetRetileState();
+              if (cancelled) {
                 windowDelegate.x = windowDelegate.initX;
                 windowDelegate.y = windowDelegate.initY;
               }
-              onClicked: event => {
-                           if (!windowDelegate.windowData)
-                           return;
+            }
 
-                           if (event.button === Qt.LeftButton) {
-                             var address = windowDelegate.windowData.address;
-                             var wsId = (windowDelegate.windowData.workspace && windowDelegate.windowData.workspace.id) || -1;
-                             var wsName = (windowDelegate.windowData.workspace && windowDelegate.windowData.workspace.name) || "";
-                             Logger.i("WorkspaceOverview", "Clicked window " + address + ", dispatching close then focus.");
-                             if (pluginMain)
-                             pluginMain.close();
+            function startRetileTransitionMotion() {
+              suppressPositionAnimation = false;
+              windowDelegate.x = windowDelegate.initX;
+              windowDelegate.y = windowDelegate.initY;
+            }
 
-                             if (wsName.startsWith("special:"))
-                             Hyprland.dispatch("togglespecialworkspace " + wsName.substring(8));
-                             else if (wsId >= 0)
-                             Hyprland.dispatch("workspace " + wsId);
-                             Hyprland.dispatch("focuswindow address:" + address);
-                             event.accepted = true;
-                           } else if (event.button === Qt.MiddleButton) {
-                             Hyprland.dispatch("closewindow address:" + windowDelegate.windowData.address);
-                             event.accepted = true;
-                           }
-                         }
+            function finishWindowDrag(cancelled) {
+              if (!windowDelegate.isDragging)
+                return;
+
+              finishingDrag = true;
+              var releaseId = root.nextDebugReleaseId();
+              if (cancelled) {
+                root.debugLog("drag", "release=" + releaseId + " cancelled before decision address=" + ((windowDelegate.windowData && windowDelegate.windowData.address) || ""));
+                resetWindowDragState(true);
+                finishingDrag = false;
+                return;
+              }
+
+              var currentWsId = (windowDelegate.windowData && windowDelegate.windowData.workspace && windowDelegate.windowData.workspace.id) || -1;
+              var currentWsName = (windowDelegate.windowData && windowDelegate.windowData.workspace && windowDelegate.windowData.workspace.name) || "";
+              var windowAddress = (windowDelegate.windowData && windowDelegate.windowData.address) || "";
+              var isFloating = (windowDelegate.windowData && windowDelegate.windowData.floating) || false;
+              var sourceMonitorId = root.draggingSourceMonitorId;
+              var targetMonitorId = root.draggingTargetMonitorId;
+              var crossMonitorDrag = root.draggingCrossMonitor;
+              var dragDeltaX = windowDelegate.x - windowDelegate.initX;
+              var dragDeltaY = windowDelegate.y - windowDelegate.initY;
+              var dropIntent = root.buildDropIntentForDelegate(windowDelegate, root.retilingTarget);
+              var floatingDropPos = isFloating ? root.resolveFloatingDropPosition(windowDelegate, dropIntent.target.workspaceId !== -1 ? dropIntent.target.workspaceId : currentWsId) : null;
+              var layoutAction = LayoutStrategy.get(dropIntent.layout.name).getDropAction(dropIntent);
+              var debugRetileTargetAddress = (root.retilingTarget && root.retilingTarget.targetAddress) || "";
+              var releaseDecision = DragDecision.decideRelease({
+                                                                 "windowAddress": windowAddress,
+                                                                 "currentWorkspaceId": currentWsId,
+                                                                 "currentSpecialName": dropIntent.source.specialName,
+                                                                 "targetWorkspace": dropIntent.target.workspaceId,
+                                                                 "targetSpecial": dropIntent.target.special,
+                                                                 "isFloating": isFloating,
+                                                                 "dragPreviewMode": pluginMain.dragPreviewMode || "smart",
+                                                                 "sourceMonitorId": sourceMonitorId,
+                                                                 "targetMonitorId": targetMonitorId,
+                                                                 "enableCrossMonitorDrag": pluginMain.enableCrossMonitorDrag,
+                                                                 "crossMonitorDrag": crossMonitorDrag,
+                                                                 "intent": dropIntent,
+                                                                 "layoutAction": layoutAction,
+                                                                 "floatingDropPosition": floatingDropPos
+                                                               });
+              var needsRetileTransition = releaseDecision.type === "tiledSwap" || releaseDecision.type === "tiledSplit";
+              var retileTransitionRecords = root.buildRetileTransitionRecords(windowAddress, root.retilingTarget, releaseDecision.type);
+              var needsOverlayRecapture = releaseDecision.type === "tiledSwap" || releaseDecision.type === "tiledSplit" || releaseDecision.type === "layoutReorder";
+              var layoutRecaptureAddresses = needsOverlayRecapture ? root.workspaceWindowAddresses(currentWsId) : [];
+              if (needsOverlayRecapture && layoutRecaptureAddresses.length === 0 && windowAddress !== "")
+                layoutRecaptureAddresses = [windowAddress];
+              root.debugLog("drag", "release=" + releaseId + " source=" + root.debugStringify(root.debugWindowState(windowDelegate.windowData)) + " targetWorkspace=" + dropIntent.target.workspaceId + " targetSpecial=" + root.debugStringify(dropIntent.target.special) + " targetMonitor=" + targetMonitorId + " sourceMonitor=" + sourceMonitorId + " crossMonitor="
+                            + crossMonitorDrag + " dragDelta=" + root.debugStringify({
+                                                                                       "x": dragDeltaX,
+                                                                                       "y": dragDeltaY
+                                                                                     }));
+              root.debugLog("drag", "release=" + releaseId + " retile=" + root.debugStringify({
+                                                                                                "targetAddress": root.retilingTarget && root.retilingTarget.targetAddress,
+                                                                                                "direction": root.retilingTarget && root.retilingTarget.direction,
+                                                                                                "isNoop": root.retilingTarget && root.retilingTarget.isNoop,
+                                                                                                "noopReason": root.retilingTarget && root.retilingTarget.noopReason
+                                                                                              }) + " intent=" + root.debugStringify(dropIntent) + " layoutAction=" + root.debugStringify(layoutAction) + " decision=" + root.debugStringify(releaseDecision) + " commands=" + root.debugStringify(releaseDecision.commands || []));
+              resetWindowDragState(false);
+              if (releaseDecision.commands && releaseDecision.commands.length > 0) {
+                if (needsOverlayRecapture && pluginMain && pluginMain.beginLayoutMutationDebug)
+                  pluginMain.beginLayoutMutationDebug(releaseId, releaseDecision.type, windowAddress, debugRetileTargetAddress, releaseDecision.commands);
+                if (retileTransitionRecords)
+                  root.setRetileTransitionRecords(retileTransitionRecords, layoutRecaptureAddresses);
+                if (needsRetileTransition)
+                  startRetileTransitionMotion();
+                if (releaseDecision.optimisticMove && pluginMain && pluginMain.applyOptimisticWindowMove)
+                  pluginMain.applyOptimisticWindowMove(windowAddress, releaseDecision.optimisticMove.x, releaseDecision.optimisticMove.y, releaseDecision.optimisticMove.workspaceId);
+
+                root.debugLog("dispatch", "release=" + releaseId + " type=" + releaseDecision.type + " commands=" + root.debugStringify(releaseDecision.commands));
+                root.runHyprBatch(releaseDecision.commands);
+
+                if (!needsRetileTransition) {
+                  updateWindowPosition.restart();
+                }
+                if (pluginMain && pluginMain.refreshWindows) {
+                  pluginMain.refreshWindows();
+                  if (needsOverlayRecapture && pluginMain.updateAll) {
+                    pluginMain.updateAll();
+                    if (needsRetileTransition && pluginMain.requestRetileGeometryRefresh)
+                      pluginMain.requestRetileGeometryRefresh(releaseDecision.type, layoutRecaptureAddresses);
+                    else if (pluginMain.requestOverlayRecapture)
+                      pluginMain.requestOverlayRecapture(releaseDecision.type, layoutRecaptureAddresses);
+                  }
+                  if (releaseDecision.type === "workspaceMove" && sourceMonitorId !== targetMonitorId && pluginMain.updateAll)
+                    pluginMain.updateAll();
+                  if (releaseDecision.type === "floatingMove")
+                    floatingReconcileRefresh.restart();
+                }
+              } else {
+                root.debugLog("drag", "release=" + releaseId + " reset/no-command reason=" + (releaseDecision.reason || releaseDecision.status || dropIntent.status || releaseDecision.type || "no-commands") + " sourceWorkspace=" + currentWsId + " sourceSpecial=" + root.normalizeSpecialName(currentWsName));
+                windowDelegate.x = windowDelegate.initX;
+                windowDelegate.y = windowDelegate.initY;
+              }
+              finishingDrag = false;
+            }
+
+            onXChanged: updateWindowDragFeedback()
+            onYChanged: updateWindowDragFeedback()
+
+            HoverHandler {
+              id: windowHoverHandler
+
+              onHoveredChanged: windowDelegate.hovered = hovered
+            }
+
+            DragHandler {
+              id: windowDragHandler
+
+              target: windowDelegate
+              snapMode: DragHandler.NoSnap
+              dragThreshold: 0
+              acceptedButtons: Qt.LeftButton
+              onActiveChanged: {
+                if (active)
+                  windowDelegate.beginWindowDrag(windowDragHandler.centroid.position);
+                else
+                  windowDelegate.finishWindowDrag(false);
+              }
+              onCanceled: point => windowDelegate.finishWindowDrag(true)
+            }
+
+            TapHandler {
+              id: windowFocusTapHandler
+
+              acceptedButtons: Qt.LeftButton
+              onTapped: (eventPoint, button) => {
+                if (!windowDelegate.windowData)
+                  return;
+
+                var address = windowDelegate.windowData.address;
+                var wsId = (windowDelegate.windowData.workspace && windowDelegate.windowData.workspace.id) || -1;
+                var wsName = (windowDelegate.windowData.workspace && windowDelegate.windowData.workspace.name) || "";
+                Logger.i("WorkspaceOverview", "Clicked window " + address + ", dispatching guarded focus.");
+                var commands = [];
+                if (wsName.startsWith("special:"))
+                  commands.push("togglespecialworkspace " + wsName.substring(8));
+                else if (wsId >= 0)
+                  commands.push("workspace " + wsId);
+                commands.push("focuswindow address:" + address);
+                root.runHyprBatch(commands, {
+                                    "closeAfterDispatch": true
+                                  });
+              }
+            }
+
+            TapHandler {
+              id: windowCloseTapHandler
+
+              acceptedButtons: Qt.MiddleButton
+              onTapped: (eventPoint, button) => {
+                if (windowDelegate.windowData)
+                  root.closeWindowAddress(windowDelegate.windowData.address);
+              }
             }
           }
         }
 
         // === RETILE PREVIEW ===
         RetilePreview {
-          id: retilingPreview
+          id: retilingPreviewBase
 
+          anchors.fill: parent
+          z: root.windowDraggingZ - 3
+          layerRole: "base"
           showPreview: root.retilingTarget !== null
-          activeDirection: root.retilingDirection
-          directionConfidence: root.retilingConfidence
-          directionLocked: root.dragInteractionState === "lockedDirection"
-          pendingDirection: root.pendingRetileDirection
+          previewModel: root.retilingTarget ? root.retilingTarget.previewModel : null
           previewOpacityScale: root.clamp(pluginMain.retilePreviewOpacity || 0.55, 0.2, 0.9)
-          // Zone visualization (target window bounds)
-          targetX: root.retilingTarget ? root.retilingTarget.targetX : 0
-          targetY: root.retilingTarget ? root.retilingTarget.targetY : 0
-          targetW: root.retilingTarget ? root.retilingTarget.targetW : 0
-          targetH: root.retilingTarget ? root.retilingTarget.targetH : 0
-          // Result preview (where dragged window lands)
-          previewX: root.retilingTarget ? root.retilingTarget.previewX : 0
-          previewY: root.retilingTarget ? root.retilingTarget.previewY : 0
-          previewWidth: root.retilingTarget ? root.retilingTarget.previewW : 0
-          previewHeight: root.retilingTarget ? root.retilingTarget.previewH : 0
-          // Target shrink preview (where target window shrinks to)
-          targetNewX: root.retilingTarget ? root.retilingTarget.targetNewX : 0
-          targetNewY: root.retilingTarget ? root.retilingTarget.targetNewY : 0
-          targetNewW: root.retilingTarget ? root.retilingTarget.targetNewW : 0
-          targetNewH: root.retilingTarget ? root.retilingTarget.targetNewH : 0
+        }
+
+        RetilePreview {
+          id: retilingPreviewForeground
+
+          anchors.fill: parent
+          z: root.windowDraggingZ + 1
+          layerRole: "foreground"
+          showPreview: root.retilingTarget !== null
+          previewModel: root.retilingTarget ? root.retilingTarget.previewModel : null
+          previewOpacityScale: root.clamp(pluginMain.retilePreviewOpacity || 0.55, 0.2, 0.9)
         }
 
         // === ACTIVE WORKSPACE INDICATOR ===
@@ -1901,9 +2013,9 @@ Item {
         blurMax: Style.shadowBlurMax
         shadowBlur: Style.shadowBlur * 1.5
         shadowOpacity: Style.shadowOpacity
-        shadowColor: Color.mBackground
-        shadowHorizontalOffset: Commons.Settings.data.general.shadowOffsetX || 0
-        shadowVerticalOffset: Commons.Settings.data.general.shadowOffsetY || 4
+        shadowColor: "#000000"
+        shadowHorizontalOffset: 0
+        shadowVerticalOffset: 4
       }
     }
   }

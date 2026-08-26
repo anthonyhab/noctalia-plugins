@@ -24,7 +24,8 @@ Install and update through the Noctalia plugin directory:
 
 - Omarchy installed on the same user session
 - your Omarchy config directory available at `~/.config/omarchy/` or a custom path
-- a working theme-set command, usually `~/.local/share/omarchy/bin/omarchy-theme-set`
+- `omarchy theme set` and `omarchy theme list` available through the Omarchy dispatcher
+- for older installs, legacy `omarchy-theme-set` and `omarchy-theme-list` binaries available from `OMARCHY_PATH/bin` or the standard `~/.local/share/omarchy/bin/` path
 
 ## Setup
 
@@ -32,7 +33,7 @@ Install and update through the Noctalia plugin directory:
 2. Open **Noctalia Settings -> Plugins -> Omarchy Integration**.
 3. Enable the plugin.
 4. Confirm the Omarchy config directory if you do not use the default location.
-5. If needed, set **Theme-set command** to your local `omarchy-theme-set` path.
+5. Leave **Theme-set command** blank to use `omarchy theme set`, or set it to a custom executable wrapper if you need one.
 6. Optionally add the bar widget or control center button for quick access.
 
 ## Usage
@@ -45,5 +46,8 @@ Install and update through the Noctalia plugin directory:
 ## Notes
 
 - Cached palettes keep theme switching fast during normal use.
-- The plugin stores its user preference backup under the Noctalia config directory, not inside the plugin directory.
-- If your Omarchy install lives in a nonstandard location, update the settings fields instead of editing plugin files.
+- The **Theme-set command** setting is treated as an executable path for custom wrappers only. The plugin otherwise uses `omarchy theme set` and falls back to legacy binaries for older installs.
+- The plugin reads `current/theme/colors.toml` for palette data.
+- The plugin prefers `current/theme/hyprland.lua` for the active border color and falls back to legacy `current/theme/hyprland.conf` when needed.
+- Fast custom wrappers are supported, for example `~/.local/bin/omarchy-theme-set-fast`.
+- If your Omarchy install lives in a nonstandard location, set `OMARCHY_PATH` or update the settings fields instead of editing plugin files.

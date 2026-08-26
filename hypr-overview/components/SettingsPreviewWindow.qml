@@ -4,11 +4,10 @@ import QtQuick.Layouts
 import Quickshell
 import Quickshell.Wayland
 import qs.Commons
-import qs.Commons as Commons
 import qs.Widgets
 
 PanelWindow {
-  id: root
+  id: previewRoot
 
   // Dependencies passed from Settings.qml
   property var pluginMain
@@ -21,12 +20,12 @@ PanelWindow {
   property real previewCenteringY: 0
   // Extracted settings
   property string visualMode: "live"
-  property string shaderPreset: "classic"
-  property real shaderPresetStrength: 1
-  property real simplifiedPixelDensity: 1
-  property real simplifiedColorDepth: 8
-  property real simplifiedSaturation: 1
-  property real simplifiedContrast: 1
+  property string shaderPreset: "pixelated"
+  property real shaderPresetStrength: 0.7
+  property real simplifiedPixelDensity: 0.5
+  property real simplifiedColorDepth: 6
+  property real simplifiedSaturation: 1.1
+  property real simplifiedContrast: 1.1
   property string accentColorType: "secondary"
   property bool showWindowIcons: true
   property bool colorizeWindowIcons: false
@@ -58,9 +57,9 @@ PanelWindow {
   property var previewHyprConfig: ({})
   // Private selected option
   property var selectedPreviewWorkspaceOption: {
-    for (var i = 0; i < root.previewWorkspaceOptions.length; i++) {
-      if (root.previewWorkspaceOptions[i].key === root.previewWorkspaceKey)
-        return root.previewWorkspaceOptions[i];
+    for (var i = 0; i < previewRoot.previewWorkspaceOptions.length; i++) {
+      if (previewRoot.previewWorkspaceOptions[i].key === previewRoot.previewWorkspaceKey)
+        return previewRoot.previewWorkspaceOptions[i];
     }
     return null;
   }
@@ -75,12 +74,15 @@ PanelWindow {
   property real persistedWindowX: -1
   property real persistedWindowY: -1
   property string persistedMonitorKey: ""
+  readonly property real previewWidth: Math.round(340 * Style.uiScaleRatio)
+  readonly property real previewHeight: Math.round(200 * Style.uiScaleRatio)
   readonly property real titleBarHeight: Math.max(36, Math.round(34 * Style.uiScaleRatio))
   readonly property bool isDragging: dragHandler.active
   property real dragLiftScale: 1.0
+  property bool committingDragPosition: false
 
   Behavior on dragLiftScale {
-    enabled: !root.isDragging
+    enabled: !previewRoot.isDragging
     NumberAnimation {
       duration: Style.animationNormal
       easing.type: Easing.OutBack
@@ -89,7 +91,7 @@ PanelWindow {
   }
 
   Behavior on windowX {
-    enabled: !root.isDragging
+    enabled: !previewRoot.isDragging && !previewRoot.committingDragPosition
     NumberAnimation {
       duration: Style.animationFast
       easing.type: Easing.OutBack
@@ -98,7 +100,7 @@ PanelWindow {
   }
 
   Behavior on windowY {
-    enabled: !root.isDragging
+    enabled: !previewRoot.isDragging && !previewRoot.committingDragPosition
     NumberAnimation {
       duration: Style.animationFast
       easing.type: Easing.OutBack
@@ -113,16 +115,16 @@ PanelWindow {
   }
 
   function screenWidth() {
-    return (root.screen && root.screen.width) || 1920;
+    return (previewRoot.screen && previewRoot.screen.width) || 1920;
   }
 
   function screenHeight() {
-    return (root.screen && root.screen.height) || 1080;
+    return (previewRoot.screen && previewRoot.screen.height) || 1080;
   }
 
   function clampToScreen(xPos, yPos) {
-    var frameWidth = root.width > 0 ? root.width : root.implicitWidth;
-    var frameHeight = root.height > 0 ? root.height : root.implicitHeight;
+    var frameWidth = previewRoot.previewWidth;
+    var frameHeight = previewRoot.previewHeight;
     var minX = Style.marginL;
     var minY = Style.marginL;
     var maxX = Math.max(minX, screenWidth() - frameWidth - Style.marginL);
@@ -143,7 +145,7 @@ PanelWindow {
     else if (barPosition === "top")
       defaultY = Style.barHeight + Style.marginL;
     else if (barPosition === "bottom")
-      defaultY = screenHeight() - root.implicitHeight - Style.barHeight - Style.marginL;
+      defaultY = screenHeight() - previewRoot.previewHeight - Style.barHeight - Style.marginL;
     return {
       "x": defaultX,
       "y": defaultY
@@ -151,65 +153,102 @@ PanelWindow {
   }
 
   function applyInitialPosition() {
-    var hasSavedPosition = isValidSavedPosition(root.pluginWindowX, root.pluginWindowY);
+    var hasSavedPosition = isValidSavedPosition(previewRoot.pluginWindowX, previewRoot.pluginWindowY);
     var seed = hasSavedPosition ? {
-                                    "x": root.pluginWindowX,
-                                    "y": root.pluginWindowY
+                                    "x": previewRoot.pluginWindowX,
+                                    "y": previewRoot.pluginWindowY
                                   } : resolveDefaultPosition();
     var clamped = clampToScreen(seed.x, seed.y);
-    root.windowX = clamped.x;
-    root.windowY = clamped.y;
+    previewRoot.windowX = clamped.x;
+    previewRoot.windowY = clamped.y;
     if (hasSavedPosition) {
-      root.persistedWindowX = clamped.x;
-      root.persistedWindowY = clamped.y;
+      previewRoot.persistedWindowX = clamped.x;
+      previewRoot.persistedWindowY = clamped.y;
     } else {
-      root.persistedWindowX = -1;
-      root.persistedWindowY = -1;
+      previewRoot.persistedWindowX = -1;
+      previewRoot.persistedWindowY = -1;
     }
-    root.persistedMonitorKey = root.monitorKey;
+    previewRoot.persistedMonitorKey = previewRoot.monitorKey;
   }
 
   function syncWithPersistedInput() {
     if (dragHandler.active)
       return;
 
-    if (!isValidSavedPosition(root.pluginWindowX, root.pluginWindowY))
+    if (!isValidSavedPosition(previewRoot.pluginWindowX, previewRoot.pluginWindowY))
       return;
 
-    var clamped = clampToScreen(root.pluginWindowX, root.pluginWindowY);
-    if (Math.abs(clamped.x - root.windowX) > 0.5 || Math.abs(clamped.y - root.windowY) > 0.5) {
-      root.windowX = clamped.x;
-      root.windowY = clamped.y;
+    var clamped = clampToScreen(previewRoot.pluginWindowX, previewRoot.pluginWindowY);
+    if (Math.abs(clamped.x - previewRoot.windowX) > 0.5 || Math.abs(clamped.y - previewRoot.windowY) > 0.5) {
+      previewRoot.windowX = clamped.x;
+      previewRoot.windowY = clamped.y;
     }
-    root.persistedWindowX = clamped.x;
-    root.persistedWindowY = clamped.y;
-    root.persistedMonitorKey = root.monitorKey;
+    previewRoot.persistedWindowX = clamped.x;
+    previewRoot.persistedWindowY = clamped.y;
+    previewRoot.persistedMonitorKey = previewRoot.monitorKey;
   }
 
   function clampCurrentPosition() {
     if (dragHandler.active)
       return;
 
-    var clamped = clampToScreen(root.windowX, root.windowY);
-    if (Math.abs(clamped.x - root.windowX) > 0.5 || Math.abs(clamped.y - root.windowY) > 0.5) {
-      root.windowX = clamped.x;
-      root.windowY = clamped.y;
+    var clamped = clampToScreen(previewRoot.windowX, previewRoot.windowY);
+    if (Math.abs(clamped.x - previewRoot.windowX) > 0.5 || Math.abs(clamped.y - previewRoot.windowY) > 0.5) {
+      previewRoot.windowX = clamped.x;
+      previewRoot.windowY = clamped.y;
     }
   }
 
   function shouldPersistPosition(xPos, yPos) {
-    if (root.persistedMonitorKey !== root.monitorKey)
+    if (previewRoot.persistedMonitorKey !== previewRoot.monitorKey)
       return true;
 
-    if (!isValidSavedPosition(root.persistedWindowX, root.persistedWindowY))
+    if (!isValidSavedPosition(previewRoot.persistedWindowX, previewRoot.persistedWindowY))
       return true;
 
-    return Math.abs(root.persistedWindowX - xPos) > 0.5 || Math.abs(root.persistedWindowY - yPos) > 0.5;
+    return Math.abs(previewRoot.persistedWindowX - xPos) > 0.5 || Math.abs(previewRoot.persistedWindowY - yPos) > 0.5;
+  }
+
+  function snapPositionToScreenEdges(position) {
+    var snapped = clampToScreen(position.x, position.y);
+    var snapDist = Math.round(28 * Style.uiScaleRatio);
+    if (snapped.x <= Style.marginL + snapDist)
+      snapped.x = Style.marginL;
+    else if (snapped.x + previewRoot.previewWidth >= previewRoot.screenWidth() - Style.marginL - snapDist)
+      snapped.x = previewRoot.screenWidth() - previewRoot.previewWidth - Style.marginL;
+    if (snapped.y <= Style.marginL + snapDist)
+      snapped.y = Style.marginL;
+    return snapped;
+  }
+
+  function finishDragPosition() {
+    previewRoot.dragLiftScale = 1.0;
+    var clamped = snapPositionToScreenEdges({
+                                              "x": previewRoot.windowX,
+                                              "y": previewRoot.windowY
+                                            });
+    previewRoot.committingDragPosition = true;
+    previewRoot.windowX = clamped.x;
+    previewRoot.windowY = clamped.y;
+    previewRoot.committingDragPosition = false;
+    if (previewRoot.shouldPersistPosition(clamped.x, clamped.y)) {
+      previewRoot.persistedWindowX = clamped.x;
+      previewRoot.persistedWindowY = clamped.y;
+      previewRoot.persistedMonitorKey = previewRoot.monitorKey;
+      previewRoot.positionSaved(previewRoot.monitorKey, clamped.x, clamped.y);
+    }
+  }
+
+  function tr(key) {
+    if (pluginMain && pluginMain.pluginApi && pluginMain.pluginApi.tr)
+      return pluginMain.pluginApi.tr(key);
+
+    return key;
   }
 
   // Window logic
   WlrLayershell.namespace: "plugin-workspace-preview"
-  screen: root.targetScreen || root.fallbackScreen
+  screen: previewRoot.targetScreen || previewRoot.fallbackScreen
   Component.onCompleted: applyInitialPosition()
   onMonitorKeyChanged: applyInitialPosition()
   onTargetScreenChanged: applyInitialPosition()
@@ -220,35 +259,35 @@ PanelWindow {
   onScreenChanged: clampCurrentPosition()
   WlrLayershell.layer: WlrLayer.Overlay
   WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
+  WlrLayershell.exclusiveZone: -1
   color: "transparent"
   // Only show if we actually have options to preview and the window is meant to be visible
-  visible: root.previewWorkspaceOptions.length > 0
+  visible: previewRoot.previewWorkspaceOptions.length > 0
   // Size logic
-  implicitWidth: Math.round(340 * Style.uiScaleRatio)
-  implicitHeight: Math.round(200 * Style.uiScaleRatio)
+  implicitWidth: screenWidth()
+  implicitHeight: screenHeight()
 
-  // Use margins for absolute-like positioning in LayerShell
   anchors {
     top: true
+    bottom: true
     left: true
-  }
-
-  margins {
-    top: root.windowY
-    left: root.windowX
+    right: true
   }
 
   Rectangle {
     id: windowFrame
 
-    anchors.fill: parent
+    x: previewRoot.windowX
+    y: previewRoot.windowY
+    width: previewRoot.previewWidth
+    height: previewRoot.previewHeight
     radius: Style.radiusL
     color: Qt.rgba(Color.mSurface.r, Color.mSurface.g, Color.mSurface.b, 0.95)
     border.width: Style.borderS
     border.color: Qt.rgba(Color.mOutline.r, Color.mOutline.g, Color.mOutline.b, 0.45)
     transform: Scale {
-      xScale: root.dragLiftScale
-      yScale: root.dragLiftScale
+      xScale: previewRoot.dragLiftScale
+      yScale: previewRoot.dragLiftScale
       origin.x: windowFrame.width / 2
       origin.y: windowFrame.height / 2
     }
@@ -257,8 +296,8 @@ PanelWindow {
     Rectangle {
       anchors.fill: parent
       radius: parent.radius
-      color: Qt.rgba((Color.mBackground?.r ?? 0), (Color.mBackground?.g ?? 0), (Color.mBackground?.b ?? 0), 1)
-      opacity: root.isDragging ? 0.45 : 0.3
+      color: Qt.rgba(Color.mSurface.r, Color.mSurface.g, Color.mSurface.b, 1)
+      opacity: previewRoot.isDragging ? 0.45 : 0.3
       z: -1
 
       Behavior on opacity {
@@ -275,11 +314,11 @@ PanelWindow {
       anchors.left: parent.left
       anchors.right: parent.right
       anchors.top: parent.top
-      height: root.titleBarHeight
+      height: previewRoot.titleBarHeight
       radius: Style.radiusL
-      color: Qt.rgba(Color.mSurfaceVariant.r, Color.mSurfaceVariant.g, Color.mSurfaceVariant.b, root.isDragging ? 0.7 : 0.5)
+      color: Qt.rgba(Color.mSurfaceVariant.r, Color.mSurfaceVariant.g, Color.mSurfaceVariant.b, previewRoot.isDragging ? 0.7 : 0.5)
       border.width: 1
-      border.color: Qt.rgba(Color.mOutline.r, Color.mOutline.g, Color.mOutline.b, root.isDragging ? 0.7 : 0.4)
+      border.color: Qt.rgba(Color.mOutline.r, Color.mOutline.g, Color.mOutline.b, previewRoot.isDragging ? 0.7 : 0.4)
 
       Behavior on color {
         ColorAnimation {
@@ -313,11 +352,11 @@ PanelWindow {
           width: 9
           height: 9
           radius: width / 2
-          color: root.accentColorType === "primary" ? Color.mPrimary : Color.mSecondary
+          color: previewRoot.accentColorType === "primary" ? Color.mPrimary : Color.mSecondary
         }
 
         NText {
-          text: "Live Preview"
+          text: previewRoot.tr("settings.previewWindow.title")
           color: Color.mOnSurface
           pointSize: Style.fontSizeS
           font.weight: Style.fontWeightSemiBold
@@ -328,7 +367,7 @@ PanelWindow {
         }
 
         Rectangle {
-          visible: root.previewMonitorData && root.previewMonitorData.name
+          visible: previewRoot.previewMonitorData && previewRoot.previewMonitorData.name
           radius: 6
           color: Qt.rgba(Color.mSurface.r, Color.mSurface.g, Color.mSurface.b, 0.7)
           border.width: 1
@@ -340,7 +379,7 @@ PanelWindow {
             id: monitorChipText
 
             anchors.centerIn: parent
-            text: root.previewMonitorData && root.previewMonitorData.name ? root.previewMonitorData.name : ""
+            text: previewRoot.previewMonitorData && previewRoot.previewMonitorData.name ? previewRoot.previewMonitorData.name : ""
             color: Color.mOnSurfaceVariant
             pointSize: Style.fontSizeXS
           }
@@ -358,7 +397,7 @@ PanelWindow {
             id: workspaceChipText
 
             anchors.centerIn: parent
-            text: root.previewWorkspaceWatermark ? ("WS " + root.previewWorkspaceWatermark) : "WS"
+            text: previewRoot.previewWorkspaceWatermark ? previewRoot.tr("settings.previewWindow.workspace-prefix") + previewRoot.previewWorkspaceWatermark : previewRoot.tr("settings.previewWindow.workspace")
             color: Color.mOnSurfaceVariant
             pointSize: Style.fontSizeXS
           }
@@ -372,7 +411,7 @@ PanelWindow {
         width: 52
         height: 4
         radius: 3
-        color: Qt.rgba(Color.mOnSurfaceVariant.r, Color.mOnSurfaceVariant.g, Color.mOnSurfaceVariant.b, root.isDragging ? 0.75 : 0.45)
+        color: Qt.rgba(Color.mOnSurfaceVariant.r, Color.mOnSurfaceVariant.g, Color.mOnSurfaceVariant.b, previewRoot.isDragging ? 0.75 : 0.45)
 
         Behavior on color {
           ColorAnimation {
@@ -395,45 +434,26 @@ PanelWindow {
 
         property real startWindowX: 0
         property real startWindowY: 0
-        property point startCursorScene: Qt.point(0, 0)
 
         acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
         grabPermissions: PointerHandler.CanTakeOverFromAnything
         target: null
+        snapMode: DragHandler.NoSnap
         dragThreshold: 0
         onActiveChanged: {
           if (active) {
-            startWindowX = root.windowX;
-            startWindowY = root.windowY;
-            startCursorScene = centroid.scenePosition;
-            root.dragLiftScale = 1.018;
+            startWindowX = previewRoot.windowX;
+            startWindowY = previewRoot.windowY;
+            previewRoot.dragLiftScale = 1.018;
           } else {
-            root.dragLiftScale = 1.0;
-            var clamped = root.clampToScreen(root.windowX, root.windowY);
-            var snapDist = Math.round(28 * Style.uiScaleRatio);
-            if (clamped.x <= Style.marginL + snapDist)
-              clamped.x = Style.marginL;
-            else if (clamped.x + root.width >= root.screenWidth() - Style.marginL - snapDist)
-              clamped.x = root.screenWidth() - root.width - Style.marginL;
-            if (clamped.y <= Style.marginL + snapDist)
-              clamped.y = Style.marginL;
-            root.windowX = clamped.x;
-            root.windowY = clamped.y;
-            if (root.shouldPersistPosition(clamped.x, clamped.y)) {
-              root.persistedWindowX = clamped.x;
-              root.persistedWindowY = clamped.y;
-              root.persistedMonitorKey = root.monitorKey;
-              root.positionSaved(root.monitorKey, clamped.x, clamped.y);
-            }
+            previewRoot.finishDragPosition();
           }
         }
         onTranslationChanged: {
           if (active) {
-            var dragX = startWindowX + (centroid.scenePosition.x - startCursorScene.x);
-            var dragY = startWindowY + (centroid.scenePosition.y - startCursorScene.y);
-            var clamped = root.clampToScreen(dragX, dragY);
-            root.windowX = clamped.x;
-            root.windowY = clamped.y;
+            var clamped = previewRoot.clampToScreen(startWindowX + dragHandler.translation.x, startWindowY + dragHandler.translation.y);
+            previewRoot.windowX = clamped.x;
+            previewRoot.windowY = clamped.y;
           }
         }
       }
@@ -451,10 +471,10 @@ PanelWindow {
     Item {
       id: previewWorkspaceViewport
 
-      property real rawMonitorWidth: ((root.previewMonitorData && root.previewMonitorData.width) || 1920) / ((root.previewMonitorData && root.previewMonitorData.scale) || 1)
-      property real rawMonitorHeight: ((root.previewMonitorData && root.previewMonitorData.height) || 1080) / ((root.previewMonitorData && root.previewMonitorData.scale) || 1)
-      property real sourceMonitorWidth: (root.previewMonitorData && root.previewMonitorData.transform % 2 === 1) ? rawMonitorHeight : rawMonitorWidth
-      property real sourceMonitorHeight: (root.previewMonitorData && root.previewMonitorData.transform % 2 === 1) ? rawMonitorWidth : rawMonitorHeight
+      property real rawMonitorWidth: ((previewRoot.previewMonitorData && previewRoot.previewMonitorData.width) || 1920) / ((previewRoot.previewMonitorData && previewRoot.previewMonitorData.scale) || 1)
+      property real rawMonitorHeight: ((previewRoot.previewMonitorData && previewRoot.previewMonitorData.height) || 1080) / ((previewRoot.previewMonitorData && previewRoot.previewMonitorData.scale) || 1)
+      property real sourceMonitorWidth: (previewRoot.previewMonitorData && previewRoot.previewMonitorData.transform % 2 === 1) ? rawMonitorHeight : rawMonitorWidth
+      property real sourceMonitorHeight: (previewRoot.previewMonitorData && previewRoot.previewMonitorData.transform % 2 === 1) ? rawMonitorWidth : rawMonitorHeight
       property real aspectRatio: sourceMonitorWidth / Math.max(1, sourceMonitorHeight)
 
       anchors.centerIn: contentArea
@@ -467,28 +487,28 @@ PanelWindow {
         anchors.fill: parent
         color: Color.mSurfaceVariant
         radius: Style.screenRadius * 0.35
-        border.width: root.selectionBorderWidth >= 0 ? root.selectionBorderWidth : Style.borderM
-        border.color: root.accentColorType === "primary" ? Color.mPrimary : Color.mSecondary
+        border.width: previewRoot.selectionBorderWidth >= 0 ? previewRoot.selectionBorderWidth : Style.borderM
+        border.color: previewRoot.accentColorType === "primary" ? Color.mPrimary : Color.mSecondary
 
         Rectangle {
-          visible: root.showRowColumnGuides
+          visible: previewRoot.showRowColumnGuides
           anchors.centerIn: parent
           width: parent.width * 0.8
           height: 1
-          color: Qt.alpha(root.accentColorType === "primary" ? Color.mPrimary : Color.mSecondary, Style.opacityLight)
+          color: Qt.alpha(previewRoot.accentColorType === "primary" ? Color.mPrimary : Color.mSecondary, Style.opacityLight)
         }
 
         Rectangle {
-          visible: root.showRowColumnGuides
+          visible: previewRoot.showRowColumnGuides
           anchors.centerIn: parent
           width: 1
           height: parent.height * 0.8
-          color: Qt.alpha(root.accentColorType === "primary" ? Color.mPrimary : Color.mSecondary, Style.opacityLight)
+          color: Qt.alpha(previewRoot.accentColorType === "primary" ? Color.mPrimary : Color.mSecondary, Style.opacityLight)
         }
 
         Text {
           anchors.centerIn: parent
-          text: root.previewWorkspaceWatermark
+          text: previewRoot.previewWorkspaceWatermark
           font.family: Settings.data.ui.fontDefault
           font.pixelSize: Math.max(40, parent.height * 0.42)
           font.weight: Style.fontWeightSemiBold
@@ -496,14 +516,14 @@ PanelWindow {
         }
 
         Rectangle {
-          visible: root.showWorkspaceLabels && root.selectedPreviewWorkspaceOption
+          visible: previewRoot.showWorkspaceLabels && previewRoot.selectedPreviewWorkspaceOption
           anchors.left: parent.left
           anchors.top: parent.top
           anchors.leftMargin: Math.max(6, parent.width * 0.03)
           anchors.topMargin: Math.max(6, parent.height * 0.03)
-          radius: root.specialWorkspaceStyle === "pill" ? Math.max(8, height / 2) : (root.specialWorkspaceStyle === "chip" ? 8 : 0)
-          color: root.specialWorkspaceStyle === "plain" ? "transparent" : Qt.rgba(Color.mSurface.r, Color.mSurface.g, Color.mSurface.b, 0.72)
-          border.width: root.specialWorkspaceStyle === "plain" ? 0 : 1
+          radius: previewRoot.specialWorkspaceStyle === "pill" ? Math.max(8, height / 2) : (previewRoot.specialWorkspaceStyle === "chip" ? 8 : 0)
+          color: previewRoot.specialWorkspaceStyle === "plain" ? "transparent" : Qt.rgba(Color.mSurface.r, Color.mSurface.g, Color.mSurface.b, 0.72)
+          border.width: previewRoot.specialWorkspaceStyle === "plain" ? 0 : 1
           border.color: Qt.rgba(Color.mOutline.r, Color.mOutline.g, Color.mOutline.b, 0.45)
           width: Math.min(parent.width * 0.78, workspaceLabelText.implicitWidth + 14)
           height: Math.max(20, Math.min(30, parent.height * 0.2))
@@ -515,7 +535,7 @@ PanelWindow {
             width: parent.width - 10
             horizontalAlignment: Text.AlignHCenter
             elide: Text.ElideRight
-            text: (root.selectedPreviewWorkspaceOption && root.selectedPreviewWorkspaceOption.name) || "Workspace"
+            text: (previewRoot.selectedPreviewWorkspaceOption && previewRoot.selectedPreviewWorkspaceOption.name) || previewRoot.tr("settings.previewWindow.workspace")
             font.family: Settings.data.ui.fontDefault
             font.pixelSize: Math.max(10, Math.min(13, parent.height * 0.52))
             color: Color.mOnSurface
@@ -523,77 +543,78 @@ PanelWindow {
         }
 
         Repeater {
-          model: root.previewWorkspaceWindows || []
+          model: previewRoot.previewWorkspaceWindows || []
 
           delegate: WindowPreview {
             required property var modelData
             required property int index
-            property int monitorId: ((modelData.win && modelData.win.monitor) || root.previewMonitorId)
+            property var previewWin: modelData && modelData.win ? modelData.win : ({})
+            property int monitorId: (previewWin.monitor !== undefined && previewWin.monitor !== null) ? previewWin.monitor : previewRoot.previewMonitorId
             property var windowMonitor: {
-              var monitors = root.pluginMain && root.pluginMain.monitors ? root.pluginMain.monitors : [];
+              var monitors = previewRoot.pluginMain && previewRoot.pluginMain.monitors ? previewRoot.pluginMain.monitors : [];
               for (var i = 0; i < monitors.length; i++) {
                 if (monitors[i] && monitors[i].id === monitorId)
                   return monitors[i];
               }
-              return root.previewMonitorData;
+              return previewRoot.previewMonitorData;
             }
             property real rawMonitorWidth: ((windowMonitor && windowMonitor.width) || 1920) / ((windowMonitor && windowMonitor.scale) || 1)
             property real rawMonitorHeight: ((windowMonitor && windowMonitor.height) || 1080) / ((windowMonitor && windowMonitor.scale) || 1)
             property real sourceMonitorWidth: (windowMonitor && windowMonitor.transform % 2 === 1) ? rawMonitorHeight : rawMonitorWidth
             property real sourceMonitorHeight: (windowMonitor && windowMonitor.transform % 2 === 1) ? rawMonitorWidth : rawMonitorHeight
 
-            pluginMain: root.pluginMain
-            toplevel: modelData.toplevel
-            windowData: modelData.win
+            pluginMain: previewRoot.pluginMain
+            toplevel: modelData && modelData.toplevel ? modelData.toplevel : null
+            windowData: previewWin
             monitorData: windowMonitor
             windowScale: Math.min(previewWorkspaceViewport.width / Math.max(1, sourceMonitorWidth), previewWorkspaceViewport.height / Math.max(1, sourceMonitorHeight))
             positionScaleX: previewWorkspaceViewport.width / Math.max(1, sourceMonitorWidth)
             positionScaleY: previewWorkspaceViewport.height / Math.max(1, sourceMonitorHeight)
             availableWorkspaceWidth: previewWorkspaceViewport.width
             availableWorkspaceHeight: previewWorkspaceViewport.height
-            centeringX: root.previewCenteringX
-            centeringY: root.previewCenteringY
+            centeringX: previewRoot.previewCenteringX
+            centeringY: previewRoot.previewCenteringY
             xOffset: 0
             yOffset: 0
-            widgetMonitorId: root.previewMonitorId
+            widgetMonitorId: previewRoot.previewMonitorId
             overviewOpen: true
-            useSimplifiedPreview: root.visualMode !== "live"
-            visualMode: root.visualMode
-            shaderPreset: root.shaderPreset
-            shaderPresetStrength: root.shaderPresetStrength
-            simplifiedPixelDensity: root.simplifiedPixelDensity
-            simplifiedColorDepth: root.simplifiedColorDepth
-            simplifiedSaturation: root.simplifiedSaturation
-            simplifiedContrast: root.simplifiedContrast
-            hyprGapsIn: (root.previewHyprConfig && root.previewHyprConfig.gapsIn !== undefined) ? root.previewHyprConfig.gapsIn : 5
-            hyprBorderSize: (root.previewHyprConfig && root.previewHyprConfig.borderSize !== undefined) ? root.previewHyprConfig.borderSize : 1
-            windowBorderSize: (root.previewHyprConfig && root.previewHyprConfig.borderSize !== undefined) ? root.previewHyprConfig.borderSize : 1
-            activeBorderColor: (root.previewHyprConfig && root.previewHyprConfig.activeBorderColor) ? root.previewHyprConfig.activeBorderColor : Color.mPrimary
-            inactiveBorderColor: (root.previewHyprConfig && root.previewHyprConfig.inactiveBorderColor) ? root.previewHyprConfig.inactiveBorderColor : Qt.rgba(Color.mOutline.r, Color.mOutline.g, Color.mOutline.b, 0.85)
+            useSimplifiedPreview: previewRoot.visualMode === "simplified"
+            visualMode: previewRoot.visualMode
+            shaderPreset: previewRoot.shaderPreset
+            shaderPresetStrength: previewRoot.shaderPresetStrength
+            simplifiedPixelDensity: previewRoot.simplifiedPixelDensity
+            simplifiedColorDepth: previewRoot.simplifiedColorDepth
+            simplifiedSaturation: previewRoot.simplifiedSaturation
+            simplifiedContrast: previewRoot.simplifiedContrast
+            hyprGapsIn: (previewRoot.previewHyprConfig && previewRoot.previewHyprConfig.gapsIn !== undefined) ? previewRoot.previewHyprConfig.gapsIn : 5
+            hyprBorderSize: (previewRoot.previewHyprConfig && previewRoot.previewHyprConfig.borderSize !== undefined) ? previewRoot.previewHyprConfig.borderSize : 1
+            windowBorderSize: (previewRoot.previewHyprConfig && previewRoot.previewHyprConfig.borderSize !== undefined) ? previewRoot.previewHyprConfig.borderSize : 1
+            activeBorderColor: (previewRoot.previewHyprConfig && previewRoot.previewHyprConfig.activeBorderColor) ? previewRoot.previewHyprConfig.activeBorderColor : Color.mPrimary
+            inactiveBorderColor: (previewRoot.previewHyprConfig && previewRoot.previewHyprConfig.inactiveBorderColor) ? previewRoot.previewHyprConfig.inactiveBorderColor : Qt.rgba(Color.mOutline.r, Color.mOutline.g, Color.mOutline.b, 0.85)
             isActiveWorkspaceWindow: true
-            isFocusedWindow: !!(root.pluginMain.hyprlandService && root.pluginMain.hyprlandService.activeWindowData && modelData.win && modelData.win.address === root.pluginMain.hyprlandService.activeWindowData.address)
-            showWindowIcons: root.showWindowIcons
-            colorizeWindowIcons: root.colorizeWindowIcons
-            windowIconPlacement: root.windowIconPlacement
-            showFocusedGlow: root.showFocusedWindowGlow
-            showUrgencyBadge: root.showUrgencyBadge
-            showFloatingBadge: root.showFloatingBadge
-            showFullscreenBadge: root.showFullscreenBadge
-            showMonitorBadge: root.showMonitorBadge
-            inactiveWorkspaceDimAmount: root.dimInactiveWorkspaces
-            inactiveWorkspaceSaturation: root.inactiveWorkspaceSaturation
-            hoverLiftAmount: root.hoverLiftAmount
-            previewCornerMode: root.previewCornerMode
-            previewFixedCornerRadius: root.previewFixedCornerRadius
-            useBorderGradient: root.useBorderGradient
-            showTitleStrip: root.showWindowTitleStrip
-            titleStripPosition: root.titleStripPosition
-            titleStripHeight: root.titleStripHeight
-            titleStripMode: root.titleStripMode
-            titleStripMeta: root.titleStripMeta
-            windowRounding: (root.previewHyprConfig && root.previewHyprConfig.rounding !== undefined) ? root.previewHyprConfig.rounding : 0
-            animationProfile: root.animationProfile
-            animationDurationMs: root.animationDurationMs
+            isFocusedWindow: !!(previewRoot.pluginMain && previewRoot.pluginMain.activeWindowAddress && previewWin.address && previewWin.address === previewRoot.pluginMain.activeWindowAddress)
+            showWindowIcons: previewRoot.showWindowIcons
+            colorizeWindowIcons: previewRoot.colorizeWindowIcons
+            windowIconPlacement: previewRoot.windowIconPlacement
+            showFocusedGlow: previewRoot.showFocusedWindowGlow
+            showUrgencyBadge: previewRoot.showUrgencyBadge
+            showFloatingBadge: previewRoot.showFloatingBadge
+            showFullscreenBadge: previewRoot.showFullscreenBadge
+            showMonitorBadge: previewRoot.showMonitorBadge
+            inactiveWorkspaceDimAmount: previewRoot.dimInactiveWorkspaces
+            inactiveWorkspaceSaturation: previewRoot.inactiveWorkspaceSaturation
+            hoverLiftAmount: previewRoot.hoverLiftAmount
+            previewCornerMode: previewRoot.previewCornerMode
+            previewFixedCornerRadius: previewRoot.previewFixedCornerRadius
+            useBorderGradient: previewRoot.useBorderGradient
+            showTitleStrip: previewRoot.showWindowTitleStrip
+            titleStripPosition: previewRoot.titleStripPosition
+            titleStripHeight: previewRoot.titleStripHeight
+            titleStripMode: previewRoot.titleStripMode
+            titleStripMeta: previewRoot.titleStripMeta
+            windowRounding: (previewRoot.previewHyprConfig && previewRoot.previewHyprConfig.rounding !== undefined) ? previewRoot.previewHyprConfig.rounding : 0
+            animationProfile: previewRoot.animationProfile
+            animationDurationMs: previewRoot.animationDurationMs
             z: index + 1
             hovered: false
             pressed: false
@@ -602,12 +623,16 @@ PanelWindow {
 
         NText {
           anchors.centerIn: parent
-          visible: (root.previewWorkspaceWindows || []).length === 0
-          text: "Open windows to preview styles"
+          visible: (previewRoot.previewWorkspaceWindows || []).length === 0
+          text: previewRoot.tr("settings.previewWindow.empty")
           color: Color.mOnSurfaceVariant
           pointSize: Style.fontSizeS
         }
       }
     }
+  }
+
+  mask: Region {
+    item: previewRoot.visible ? windowFrame : null
   }
 }

@@ -1,8 +1,12 @@
+// qmllint disable signal-handler-parameters
 import QtQuick
 import Quickshell
 import Quickshell.Io
 import "ColorsConvert.js" as ColorsConvert
+import "OmarchyCommands.js" as OmarchyCommands
 import "SchemeCache.js" as SchemeCache
+import "ThemeFiles.js" as ThemeFiles
+import "ThemeIdentity.js" as ThemeIdentity
 import "ThemePipeline.js" as ThemePipeline
 import qs.Commons
 import qs.Services.Theming
@@ -23,12 +27,15 @@ Item {
   property var availableThemes: []
   property bool suppressSettingsSignal: false
   property var pendingAlacrittyColors: null
+  property var pendingHyprlandThemePaths: []
+  property string pendingHyprlandThemePath: ""
   property bool ignoreNextPluginSettingsChanged: false
 
   // Operation manager state (replaces old pending operations)
   property bool operationInProgress: false
   property string operationThemeName: ""
   property int operationId: 0
+  readonly property bool isBusy: applying || operationInProgress
 
   // Reload/apply coordination to avoid race conditions
   property bool pendingReloadApply: false
@@ -53,8 +60,6 @@ Item {
   readonly property string schemeFolder: {
     return schemeBaseDir + "/" + schemeKey;
   }
-  readonly property string schemeOutputPath: schemeFolder + "/" + schemeKey + ".json"
-  readonly property string schemeOutputDir: schemeFolder
   readonly property string legacySchemeKey: (schemeKey || "").toLowerCase()
   property bool legacyCleanupChecked: false
 
@@ -93,10 +98,14 @@ Item {
   }
 
   readonly property string omarchyConfigPath: omarchyConfigDir + "current/theme/colors.toml"
-  readonly property string omarchyHyprlandPath: omarchyConfigDir + "current/theme/hyprland.conf"
+  readonly property string omarchyHyprlandLuaPath: omarchyConfigDir + "current/theme/hyprland.lua"
+  readonly property string omarchyHyprlandConfPath: omarchyConfigDir + "current/theme/hyprland.conf"
   readonly property string omarchyThemeNamePath: omarchyConfigDir + "current/theme.name"
   readonly property string omarchyThemesDir: omarchyConfigDir + "themes"
   readonly property string omarchyPath: {
+    const envPath = Quickshell.env("OMARCHY_PATH");
+    if (envPath && envPath.trim() !== "")
+      return expandHome(envPath.trim());
     const home = Quickshell.env("HOME");
     if (home && home !== "")
       return home + "/.local/share/omarchy";
@@ -107,7 +116,9 @@ Item {
   AsyncThemeSetter {
     id: asyncThemeSetter
     themeSetCommand: root.themeSetCommand
-    useFastScript: false
+    legacyThemeSetCommand: root.legacyThemeSetCommand
+    omarchyPath: root.omarchyPath
+
     timeoutMs: 3000
   }
 
@@ -117,35 +128,8 @@ Item {
     pluginApi: root.pluginApi
   }
 
-  function normalizeThemeKey(name) {
-    if (!name || typeof name !== "string")
-      return "";
-    return name.replace(/<[^>]+>/g, "").trim().toLowerCase().replace(/\s+/g, "-");
-  }
-
-  // Format directory name to display name (matches Omarchy's walker style)
-  // e.g., "catppuccin-latte" → "Catppuccin Latte"
-  // e.g., "gruvbox" → "Gruvbox"
-  function formatThemeName(dirName) {
-    if (!dirName || typeof dirName !== "string")
-      return "";
-
-    // Replace hyphens with spaces
-    var spaced = dirName.replace(/-/g, " ");
-
-    // Capitalize first letter of each word
-    var words = spaced.split(" ");
-    for (var i = 0; i < words.length; i++) {
-      if (words[i].length > 0) {
-        words[i] = words[i].charAt(0).toUpperCase() + words[i].slice(1);
-      }
-    }
-
-    return words.join(" ");
-  }
-
   // Computed property for display name
-  readonly property string themeDisplayName: formatThemeName(themeName)
+  readonly property string themeDisplayName: ThemeIdentity.formatThemeName(themeName)
 
   function logDebug() {
     if (!debugLogging)
@@ -181,34 +165,15 @@ Item {
     }
 
     const filtered = themes.filter(theme => {
-                                     const mode = theme.mode || "dark";
-                                     return isDay ? mode === "light" : mode === "dark";
-                                   });
+      const mode = theme.mode || "dark";
+      return isDay ? mode === "light" : mode === "dark";
+    });
 
     if (filtered.length === 0) {
       Logger.w("Omarchy", "No themes match current time of day, falling back to all themes");
       return themes;
     }
     return filtered;
-  }
-
-  function setNoctaliaDarkMode(isDarkMode) {
-    // Only update dark mode when scheduling is disabled
-    // Respect user's scheduling preferences in Noctalia
-    const schedulingMode = Settings.data.colorSchemes.schedulingMode || "off";
-    if (schedulingMode !== "off") {
-      Logger.d("Omarchy", "Skipping dark mode update - scheduling is active:", schedulingMode);
-      return false;
-    }
-
-    if (Settings.data.colorSchemes.darkMode === isDarkMode)
-      return false;
-
-    const wasWallpaper = !!Settings.data.colorSchemes.useWallpaperColors;
-    Settings.data.colorSchemes.useWallpaperColors = true;
-    Settings.data.colorSchemes.darkMode = isDarkMode;
-    Settings.data.colorSchemes.useWallpaperColors = wasWallpaper;
-    return true;
   }
 
   function runShell(process, shell, script, args) {
@@ -226,14 +191,12 @@ Item {
 
   readonly property string themeSetCommand: {
     const configured = pluginApi?.pluginSettings?.themeSetCommand;
-    if (configured && typeof configured === "string" && configured.trim() !== "") {
+    if (configured && typeof configured === "string" && configured.trim() !== "")
       return expandHome(configured.trim());
-    }
-    const home = Quickshell.env("HOME");
-    if (home && home !== "")
-      return home + "/.local/share/omarchy/bin/omarchy-theme-set";
-    return "~/.local/share/omarchy/bin/omarchy-theme-set";
+    return "";
   }
+  readonly property string legacyThemeSetCommand: omarchyPath + "/bin/omarchy-theme-set"
+  readonly property string legacyThemeListCommand: omarchyPath + "/bin/omarchy-theme-list"
 
   function expandHome(path) {
     if (!path || typeof path !== "string")
@@ -398,16 +361,16 @@ Item {
   }
 
   function checkAvailability() {
-    runShell(availabilityProcess, "bash", "[ -f \"$1\" ] && [ -f \"$2\" ]", [omarchyConfigPath, omarchyThemeNamePath]);
+    const cmd = OmarchyCommands.availabilityScript();
+    runShell(availabilityProcess, "bash", cmd, [omarchyConfigPath, omarchyThemeNamePath, themeSetCommand, legacyThemeSetCommand, legacyThemeListCommand, omarchyPath]);
   }
 
   function scanThemes() {
-    logDebug("Scanning themes using omarchy-theme-list");
+    logDebug("Scanning themes using Omarchy theme list");
     // Output format: display_name|dir_name|mode
-    const cmd = "themes_dir=\"$1\"; stock_dir=\"$2\"; " + "omarchy-theme-list | while IFS= read -r name; do " + "[ -z \"$name\" ] && continue; " + "theme_dir=$(echo \"$name\" | sed -E 's/<[^>]+>//g' | tr '[:upper:]' '[:lower:]' | tr ' ' '-'); "
-          + "if [ -f \"$themes_dir/$theme_dir/light.mode\" ] || [ -f \"$stock_dir/$theme_dir/light.mode\" ]; then mode=light; else mode=dark; fi; " + "printf '%s|%s|%s\\n' \"$name\" \"$theme_dir\" \"$mode\"; " + "done";
+    const cmd = OmarchyCommands.themeListScript();
     logDebug("Theme scan command:", cmd);
-    runShell(themesProcess, "bash", cmd, [omarchyThemesDir, omarchyPath + "/themes"]);
+    runShell(themesProcess, "bash", cmd, [omarchyThemesDir, omarchyPath + "/themes", legacyThemeListCommand, omarchyPath]);
   }
 
   function refreshThemeName() {
@@ -469,16 +432,11 @@ Item {
 
     const cacheCompatible = SchemeCache.isCompatible(ThemePipeline.PIPELINE_VERSION);
     if (themeName && cacheCompatible) {
-      const cacheKey = normalizeThemeKey(themeName);
+      const cacheKey = ThemeIdentity.normalizeThemeKey(themeName);
       const cached = cacheKey ? SchemeCache.getScheme(cacheKey) : null;
       if (cached?.palette && cached?.mode) {
         Logger.i("Omarchy", "Using cached scheme for:", themeName);
-        const isDarkMode = cached.mode === "dark";
-        if (Settings.data.colorSchemes.darkMode !== isDarkMode) {
-          Logger.i("Omarchy", "Auto-switching Noctalia dark mode to:", isDarkMode);
-          setNoctaliaDarkMode(isDarkMode);
-        }
-        writeSchemeFile(cached);
+        writeSchemeResult(cached);
         return true;
       }
     } else if (!cacheCompatible) {
@@ -538,6 +496,10 @@ Item {
         if (!schemeResult.success) {
           Logger.i("Omarchy", "Cache miss detected, generating scheme from files");
           Qt.callLater(function () {
+            if (opId !== operationId || root.themeName !== nextThemeName) {
+              Logger.d("Omarchy", "Skipping stale cache-miss apply for:", nextThemeName);
+              return;
+            }
             applyCurrentTheme();
           });
         }
@@ -546,6 +508,10 @@ Item {
         themeName = previousThemeName;
         refreshThemeName();
         Qt.callLater(function () {
+          if (opId !== operationId || root.themeName !== previousThemeName) {
+            Logger.d("Omarchy", "Skipping stale failure recovery for:", nextThemeName);
+            return;
+          }
           applyCurrentTheme();
         });
         ToastService.showError("Omarchy", pluginApi?.tr("errors.failed-theme-set"));
@@ -555,98 +521,61 @@ Item {
     return true;
   }
 
-  function parseColorsToml(content) {
-    Logger.i("Omarchy", "Parsing colors.toml, content length:", content.length);
-    logDebug("First 500 chars:", content.slice(0, 500));
-
-    function extractColorFromLine(line) {
-      const colorMatch = line.match(/=\s*["'](?:#|0x)?([a-fA-F0-9]{6,8})["']/);
-      if (colorMatch) {
-        const hex = colorMatch[1].toLowerCase();
-        return "#" + hex.slice(-6);
-      }
-      return null;
-    }
-
-    const colors = {};
-    const lines = content.split("\n");
-    logDebug("Parsing", lines.length, "lines");
-
-    for (var i = 0; i < lines.length; i++) {
-      const line = lines[i].trim();
-      if (!line || line.startsWith("#") || line.startsWith("["))
-        continue;
-
-      const color = extractColorFromLine(line);
-      if (color) {
-        const keyMatch = line.match(/^([a-zA-Z0-9_]+)\s*=/);
-        if (keyMatch) {
-          const key = keyMatch[1];
-          colors[key] = color;
-          logDebug("Found", key, ":", color);
-        }
-      }
-    }
-
-    Logger.i("Omarchy", "Parsed colors:", Object.keys(colors).join(","));
-
-    if (!colors.background || !colors.foreground) {
-      Logger.e("Omarchy", "PARSE FAILED: Missing required colors");
-      return null;
-    }
-    return colors;
+  function beginHyprlandThemeRead(parsed) {
+    pendingAlacrittyColors = parsed;
+    pendingHyprlandThemePaths = [omarchyHyprlandLuaPath, omarchyHyprlandConfPath];
+    pendingHyprlandThemePath = "";
+    readNextHyprlandThemeFile();
   }
 
-  function parseHyprlandConf(content) {
-    const lines = content.split("\n");
-    for (var i = 0; i < lines.length; i++) {
-      const line = lines[i].trim();
-      if (line.startsWith("$activeBorderColor")) {
-        const match = line.match(/=\s*(.+)/);
-        if (!match)
-          continue;
-
-        const value = match[1].trim();
-        const colorMatches = value.match(/rgba?\(([a-fA-F0-9]{6,8})\)/g);
-        if (colorMatches && colorMatches.length > 0) {
-          const lastColor = colorMatches[colorMatches.length - 1];
-          const hexMatch = lastColor.match(/rgba?\(([a-fA-F0-9]{6,8})\)/);
-          if (hexMatch) {
-            const hex = hexMatch[1].slice(0, 6);
-            logDebug("Found Hyprland border color:", "#" + hex);
-            return "#" + hex.toLowerCase();
-          }
-        }
-      }
-    }
-    logDebug("No Hyprland border color found, using default");
-    return null;
-  }
-
-  function writeSchemeFile(result) {
-    const mode = result?.mode;
-    const scheme = result?.palette;
-    if (!scheme || !mode) {
-      Logger.e("Omarchy", "writeSchemeFile missing scheme data or mode");
+  function readNextHyprlandThemeFile() {
+    if (!pendingAlacrittyColors) {
       applying = false;
+      Logger.e("Omarchy", "No pending theme colors for Hyprland theme read");
       return;
     }
 
-    if (!schemeOutputPath || !schemeOutputDir) {
-      applying = false;
+    if (!pendingHyprlandThemePaths || pendingHyprlandThemePaths.length === 0) {
+      Logger.w("Omarchy", "Could not read a Hyprland theme border color, using default border color");
+      finishSchemeGeneration(pendingAlacrittyColors);
       return;
     }
 
-    const wrappedScheme = {
-      "dark": scheme,
-      "light": scheme
-    };
+    const nextPath = pendingHyprlandThemePaths[0];
+    pendingHyprlandThemePaths = pendingHyprlandThemePaths.slice(1);
+    pendingHyprlandThemePath = nextPath;
+    hyprlandReadProcess.command = ["cat", nextPath];
+    hyprlandReadProcess.running = true;
+  }
 
-    const jsonContent = JSON.stringify(wrappedScheme, null, 2);
-    logDebug("Writing scheme JSON, length:", jsonContent.length);
-    const writeCmd = "mkdir -p \"$1\" && cat > \"$2\" << 'OMARCHY_SCHEME_EOF'\n" + jsonContent + "\nOMARCHY_SCHEME_EOF\n";
-    logDebug("Scheme write command:", writeCmd);
-    runShell(schemeWriteProcess, "sh", writeCmd, [schemeOutputDir, schemeOutputPath]);
+  function finishSchemeGeneration(parsed) {
+    pendingAlacrittyColors = null;
+    pendingHyprlandThemePaths = [];
+    pendingHyprlandThemePath = "";
+
+    Logger.i("Omarchy", "Generating color scheme");
+    const schemeResult = ThemePipeline.generateScheme(parsed, ColorsConvert);
+    logDebug("Detected mode:", schemeResult.mode);
+
+    writeSchemeResult(schemeResult);
+  }
+
+  function writeSchemeResult(result) {
+    if (!instantSchemeApplier.writeAndApplyScheme(result, handleSchemeApplyFinished))
+      handleSchemeApplyFinished(false);
+  }
+
+  function handleSchemeApplyFinished(success) {
+    applying = false;
+    if (!success) {
+      Logger.e("Omarchy", "Failed to write or apply scheme");
+      ToastService.showError("Omarchy", pluginApi?.tr("errors.failed-apply"));
+    }
+
+    if (pendingApplyAfterCurrent) {
+      pendingApplyAfterCurrent = false;
+      Qt.callLater(applyCurrentTheme);
+    }
   }
 
   function cleanupLegacySchemeFolder() {
@@ -763,7 +692,7 @@ Item {
         if (!displayName || !dirName)
           continue;
 
-        const normalizedName = normalizeThemeKey(dirName);
+        const normalizedName = ThemeIdentity.normalizeThemeKey(dirName);
         const cachedScheme = SchemeCache.getScheme(normalizedName);
         const mode = cachedScheme?.mode || detectedMode || "dark";
 
@@ -812,7 +741,7 @@ Item {
       const content = stdout.text || "";
       logDebug("Read", content.length, "bytes from", omarchyConfigPath);
 
-      const parsed = parseColorsToml(content);
+      const parsed = ThemeFiles.parseColorsToml(content);
       if (!parsed) {
         applying = false;
         Logger.e("Omarchy", "parseColorsToml returned null");
@@ -820,10 +749,8 @@ Item {
         return;
       }
 
-      Logger.i("Omarchy", "Successfully parsed theme colors, now reading Hyprland config");
-      pendingAlacrittyColors = parsed;
-      hyprlandReadProcess.command = ["cat", omarchyHyprlandPath];
-      hyprlandReadProcess.running = true;
+      Logger.i("Omarchy", "Successfully parsed theme colors, now reading Hyprland theme files");
+      beginHyprlandThemeRead(parsed);
     }
   }
 
@@ -835,65 +762,30 @@ Item {
       Logger.i("Omarchy", "hyprlandReadProcess exited with code:", code);
 
       const parsed = pendingAlacrittyColors;
-      pendingAlacrittyColors = null;
 
       if (!parsed) {
         applying = false;
+        pendingHyprlandThemePaths = [];
+        pendingHyprlandThemePath = "";
         Logger.e("Omarchy", "No pending alacritty colors");
         return;
       }
 
       if (code === 0) {
         const content = stdout.text || "";
-        const borderColor = parseHyprlandConf(content);
+        const borderColor = ThemeFiles.parseHyprlandBorderColor(content);
         if (borderColor) {
           parsed.hyprlandBorder = borderColor;
           Logger.i("Omarchy", "Using Hyprland border color:", borderColor);
+          finishSchemeGeneration(parsed);
+          return;
         }
+        logDebug("No Hyprland border color found in:", pendingHyprlandThemePath);
       } else {
-        Logger.w("Omarchy", "Could not read hyprland.conf, using default border color");
+        logDebug("Could not read Hyprland theme file:", pendingHyprlandThemePath, "exit code:", code);
       }
 
-      Logger.i("Omarchy", "Generating color scheme");
-      const schemeResult = ThemePipeline.generateScheme(parsed, ColorsConvert);
-      logDebug("Detected mode:", schemeResult.mode);
-
-      const isDarkMode = schemeResult.mode === "dark";
-      if (Settings.data.colorSchemes.darkMode !== isDarkMode) {
-        Logger.i("Omarchy", "Auto-switching Noctalia dark mode to:", isDarkMode);
-        setNoctaliaDarkMode(isDarkMode);
-      }
-      writeSchemeFile(schemeResult);
-    }
-  }
-
-  Process {
-    id: schemeWriteProcess
-    running: false
-    onExited: function (code) {
-      Logger.i("Omarchy", "schemeWriteProcess exited with code:", code);
-      applying = false;
-      if (code !== 0) {
-        Logger.e("Omarchy", "Failed to write scheme file, exit code:", code);
-        ToastService.showError("Omarchy", pluginApi?.tr("errors.failed-apply"));
-        if (pendingApplyAfterCurrent) {
-          pendingApplyAfterCurrent = false;
-          Qt.callLater(applyCurrentTheme);
-        }
-        return;
-      }
-
-      Logger.i("Omarchy", "Scheme file written successfully to:", schemeOutputPath);
-      // Store scheme identity before applying so the shell treats this as a predefined
-      // scheme transition instead of remaining in wallpaper-color mode.
-      Settings.data.colorSchemes.predefinedScheme = schemeKey;
-      Settings.data.colorSchemes.useWallpaperColors = false;
-      ColorSchemeService.applyScheme(schemeOutputPath);
-
-      if (pendingApplyAfterCurrent) {
-        pendingApplyAfterCurrent = false;
-        Qt.callLater(applyCurrentTheme);
-      }
+      readNextHyprlandThemeFile();
     }
   }
 
@@ -919,11 +811,10 @@ Item {
       return;
 
     let currentIndex = -1;
-    const currentKey = normalizeThemeKey(root.themeName);
+    const currentKey = ThemeIdentity.normalizeThemeKey(root.themeName);
     for (let i = 0; i < themes.length; i++) {
       const entry = themes[i];
-      // Use dirName for comparison if available, fallback to name
-      const entryKey = typeof entry === "string" ? normalizeThemeKey(entry) : normalizeThemeKey(entry.dirName || entry.name);
+      const entryKey = ThemeIdentity.themeEntryKey(entry);
       if (entryKey === currentKey) {
         currentIndex = i;
         break;
@@ -933,7 +824,7 @@ Item {
     const nextIndex = (currentIndex + 1) % themes.length;
     const nextTheme = themes[nextIndex];
     // Use dirName for operations, not display name
-    const nextName = typeof nextTheme === "string" ? nextTheme : (nextTheme.dirName || nextTheme.name);
+    const nextName = ThemeIdentity.themeEntryDirName(nextTheme);
     Logger.d("Omarchy", "cycleTheme: current:", root.themeName, "-> next:", nextName);
     root.setTheme(nextName);
   }
@@ -943,12 +834,11 @@ Item {
     if (themes.length === 0)
       return;
 
-    const currentKey = normalizeThemeKey(root.themeName);
+    const currentKey = ThemeIdentity.normalizeThemeKey(root.themeName);
     const otherThemes = themes.filter(theme => {
-                                        // Use dirName for comparison if available, fallback to name
-                                        const themeKey = typeof theme === "string" ? normalizeThemeKey(theme) : normalizeThemeKey(theme.dirName || theme.name);
-                                        return themeKey !== currentKey;
-                                      });
+      const themeKey = ThemeIdentity.themeEntryKey(theme);
+      return themeKey !== currentKey;
+    });
 
     if (otherThemes.length === 0)
       return;
@@ -956,36 +846,55 @@ Item {
     const randomIndex = Math.floor(Math.random() * otherThemes.length);
     const randomTheme = otherThemes[randomIndex];
     // Use dirName for operations, not display name
-    const randomName = typeof randomTheme === "string" ? randomTheme : (randomTheme.dirName || randomTheme.name);
+    const randomName = ThemeIdentity.themeEntryDirName(randomTheme);
     Logger.d("Omarchy", "randomTheme: selected theme dirName:", randomName);
     root.setTheme(randomName);
+  }
+
+  function ipcReload() {
+    root.reloadPluginState();
+  }
+
+  function ipcToggle() {
+    if (pluginApi?.pluginSettings?.active)
+      root.deactivate();
+    else
+      root.activate();
+  }
+
+  function ipcSetTheme(themeName) {
+    root.setTheme(themeName);
+  }
+
+  function ipcCycleTheme() {
+    root.cycleTheme();
+  }
+
+  function ipcRandomTheme() {
+    root.randomTheme();
   }
 
   IpcHandler {
     target: "omarchy"
 
     function reload() {
-      root.reloadPluginState();
+      root.ipcReload();
     }
 
     function toggle() {
-      if (pluginApi?.pluginSettings?.active) {
-        root.deactivate();
-      } else {
-        root.activate();
-      }
+      root.ipcToggle();
     }
 
     function setTheme(themeName: string) {
-      root.setTheme(themeName);
+      root.ipcSetTheme(themeName);
     }
 
     function cycleTheme() {
-      root.cycleTheme();
+      root.ipcCycleTheme();
     }
 
     function randomTheme() {
-      root.randomTheme();
+      root.ipcRandomTheme();
     }
   }
 
@@ -993,27 +902,23 @@ Item {
     target: "plugin:omarchy"
 
     function reload() {
-      root.reloadPluginState();
+      root.ipcReload();
     }
 
     function toggle() {
-      if (pluginApi?.pluginSettings?.active) {
-        root.deactivate();
-      } else {
-        root.activate();
-      }
+      root.ipcToggle();
     }
 
     function setTheme(themeName: string) {
-      root.setTheme(themeName);
+      root.ipcSetTheme(themeName);
     }
 
     function cycleTheme() {
-      root.cycleTheme();
+      root.ipcCycleTheme();
     }
 
     function randomTheme() {
-      root.randomTheme();
+      root.ipcRandomTheme();
     }
   }
 

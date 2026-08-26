@@ -139,9 +139,9 @@ ColumnLayout {
     description: pluginApi?.tr("settings.auto-cycle.enabled-desc")
     checked: root.autoCycleEnabled
     onToggled: checked => {
-                 root.autoCycleEnabled = checked;
-                 saveSettings();
-               }
+      root.autoCycleEnabled = checked;
+      saveSettings();
+    }
   }
 
   NTextInput {
@@ -162,9 +162,9 @@ ColumnLayout {
     description: pluginApi?.tr("settings.shuffle-desc")
     checked: root.shuffleMode
     onToggled: checked => {
-                 root.shuffleMode = checked;
-                 saveSettings();
-               }
+      root.shuffleMode = checked;
+      saveSettings();
+    }
   }
 
   NDivider {
@@ -234,9 +234,9 @@ ColumnLayout {
     ]
     currentKey: root.transitionType
     onSelected: key => {
-                  root.transitionType = key;
-                  saveSettings();
-                }
+      root.transitionType = key;
+      saveSettings();
+    }
   }
 
   RowLayout {
@@ -306,19 +306,25 @@ ColumnLayout {
 
     NButton {
       text: pluginApi?.tr("settings.bezier.snappy")
-      highlighted: transitionBezier === ".4,0,.2,1"
+      outlined: transitionBezier !== ".4,0,.2,1"
+      backgroundColor: Color.mPrimary
+      textColor: Color.mOnPrimary
       onClicked: transitionBezier = ".4,0,.2,1"
     }
 
     NButton {
       text: pluginApi?.tr("settings.bezier.natural")
-      highlighted: transitionBezier === ".17,.67,.83,.67"
+      outlined: transitionBezier !== ".17,.67,.83,.67"
+      backgroundColor: Color.mPrimary
+      textColor: Color.mOnPrimary
       onClicked: transitionBezier = ".17,.67,.83,.67"
     }
 
     NButton {
       text: pluginApi?.tr("settings.bezier.linear")
-      highlighted: transitionBezier === "0,0,1,1"
+      outlined: transitionBezier !== "0,0,1,1"
+      backgroundColor: Color.mPrimary
+      textColor: Color.mOnPrimary
       onClicked: transitionBezier = "0,0,1,1"
     }
   }
@@ -352,9 +358,9 @@ ColumnLayout {
     description: pluginApi?.tr("settings.show-name-desc")
     checked: root.showWallpaperName
     onToggled: checked => {
-                 root.showWallpaperName = checked;
-                 saveSettings();
-               }
+      root.showWallpaperName = checked;
+      saveSettings();
+    }
   }
 
   NDivider {

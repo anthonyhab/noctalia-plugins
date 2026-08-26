@@ -1,0 +1,31 @@
+{
+   "id": "omarchy-feedback",
+   "name": "Omarchy Feedback",
+   "version": "0.1.1",
+   "minNoctaliaVersion": "3.6.0",
+   "author": "habibe",
+   "license": "MIT",
+   "repository": "https://github.com/anthonyhab/noctalia-plugins",
+   "description": "Tiny Omarchy runtime state indicators for Noctalia bars.",
+   "tags": [
+      "Bar",
+      "System"
+   ],
+   "entryPoints": {
+      "main": "Main.qml",
+      "barWidget": "BarWidget.qml",
+      "settings": "Settings.qml"
+   },
+   "dependencies": {
+      "plugins": []
+   },
+   "metadata": {
+      "allowUserSettings": true,
+      "defaultSettings": {
+         "showVoxtype": true,
+         "showScreenRecording": true,
+         "showIdleDisabled": true,
+         "showUpdateAvailable": true
+      }
+   }
+}

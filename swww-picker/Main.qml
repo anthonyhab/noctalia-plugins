@@ -236,9 +236,9 @@ Item {
   // Toggle grid columns
   function toggleGridColumns() {
     mutatePluginSettings(s => {
-                           let current = s.gridColumns ?? 2;
-                           s.gridColumns = (current % 3) + 1;
-                         });
+      let current = s.gridColumns ?? 2;
+      s.gridColumns = (current % 3) + 1;
+    });
     pluginApi.saveSettings();
   }
 
@@ -251,7 +251,7 @@ Item {
     onTriggered: root.next()
   }
 
-  // Theme watcher (Omarchy swaps symlink target without changing scheme name)
+  // Theme watcher (re-check the resolved wallpaper directory in case a symlink target changes)
   Timer {
     id: themeWatchTimer
     interval: 5000
@@ -308,9 +308,9 @@ Item {
       // Filter wallpaper list to only include files that actually exist
       const allPaths = output.split("\n").filter(p => p.length > 0);
       const existingPaths = allPaths.filter(path => {
-                                              // Quick check - we'll do proper verification when setting wallpaper
-                                              return path.startsWith("/") && path.length > 0;
-                                            });
+        // Quick check - we'll do proper verification when setting wallpaper
+        return path.startsWith("/") && path.length > 0;
+      });
 
       if (existingPaths.length !== allPaths.length) {
         Logger.w("SwwwPicker", "Filtered out " + (allPaths.length - existingPaths.length) + " non-existent files");
@@ -401,22 +401,22 @@ Item {
       // Wallpaper was already applied by theme-bg-next
       // Just refresh state asynchronously for UI updates
       Qt.callLater(() => {
-                     root.refresh();
-                   });
+        root.refresh();
+      });
     }
 
     function togglePanel() {
       if (!pluginApi)
         return;
       pluginApi.withCurrentScreen(screen => {
-                                    if (pluginApi.panelOpenScreen) {
-                                      pluginApi.closePanel(pluginApi.panelOpenScreen);
-                                      return;
-                                    }
+        if (pluginApi.panelOpenScreen) {
+          pluginApi.closePanel(pluginApi.panelOpenScreen);
+          return;
+        }
 
-                                    // No sourceItem provided => opens centered on the target screen.
-                                    pluginApi.openPanel(screen);
-                                  });
+        // No sourceItem provided => opens centered on the target screen.
+        pluginApi.openPanel(screen);
+      });
     }
   }
 
@@ -427,12 +427,12 @@ Item {
 
     // Restore last wallpaper after a brief delay to ensure daemon is ready
     Qt.callLater(() => {
-                   const last = pluginApi?.pluginSettings?.lastWallpaper;
-                   if (last && available) {
-                     Logger.i("SwwwPicker", "Restoring last wallpaper: " + last);
-                     setWallpaper(last);
-                   }
-                 });
+      const last = pluginApi?.pluginSettings?.lastWallpaper;
+      if (last && available) {
+        Logger.i("SwwwPicker", "Restoring last wallpaper: " + last);
+        setWallpaper(last);
+      }
+    });
   }
 
   Connections {

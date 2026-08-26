@@ -1,7 +1,7 @@
 import QtQuick
-import Quickshell
 import Quickshell.Hyprland
 import Quickshell.Io
+import "DispatchCompat.js" as DispatchCompat
 import qs.Commons
 
 Item {
@@ -23,29 +23,36 @@ Item {
   // Config persistence
   property int originalFollowMouse: 1
   property bool originalNoWarps: false
+  property bool originalWarpOnChangeWorkspace: false
+  property bool originalWarpOnToggleSpecial: false
+  property bool originalAlwaysFollowOnDnd: false
   property bool hasFetchedOriginals: false
+  property int originalFetchPending: 0
   // Scroll layout direction per workspace id (populated from hyprctl workspacerules -j)
   property var workspaceScrollDirections: ({})
 
   function enableDragMode() {
     runKeyword("input:follow_mouse 0");
     runKeyword("cursor:no_warps 1");
+    runKeyword("cursor:warp_on_change_workspace 0");
+    runKeyword("cursor:warp_on_toggle_special 0");
+    runKeyword("misc:always_follow_on_dnd 0");
   }
 
   function disableDragMode() {
     runKeyword("input:follow_mouse " + root.originalFollowMouse);
     runKeyword("cursor:no_warps " + (root.originalNoWarps ? "1" : "0"));
+    runKeyword("cursor:warp_on_change_workspace " + (root.originalWarpOnChangeWorkspace ? "1" : "0"));
+    runKeyword("cursor:warp_on_toggle_special " + (root.originalWarpOnToggleSpecial ? "1" : "0"));
+    runKeyword("misc:always_follow_on_dnd " + (root.originalAlwaysFollowOnDnd ? "1" : "0"));
   }
 
   function runKeyword(keyword) {
-    var args = keyword.split(" ");
-    var cmd = ["hyprctl", "keyword"];
-    for (var i = 0; i < args.length; i++) {
-      if (args[i] !== "")
-        cmd.push(args[i]);
-    }
+    var luaConfig = DispatchCompat.keywordToLuaConfig("keyword " + keyword);
+    if (luaConfig === "")
+      return;
     keywordProcessComponent.createObject(root, {
-                                           "command": cmd
+                                           "command": ["hyprctl", "eval", luaConfig]
                                          }).running = true;
   }
 
@@ -80,40 +87,63 @@ Item {
   }
 
   function updateConfig() {
-    if (!Hyprland.valid)
-      return;
-
     // Batch requests if possible, or just fire them off
     fetchOption("general:gaps_in", v => {
-                  return root.gapsIn = v;
-                });
+      return root.gapsIn = v;
+    });
     fetchOption("general:gaps_out", v => {
-                  return root.gapsOut = v;
-                });
+      return root.gapsOut = v;
+    });
     fetchOption("general:gaps_workspaces", v => {
-                  return root.gapsWorkspaces = v;
-                });
+      return root.gapsWorkspaces = v;
+    });
     fetchOption("decoration:rounding", v => {
-                  return root.rounding = v;
-                });
+      return root.rounding = v;
+    });
     fetchOption("general:border_size", v => {
-                  return root.borderSize = v;
-                });
+      return root.borderSize = v;
+    });
     fetchOption("general:col.active_border", v => {
-                  return root.activeBorderColor = parseHyprColor(v);
-                });
+      return root.activeBorderColor = parseHyprColor(v);
+    });
     fetchOption("general:col.inactive_border", v => {
-                  return root.inactiveBorderColor = parseHyprColor(v);
-                });
-    // Capture originals once
-    if (!hasFetchedOriginals) {
-      fetchOption("input:follow_mouse", v => {
-                    root.originalFollowMouse = v;
-                    root.hasFetchedOriginals = true;
-                  });
-      fetchOption("cursor:no_warps", v => {
-                    root.originalNoWarps = !!v;
-                  });
+      return root.inactiveBorderColor = parseHyprColor(v);
+    });
+    captureOriginalPointerOptions();
+  }
+
+  function captureOriginalPointerOptions() {
+    if (hasFetchedOriginals || originalFetchPending > 0)
+      return;
+
+    originalFetchPending = 5;
+    fetchOptionWithDefault("input:follow_mouse", 1, v => {
+      root.originalFollowMouse = v;
+      root.completeOriginalFetch("input:follow_mouse");
+    });
+    fetchOptionWithDefault("cursor:no_warps", false, v => {
+      root.originalNoWarps = !!v;
+      root.completeOriginalFetch("cursor:no_warps");
+    });
+    fetchOptionWithDefault("cursor:warp_on_change_workspace", false, v => {
+      root.originalWarpOnChangeWorkspace = !!v;
+      root.completeOriginalFetch("cursor:warp_on_change_workspace");
+    });
+    fetchOptionWithDefault("cursor:warp_on_toggle_special", false, v => {
+      root.originalWarpOnToggleSpecial = !!v;
+      root.completeOriginalFetch("cursor:warp_on_toggle_special");
+    });
+    fetchOptionWithDefault("misc:always_follow_on_dnd", false, v => {
+      root.originalAlwaysFollowOnDnd = !!v;
+      root.completeOriginalFetch("misc:always_follow_on_dnd");
+    });
+  }
+
+  function completeOriginalFetch(optionName) {
+    originalFetchPending = Math.max(0, originalFetchPending - 1);
+    if (originalFetchPending === 0) {
+      hasFetchedOriginals = true;
+      Logger.d("HyprOverview", "Captured pointer options after " + optionName);
     }
   }
 
@@ -129,6 +159,19 @@ Item {
   function fetchOption(optionName, callback) {
     var proc = processComponent.createObject(root, {
                                                "option": optionName
+                                             });
+    var timer = fetchTimeoutComponent.createObject(root, {
+                                                     "proc": proc
+                                                   });
+    proc.timeoutTimer = timer;
+    proc.result.connect(callback);
+    proc.running = true;
+  }
+
+  function fetchOptionWithDefault(optionName, fallbackValue, callback) {
+    var proc = processComponent.createObject(root, {
+                                               "option": optionName,
+                                               "fallbackValue": fallbackValue
                                              });
     var timer = fetchTimeoutComponent.createObject(root, {
                                                      "proc": proc
@@ -180,6 +223,8 @@ Item {
     Process {
       property string option: ""
       property var timeoutTimer: null
+      property var fallbackValue: null
+      property bool hasValue: false
 
       signal result(var value)
 
@@ -194,6 +239,10 @@ Item {
             timeoutTimer.destroy();
             timeoutTimer = null;
           }
+          if (!hasValue && fallbackValue !== null) {
+            hasValue = true;
+            result(fallbackValue);
+          }
           destroy();
         }
       }
@@ -203,12 +252,19 @@ Item {
           try {
             var json = JSON.parse(data);
             // Hyprland returns: { "option": "...", "set": true, "str": "...", "int": 10, "float": 0.0, "data": "..." }
-            if (json.str !== undefined && json.str !== "")
+            if (json.str !== undefined && json.str !== "") {
+              hasValue = true;
               result(json.str);
-            else if (json.int !== undefined)
+            } else if (json.bool !== undefined) {
+              hasValue = true;
+              result(json.bool);
+            } else if (json.int !== undefined) {
+              hasValue = true;
               result(json.int);
-            else if (json.float !== undefined)
+            } else if (json.float !== undefined) {
+              hasValue = true;
               result(json.float);
+            }
           } catch (e) {
             Logger.w("HyprOverview", "fetchOption parse error:", e);
           }

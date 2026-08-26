@@ -1,34 +1,37 @@
 {
-  "id": "omarchy",
-  "name": "Omarchy Integration",
-  "version": "0.4.1",
-  "minNoctaliaVersion": "3.6.0",
-  "author": "habibe",
-  "license": "MIT",
-  "repository": "https://github.com/anthonyhab/noctalia-plugins",
-  "description": "Automatic color scheme sync from Omarchy themes using CIELAB-optimized palettes.",
-  "tags": ["Bar", "System"],
-  "entryPoints": {
-    "main": "Main.qml",
-    "panel": "Panel.qml",
-    "barWidget": "BarWidget.qml",
-    "settings": "Settings.qml",
-    "controlCenterWidget": "ControlCenterWidget.qml"
-  },
-  "dependencies": {
-    "plugins": []
-  },
-  "metadata": {
-    "allowUserSettings": true,
-    "defaultSettings": {
-      "active": false,
-      "debugLogging": false,
-      "themeSetCommand": "",
-      "omarchyConfigDir": "",
-      "showThemeName": true,
-      "showSearchInput": true,
-      "timeBasedThemeFiltering": false,
-      "themeFilteringMode": "random-only"
-    }
-  }
+   "id": "omarchy",
+   "name": "Omarchy Integration",
+   "version": "0.4.2",
+   "minNoctaliaVersion": "3.6.0",
+   "author": "habibe",
+   "license": "MIT",
+   "repository": "https://github.com/anthonyhab/noctalia-plugins",
+   "description": "Automatic color scheme sync from Omarchy themes using CIELAB-optimized palettes.",
+   "tags": [
+      "Bar",
+      "System"
+   ],
+   "entryPoints": {
+      "main": "Main.qml",
+      "panel": "Panel.qml",
+      "barWidget": "BarWidget.qml",
+      "settings": "Settings.qml",
+      "controlCenterWidget": "ControlCenterWidget.qml"
+   },
+   "dependencies": {
+      "plugins": []
+   },
+   "metadata": {
+      "allowUserSettings": true,
+      "defaultSettings": {
+         "active": false,
+         "debugLogging": false,
+         "themeSetCommand": "",
+         "omarchyConfigDir": "",
+         "showThemeName": true,
+         "showSearchInput": true,
+         "timeBasedThemeFiltering": false,
+         "themeFilteringMode": "random-only"
+      }
+   }
 }

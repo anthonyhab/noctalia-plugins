@@ -1,15 +1,27 @@
 # Hypr Overview Plugin for Noctalia
 
-A visually stunning Hyprland overview with real-time window previews and wallpaper integration, designed for Noctalia Shell.
+Hypr Overview adds a Hyprland workspace overview to Noctalia Shell with window previews, keyboard navigation, and drag-and-drop window movement.
 
-## ✨ Features
+## Features
 
-- **Panoramic View**: A balanced 3-column grid that fills your panel with a professional, symmetrical layout.
-- **Live Previews**: Real-time rendering of all your open windows using `ScreencopyView`.
-- **Dynamic Sizing**: The panel height automatically adjusts to the number of active workspaces.
-- **Wallpaper Backgrounds**: Automatically pulls your desktop wallpaper to show "life" in every workspace preview.
-- **Drag & Drop**: Effortlessly move windows between workspaces by dragging their previews.
-- **Clean Aesthetic**: No visible scrollbars—just your windows and your work.
+- Configurable workspace grid with optional empty-row hiding.
+- Live window previews using Hyprland/Wayland screencopy, with an optional pixelated/dithered shader style.
+- Drag windows between workspaces, including optional cross-monitor migration.
+- Retile previews for supported Hyprland layouts.
+- Keyboard, mouse, and scroll-wheel workspace navigation.
+- Optional workspace labels, window title strips, status badges, and monitor indicators.
+
+## Settings
+
+Key settings are available in the Noctalia plugin settings panel:
+
+- `showMonitorIndicators`: show monitor badges on window previews.
+- `enableCrossMonitorDrag`: allow dragging windows to workspaces on other monitors.
+- `visualMode`: `live`, `simplified` pixel shader, or `off`.
+- `shaderPreset`: `pixelated` or `mac` for the classic dithered look.
+- Grid rows, columns, scale, spacing, position, animation profile, labels, badges, title strips, preview styling, drag thresholds, and layout badges/guides.
+
+Obsolete effects keys are removed from saved plugin settings on load. Compatibility preview keys from earlier builds are migrated into the supported preview style settings.
 
 ## Installation
 

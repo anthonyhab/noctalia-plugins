@@ -1,11 +1,12 @@
+// qmllint disable signal-handler-parameters
 import QtQuick
-import Quickshell
 import Quickshell.Io
 import "SchemeCache.js" as SchemeCache
+import "ThemeIdentity.js" as ThemeIdentity
 import qs.Commons
 import qs.Services.Theming
 
-// Instant color scheme application from cache
+// Instant color scheme application from cache and generated Omarchy palettes.
 Item {
   id: root
 
@@ -22,17 +23,28 @@ Item {
   }
   readonly property string schemeOutputPath: schemeFolder + "/" + schemeKey + ".json"
   readonly property string schemeOutputDir: schemeFolder
-  // Preload cache at startup
+
   property var cachedSchemes: ({})
-  property string pendingSchemeContent: ""
+  property var pendingApplyCallback: null
 
   function preloadCache() {
-    // Load all schemes from SchemeCache into memory
     const schemes = SchemeCache.getAllSchemes ? SchemeCache.getAllSchemes() : null;
     if (schemes) {
       cachedSchemes = schemes;
       Logger.i("InstantSchemeApplier", "Preloaded", Object.keys(schemes).length, "schemes");
     }
+  }
+
+  function colorSchemeSetting(key, fallback) {
+    const colorSchemes = Settings.data.colorSchemes;
+    if (!colorSchemes)
+      return fallback;
+    const value = colorSchemes[key];
+    return (value === undefined || value === null) ? fallback : value;
+  }
+
+  function setColorSchemeSetting(key, value) {
+    Settings.data.colorSchemes[key] = value;
   }
 
   function applyScheme(themeName) {
@@ -44,11 +56,8 @@ Item {
         "duration": 0
       };
 
-    // Normalize theme name to cache key
-    const cacheKey = normalizeThemeKey(themeName);
-    // Try memory cache first
+    const cacheKey = ThemeIdentity.normalizeThemeKey(themeName);
     var cached = cachedSchemes[cacheKey];
-    // Fallback to SchemeCache
     if (!cached && SchemeCache.getScheme)
       cached = SchemeCache.getScheme(cacheKey);
 
@@ -61,9 +70,11 @@ Item {
         "cacheHit": false
       };
     }
-    // Apply the scheme
+
     try {
-      applyCachedScheme(cached, themeName);
+      const started = writeAndApplyScheme(cached, null);
+      if (!started)
+        throw new Error("Invalid scheme data or output path");
       const duration = Date.now() - startTime;
       Logger.i("InstantSchemeApplier", "Applied scheme in", duration, "ms:", themeName);
       return {
@@ -82,77 +93,52 @@ Item {
     }
   }
 
-  function applyCachedScheme(cached, themeName) {
-    const isDarkMode = cached.mode === "dark";
-    // Update Noctalia dark mode if needed
-    // Only when scheduling is disabled - respect user's scheduling preferences
-    const schedulingMode = Settings.data.colorSchemes.schedulingMode || "off";
-    if (schedulingMode === "off" && Settings.data.colorSchemes.darkMode !== isDarkMode) {
-      Logger.i("InstantSchemeApplier", "Updating dark mode:", isDarkMode);
-      const wasWallpaper = !!Settings.data.colorSchemes.useWallpaperColors;
-      Settings.data.colorSchemes.useWallpaperColors = true;
-      Settings.data.colorSchemes.darkMode = isDarkMode;
-      Settings.data.colorSchemes.useWallpaperColors = wasWallpaper;
+  function updateNoctaliaDarkMode(mode) {
+    const isDarkMode = mode === "dark";
+    const schedulingMode = colorSchemeSetting("schedulingMode", "off");
+    if (schedulingMode !== "off" || colorSchemeSetting("darkMode", false) === isDarkMode)
+      return;
+
+    Logger.i("InstantSchemeApplier", "Updating dark mode:", isDarkMode);
+    const wasWallpaper = !!colorSchemeSetting("useWallpaperColors", false);
+    setColorSchemeSetting("useWallpaperColors", true);
+    setColorSchemeSetting("darkMode", isDarkMode);
+    setColorSchemeSetting("useWallpaperColors", wasWallpaper);
+  }
+
+  function writeAndApplyScheme(result, callback) {
+    const mode = result?.mode;
+    const scheme = result?.palette;
+    if (!scheme || !mode || !schemeOutputPath || !schemeOutputDir) {
+      Logger.e("InstantSchemeApplier", "writeAndApplyScheme missing scheme data or output path");
+      return false;
     }
-    // Write scheme file
-    const scheme = cached.palette;
-    if (!scheme || !schemeOutputPath)
-      throw new Error("Invalid scheme data or output path");
+
+    updateNoctaliaDarkMode(mode);
 
     const wrappedScheme = {
       "dark": scheme,
       "light": scheme
     };
     const jsonContent = JSON.stringify(wrappedScheme, null, 2);
-    // Use FileView for async write
-    writeSchemeFile(jsonContent, themeName);
+    pendingApplyCallback = callback || null;
+    writeSchemeFile(jsonContent);
+    return true;
   }
 
-  function writeSchemeFile(jsonContent, themeName) {
-    // Create directory if needed and write file
+  function finishPendingApply(success) {
+    const callback = pendingApplyCallback;
+    pendingApplyCallback = null;
+    if (callback)
+      Qt.callLater(function () {
+        callback(success);
+      });
+  }
+
+  function writeSchemeFile(jsonContent) {
     const writeCmd = "mkdir -p \"" + schemeOutputDir + "\" && cat > \"" + schemeOutputPath + "\" << 'OMARCHY_SCHEME_EOF'\n" + jsonContent + "\nOMARCHY_SCHEME_EOF\n";
     schemeWriteProcess.command = ["sh", "-c", writeCmd];
     schemeWriteProcess.running = true;
-  }
-
-  function normalizeThemeKey(name) {
-    if (!name || typeof name !== "string")
-      return "";
-
-    return name.replace(/<[^>]+>/g, "").trim().toLowerCase().replace(/\s+/g, "-");
-  }
-
-  // Update cache when themes are scanned
-  function updateCache(themes) {
-    if (!themes || themes.length === 0)
-      return;
-
-    themes.forEach(function (theme) {
-      const key = normalizeThemeKey(theme.name);
-      if (key && !cachedSchemes[key]) {
-        // Try to load from SchemeCache
-        const cached = SchemeCache.getScheme ? SchemeCache.getScheme(key) : null;
-        if (cached)
-          cachedSchemes[key] = cached;
-      }
-    });
-    Logger.i("InstantSchemeApplier", "Cache updated, total schemes:", Object.keys(cachedSchemes).length);
-  }
-
-  // Add scheme to cache after live generation
-  function addToCache(themeDirName, scheme) {
-    if (!themeDirName || !scheme)
-      return;
-
-    const key = normalizeThemeKey(themeDirName);
-    if (!key)
-      return;
-
-    // Add to memory cache
-    cachedSchemes[key] = scheme;
-    Logger.i("InstantSchemeApplier", "Added scheme to memory cache:", themeDirName);
-    // Return the scheme for chaining
-    return scheme;
   }
 
   Component.onCompleted: {
@@ -166,13 +152,13 @@ Item {
     onExited: function (code) {
       if (code === 0) {
         Logger.i("InstantSchemeApplier", "Scheme file written:", schemeOutputPath);
-        // Store scheme identity before applying so the shell treats this as a predefined
-        // scheme transition instead of remaining in wallpaper-color mode.
         Settings.data.colorSchemes.predefinedScheme = schemeKey;
         Settings.data.colorSchemes.useWallpaperColors = false;
         ColorSchemeService.applyScheme(schemeOutputPath);
+        finishPendingApply(true);
       } else {
         Logger.e("InstantSchemeApplier", "Failed to write scheme file, exit code:", code);
+        finishPendingApply(false);
       }
     }
   }

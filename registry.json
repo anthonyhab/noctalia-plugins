@@ -1,60 +1,71 @@
 {
-  "version": 1,
-  "plugins": [
-    {
-      "id": "homeassistant",
-      "name": "Home Assistant",
-      "version": "0.1.7",
-      "author": "habibe",
-      "description": "Control Home Assistant media players with bar and panel widgets.",
-      "repository": "https://github.com/anthonyhab/noctalia-plugins/",
-      "minNoctaliaVersion": "3.6.0",
-      "license": "MIT",
-      "lastUpdated": "2026-04-09T12:00:00Z"
-    },
-    {
-      "id": "omarchy",
-      "name": "Omarchy Integration",
-      "version": "0.4.1",
-      "author": "habibe",
-      "description": "Automatic color scheme sync from Omarchy themes using CIELAB-optimized palettes.",
-      "repository": "https://github.com/anthonyhab/noctalia-plugins/",
-      "minNoctaliaVersion": "3.6.0",
-      "license": "MIT",
-      "lastUpdated": "2026-04-09T12:00:00Z"
-    },
-    {
-      "id": "bb-auth",
-      "name": "BB Auth",
-      "version": "0.2.1",
-      "author": "habibe",
-      "description": "Polkit authentication agent with keyring unlock and GPG pinentry support.",
-      "repository": "https://github.com/anthonyhab/noctalia-plugins/",
-      "minNoctaliaVersion": "3.6.0",
-      "license": "MIT",
-      "lastUpdated": "2026-02-10T12:00:00Z"
-    },
-    {
-      "id": "swww-picker",
-      "name": "AWWW Wallpaper Picker",
-      "version": "0.2.4",
-      "author": "habibe",
-      "description": "Wallpaper management with awww — optimized for 160Hz VRR displays with snappy bezier transitions.",
-      "repository": "https://github.com/anthonyhab/noctalia-plugins/",
-      "minNoctaliaVersion": "3.6.0",
-      "license": "MIT",
-      "lastUpdated": "2026-05-01T12:00:00Z"
-    },
-    {
-      "id": "hypr-overview",
-      "name": "Hypr Overview",
-      "version": "1.1.0",
-      "author": "habibe",
-      "description": "Visual workspace overview for Hyprland with live previews, drag-and-drop, keyboard navigation, and multi-layout support.",
-      "repository": "https://github.com/anthonyhab/noctalia-plugins/",
-      "minNoctaliaVersion": "3.6.0",
-      "license": "MIT",
-      "lastUpdated": "2026-05-01T12:00:00Z"
-    }
-  ]
+   "version": 1,
+   "plugins": [
+      {
+         "id": "homeassistant",
+         "name": "Home Assistant",
+         "version": "0.1.7",
+         "author": "habibe",
+         "description": "Control Home Assistant media players with bar and panel widgets.",
+         "repository": "https://github.com/anthonyhab/noctalia-plugins/",
+         "minNoctaliaVersion": "3.6.0",
+         "license": "MIT",
+         "lastUpdated": "2026-04-09T12:00:00Z"
+      },
+      {
+         "id": "omarchy",
+         "name": "Omarchy Integration",
+         "version": "0.4.2",
+         "author": "habibe",
+         "description": "Automatic color scheme sync from Omarchy themes using CIELAB-optimized palettes.",
+         "repository": "https://github.com/anthonyhab/noctalia-plugins/",
+         "minNoctaliaVersion": "3.6.0",
+         "license": "MIT",
+         "lastUpdated": "2026-05-20T12:00:00Z"
+      },
+      {
+         "id": "omarchy-feedback",
+         "name": "Omarchy Feedback",
+         "version": "0.1.1",
+         "author": "habibe",
+         "description": "Tiny Omarchy runtime state indicators for Noctalia bars.",
+         "repository": "https://github.com/anthonyhab/noctalia-plugins/",
+         "minNoctaliaVersion": "3.6.0",
+         "license": "MIT",
+         "lastUpdated": "2026-05-20T12:00:00Z"
+      },
+      {
+         "id": "bb-auth",
+         "name": "BB Auth",
+         "version": "0.2.1",
+         "author": "habibe",
+         "description": "Polkit authentication agent with keyring unlock and GPG pinentry support.",
+         "repository": "https://github.com/anthonyhab/noctalia-plugins/",
+         "minNoctaliaVersion": "3.6.0",
+         "license": "MIT",
+         "lastUpdated": "2026-02-10T12:00:00Z"
+      },
+      {
+         "id": "swww-picker",
+         "name": "AWWW Wallpaper Picker",
+         "version": "0.2.4",
+         "author": "habibe",
+         "description": "Wallpaper management with awww — optimized for 160Hz VRR displays with snappy bezier transitions.",
+         "repository": "https://github.com/anthonyhab/noctalia-plugins/",
+         "minNoctaliaVersion": "3.6.0",
+         "license": "MIT",
+         "lastUpdated": "2026-05-01T12:00:00Z"
+      },
+      {
+         "id": "hypr-overview",
+         "name": "Hypr Overview",
+         "version": "1.1.0",
+         "author": "habibe",
+         "description": "Visual workspace overview for Hyprland with live previews, drag-and-drop, keyboard navigation, and multi-layout support.",
+         "repository": "https://github.com/anthonyhab/noctalia-plugins/",
+         "minNoctaliaVersion": "3.6.0",
+         "license": "MIT",
+         "lastUpdated": "2026-05-01T12:00:00Z"
+      }
+   ]
 }

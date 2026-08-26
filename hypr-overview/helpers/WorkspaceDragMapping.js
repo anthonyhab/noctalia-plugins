@@ -41,80 +41,31 @@ function mapPreviewFrameToLogical(args) {
 
     var centeringX = toNumber(args.centeringX, 0)
     var centeringY = toNumber(args.centeringY, 0)
+    var workAreaX = Math.max(0, toNumber(args.workAreaX, 0))
+    var workAreaY = Math.max(0, toNumber(args.workAreaY, 0))
     var rawX = ((clampedFrameX - inset) / scaleX) - centeringX
     var rawY = ((clampedFrameY - inset) / scaleY) - centeringY
 
     var monitorX = toNumber(args.monitorX, 0)
     var monitorY = toNumber(args.monitorY, 0)
-    var monitorLogicalWidth = Math.max(1, toNumber(args.monitorLogicalWidth, 1920))
-    var monitorLogicalHeight = Math.max(1, toNumber(args.monitorLogicalHeight, 1080))
+    var monitorLogicalWidth = Math.max(1, toNumber(args.workAreaWidth, toNumber(args.monitorLogicalWidth, 1920)))
+    var monitorLogicalHeight = Math.max(1, toNumber(args.workAreaHeight, toNumber(args.monitorLogicalHeight, 1080)))
     var windowWidthRaw = Math.max(1, toNumber(args.windowWidthRaw, 1))
     var windowHeightRaw = Math.max(1, toNumber(args.windowHeightRaw, 1))
 
-    var minX = monitorX
-    var minY = monitorY
-    var maxX = Math.max(minX, monitorX + monitorLogicalWidth - windowWidthRaw)
-    var maxY = Math.max(minY, monitorY + monitorLogicalHeight - windowHeightRaw)
+    var minX = monitorX + workAreaX
+    var minY = monitorY + workAreaY
+    var maxX = Math.max(minX, minX + monitorLogicalWidth - windowWidthRaw)
+    var maxY = Math.max(minY, minY + monitorLogicalHeight - windowHeightRaw)
 
     return {
-        "x": Math.round(clamp(rawX + monitorX, minX, maxX)),
-        "y": Math.round(clamp(rawY + monitorY, minY, maxY)),
+        "x": Math.round(clamp(rawX + minX, minX, maxX)),
+        "y": Math.round(clamp(rawY + minY, minY, maxY)),
         "minX": minX,
         "minY": minY,
         "maxX": maxX,
         "maxY": maxY
     }
-}
-
-function snapToCandidates(value, candidates, minValue, maxValue, thresholdPx) {
-    if (!candidates || candidates.length === 0)
-        return value
-
-    var bestValue = value
-    var bestDistance = thresholdPx + 1
-
-    for (var i = 0; i < candidates.length; i++) {
-        var candidate = Math.round(clamp(candidates[i], minValue, maxValue))
-        var distance = Math.abs(value - candidate)
-        if (distance < bestDistance) {
-            bestDistance = distance
-            bestValue = candidate
-        }
-    }
-
-    if (bestDistance <= thresholdPx)
-        return bestValue
-
-    return value
-}
-
-function hasFloatingOverlapAt(windowByAddress, draggedAddress, workspaceId, monitorId, xPos, yPos, widthPx, heightPx, overlapThresholdRatio) {
-    var minOverlapX = Math.max(16, Math.min(widthPx, 200) * Math.max(0, toNumber(overlapThresholdRatio, 0.32)))
-    var minOverlapY = Math.max(16, Math.min(heightPx, 200) * Math.max(0, toNumber(overlapThresholdRatio, 0.32)))
-
-    for (var addr in windowByAddress) {
-        if (addr === draggedAddress)
-            continue
-
-        var win = windowByAddress[addr]
-        if (!win || !win.workspace || win.workspace.id !== workspaceId || !win.floating)
-            continue
-
-        if (toNumber(win.monitor, -1) !== monitorId)
-            continue
-
-        var winX = toNumber(win.at && win.at[0], 0)
-        var winY = toNumber(win.at && win.at[1], 0)
-        var winW = Math.max(1, toNumber(win.size && win.size[0], 1))
-        var winH = Math.max(1, toNumber(win.size && win.size[1], 1))
-        var overlapX = Math.min(xPos + widthPx, winX + winW) - Math.max(xPos, winX)
-        var overlapY = Math.min(yPos + heightPx, winY + winH) - Math.max(yPos, winY)
-
-        if (overlapX >= minOverlapX && overlapY >= minOverlapY)
-            return true
-    }
-
-    return false
 }
 
 function resolveFloatingDropPosition(args) {
@@ -138,6 +89,10 @@ function resolveFloatingDropPosition(args) {
         "monitorY": args.monitorY,
         "monitorLogicalWidth": args.monitorLogicalWidth,
         "monitorLogicalHeight": args.monitorLogicalHeight,
+        "workAreaX": args.workAreaX,
+        "workAreaY": args.workAreaY,
+        "workAreaWidth": args.workAreaWidth,
+        "workAreaHeight": args.workAreaHeight,
         "windowWidthRaw": args.windowWidthRaw,
         "windowHeightRaw": args.windowHeightRaw
     })
@@ -145,72 +100,8 @@ function resolveFloatingDropPosition(args) {
     if (!mapped)
         return null
 
-    var nextX = mapped.x
-    var nextY = mapped.y
-    var minX = mapped.minX
-    var minY = mapped.minY
-    var maxX = mapped.maxX
-    var maxY = mapped.maxY
-
-    var windowWidthRaw = Math.max(1, toNumber(args.windowWidthRaw, 1))
-    var windowHeightRaw = Math.max(1, toNumber(args.windowHeightRaw, 1))
-    var snapBasePx = Math.max(0, toNumber(args.snapBasePx, 42))
-    var snapRatio = Math.max(0, toNumber(args.snapRatio, 0.1))
-    var snapThreshold = Math.max(snapBasePx, Math.round(Math.min(windowWidthRaw, windowHeightRaw) * snapRatio))
-
-    var xCandidates = [minX, maxX]
-    var yCandidates = [minY, maxY]
-
-    var workspaceId = toNumber(args.workspaceId, -1)
-    var monitorId = toNumber(args.monitorId, -1)
-    var draggedAddress = args.draggedAddress || ""
-    var windowByAddress = args.windowByAddress || {}
-
-    for (var addr in windowByAddress) {
-        if (addr === draggedAddress)
-            continue
-
-        var otherWin = windowByAddress[addr]
-        if (!otherWin || !otherWin.workspace || !otherWin.floating || otherWin.workspace.id !== workspaceId)
-            continue
-
-        if (toNumber(otherWin.monitor, -1) !== monitorId)
-            continue
-
-        var otherX = toNumber(otherWin.at && otherWin.at[0], 0)
-        var otherY = toNumber(otherWin.at && otherWin.at[1], 0)
-        var otherW = Math.max(1, toNumber(otherWin.size && otherWin.size[0], 1))
-        var otherH = Math.max(1, toNumber(otherWin.size && otherWin.size[1], 1))
-
-        xCandidates.push(otherX)
-        xCandidates.push(otherX + otherW - windowWidthRaw)
-        xCandidates.push(otherX - windowWidthRaw)
-        xCandidates.push(otherX + otherW)
-
-        yCandidates.push(otherY)
-        yCandidates.push(otherY + otherH - windowHeightRaw)
-        yCandidates.push(otherY - windowHeightRaw)
-        yCandidates.push(otherY + otherH)
-    }
-
-    nextX = snapToCandidates(nextX, xCandidates, minX, maxX, snapThreshold)
-    nextY = snapToCandidates(nextY, yCandidates, minY, maxY, snapThreshold)
-
-    var minStepPx = Math.max(1, toNumber(args.minStepPx, 28))
-    var maxOffsetSteps = Math.max(0, Math.floor(toNumber(args.maxOffsetSteps, 6)))
-    var overlapThresholdRatio = Math.max(0, toNumber(args.overlapThresholdRatio, 0.32))
-    var step = Math.max(minStepPx, Math.round(Math.min(windowWidthRaw, windowHeightRaw) * 0.12))
-
-    for (var i = 0; i < maxOffsetSteps; i++) {
-        if (!hasFloatingOverlapAt(windowByAddress, draggedAddress, workspaceId, monitorId, nextX, nextY, windowWidthRaw, windowHeightRaw, overlapThresholdRatio))
-            break
-
-        nextX = Math.round(clamp(nextX + step, minX, maxX))
-        nextY = Math.round(clamp(nextY + step, minY, maxY))
-    }
-
     return {
-        "x": nextX,
-        "y": nextY
+        "x": mapped.x,
+        "y": mapped.y
     }
 }

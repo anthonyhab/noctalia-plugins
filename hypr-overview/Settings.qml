@@ -5,6 +5,8 @@ import Quickshell
 import Quickshell.Hyprland
 import Quickshell.Wayland
 import "components"
+import "helpers/HyprlandState.js" as HyprlandState
+import "helpers/SettingsSchema.js" as SettingsSchema
 import "helpers"
 import qs.Commons
 import qs.Widgets
@@ -13,9 +15,8 @@ ColumnLayout {
   id: root
 
   property var pluginApi: null
-  property var cfg: pluginApi?.pluginSettings || ({})
-  property var defaults: pluginApi?.manifest?.metadata?.defaultSettings || ({})
   readonly property var pluginMain: pluginApi && pluginApi.mainInstance
+  property bool isSyncing: false
   // Local state
   property int gridRows: 2
   property int gridColumns: 5
@@ -30,10 +31,12 @@ ColumnLayout {
   property int selectionBorderWidth: -1
   property string accentColorType: "secondary"
   property string visualMode: "live"
-  property string previewMode: "live"
-  property string shaderPreset: "classic"
+  property string shaderPreset: "pixelated"
   property real shaderPresetStrength: 0.7
-  property bool useSimplifiedPreview: (pluginMain && pluginMain.useSimplifiedPreview) || false
+  property real simplifiedPixelDensity: 0.5
+  property real simplifiedColorDepth: 6
+  property real simplifiedSaturation: 1.1
+  property real simplifiedContrast: 1.1
   property real overviewBackgroundOpacityRatio: (pluginMain && pluginMain.overviewBackgroundOpacityRatio) || 1
   property bool showWindowTitleStrip: true
   property int titleStripHeight: 20
@@ -49,10 +52,8 @@ ColumnLayout {
   property bool showUrgencyBadge: true
   property bool showFloatingBadge: true
   property bool showFullscreenBadge: false
-  property bool showMonitorBadge: false
   property bool showMonitorIndicators: getSetting("showMonitorIndicators", true)
   property bool enableCrossMonitorDrag: getSetting("enableCrossMonitorDrag", true)
-  property string crossMonitorDragStyle: getSetting("crossMonitorDragStyle", "border")
   property bool showLayoutBadge: true
   property real dimInactiveWorkspaces: 0.35
   property real inactiveWorkspaceSaturation: 0.75
@@ -61,7 +62,7 @@ ColumnLayout {
   property int previewFixedCornerRadius: 10
   property bool useBorderGradient: true
   property string dragPreviewMode: "smart"
-  property real dragSnapThreshold: 0.33
+  property real dragSnapThreshold: 0.42
   property real previewWindowX: root.pluginMain && root.pluginMain.previewWindowX !== undefined ? root.pluginMain.previewWindowX : -1
   property real previewWindowY: root.pluginMain && root.pluginMain.previewWindowY !== undefined ? root.pluginMain.previewWindowY : -1
   property var previewWindowPositions: root.pluginMain && root.pluginMain.previewWindowPositions ? root.pluginMain.previewWindowPositions : ({})
@@ -70,18 +71,6 @@ ColumnLayout {
   property int animationDurationMs: 200
   property bool showRowColumnGuides: false
   property string specialWorkspaceStyle: "pill"
-  property real simplifiedPixelDensity: 0.5
-  property real simplifiedColorDepth: 6
-  property real simplifiedSaturation: 1.1
-  property real simplifiedContrast: 1.1
-  // Glass/Blur settings
-  property bool enableGlassMode: false
-  property real glassTintStrength: 0.55
-  property real glassBorderOpacity: 0.75
-  property bool enableBlur: false
-  // Wallpaper settings
-  property bool showEmptyWorkspaceWallpaper: false
-  property string emptyWorkspaceWallpaperPath: ""
   // Get primary screen info for predictive fit calculation
   readonly property var primaryScreen: Quickshell.screens.length > 0 ? Quickshell.screens[0] : null
   readonly property real screenWidth: primaryScreen ? primaryScreen.width : 1920
@@ -264,22 +253,7 @@ ColumnLayout {
                   "hasLivePreview": !!toplevel
                 });
     }
-    list.sort(function (a, b) {
-      var winA = a.win || {};
-      var winB = b.win || {};
-      var pinnedA = !!winA.pinned;
-      var pinnedB = !!winB.pinned;
-      if (pinnedA !== pinnedB)
-        return pinnedA ? 1 : -1;
-
-      var floatingA = !!winA.floating;
-      var floatingB = !!winB.floating;
-      if (floatingA !== floatingB)
-        return floatingA ? 1 : -1;
-
-      return ((winB.focusHistoryID !== undefined) ? winB.focusHistoryID : 9999) - ((winA.focusHistoryID !== undefined) ? winA.focusHistoryID : 9999);
-    });
-    return list;
+    return HyprlandState.sortWindowRecords(list);
   }
   readonly property int previewMonitorId: {
     if (previewWorkspaceWindows.length > 0)
@@ -332,8 +306,8 @@ ColumnLayout {
       var toplevel = item.toplevel;
       var address = item.key;
       var win = pluginMain && pluginMain.windowByAddress ? pluginMain.windowByAddress[address] : null;
-      var title = (win && win.title) || tr("overview.title.unknown", "Untitled");
-      var cls = (win && win.class) || tr("overview.tooltip.unknown-class", "unknown");
+      var title = (win && win.title) || tr("overview.title.unknown");
+      var cls = (win && win.class) || tr("overview.tooltip.unknown-class");
       options.push({
                      "key": address,
                      "name": title + " [" + cls + "]"
@@ -428,17 +402,17 @@ ColumnLayout {
   }
 
   function workspaceDisplayName(key, count, isActive) {
-    var suffix = count > 0 ? (" " + tr("overview.tooltip.windows-count", "({count} windows)").replace("{count}", count)) : "";
+    var suffix = count > 0 ? (" " + tr("overview.tooltip.windows-count").replace("{count}", count)) : "";
     if (key.startsWith("special:")) {
       var specialName = key.slice("special:".length);
-      var displaySpecialName = specialName === "special" ? tr("overview.tooltip.special", "special") : specialName;
-      return tr("overview.tooltip.special-prefix", "Special: ") + displaySpecialName + suffix + (isActive ? tr("overview.tooltip.active-suffix", " (active)") : "");
+      var displaySpecialName = specialName === "special" ? tr("overview.tooltip.special") : specialName;
+      return tr("overview.tooltip.special-prefix") + displaySpecialName + suffix + (isActive ? tr("overview.tooltip.active-suffix") : "");
     }
     if (key.startsWith("ws:")) {
       var id = key.slice(3);
-      return tr("overview.tooltip.workspace-prefix", "Workspace ") + id + suffix + (isActive ? tr("overview.tooltip.active-suffix", " (active)") : "");
+      return tr("overview.tooltip.workspace-prefix") + id + suffix + (isActive ? tr("overview.tooltip.active-suffix") : "");
     }
-    return key + suffix + (isActive ? tr("overview.tooltip.active-suffix", " (active)") : "");
+    return key + suffix + (isActive ? tr("overview.tooltip.active-suffix") : "");
   }
 
   function isPreviewWindowFocused(win) {
@@ -537,22 +511,14 @@ ColumnLayout {
   }
 
   function getSetting(key, fallback) {
-    if (cfg[key] !== undefined)
-      return cfg[key];
-    if (defaults[key] !== undefined)
-      return defaults[key];
-    return fallback;
+    return SettingsSchema.getSetting(pluginApi, key, fallback);
   }
 
-  function tr(key, fallback) {
+  function tr(key) {
     if (!pluginApi || !pluginApi.tr)
-      return fallback;
+      return key;
 
-    var translated = pluginApi.tr(key);
-    if (!translated || String(translated).startsWith("!!"))
-      return fallback;
-
-    return translated;
+    return pluginApi.tr(key);
   }
 
   function parseIntSetting(value, fallback) {
@@ -572,14 +538,7 @@ ColumnLayout {
   }
 
   function normalizeTitleStripPosition(position) {
-    var value = (position || "overlay-top").toString();
-    if (value === "external")
-      return "overlay-top";
-
-    if (value !== "overlay-top" && value !== "overlay-bottom")
-      return "overlay-top";
-
-    return value;
+    return SettingsSchema.normalizeTitleStripPosition(position);
   }
 
   function normalizePreviewPositionEntry(value) {
@@ -704,54 +663,59 @@ ColumnLayout {
     if (!pluginApi)
       return;
 
-    gridRows = parseIntSetting(getSetting("rows", 2), 2);
-    gridColumns = parseIntSetting(getSetting("columns", 5), 5);
-    gridScale = parseFloatSetting(getSetting("scale", 0.16), 0.16);
-    hideEmptyRows = !!getSetting("hideEmptyRows", true);
-    showScratchpadWorkspaces = !!getSetting("showScratchpadWorkspaces", false);
-    gridSpacing = parseIntSetting(getSetting("gridSpacing", 0), 0);
-    overviewPosition = getSetting("position", "top") || "top";
-    barMargin = parseIntSetting(getSetting("barMargin", 0), 0);
-    useSlideAnimation = !!getSetting("useSlideAnimation", true);
-    overviewBackgroundOpacityRatio = parseFloatSetting(getSetting("overviewBackgroundOpacityRatio", 1), 1);
-    animationProfile = getSetting("animationProfile", "hyprlike") || "hyprlike";
-    animationDurationMs = parseIntSetting(getSetting("animationDurationMs", 200), 200);
-    showRowColumnGuides = !!getSetting("showRowColumnGuides", false);
-    containerBorderWidth = parseIntSetting(getSetting("containerBorderWidth", -1), -1);
-    selectionBorderWidth = parseIntSetting(getSetting("selectionBorderWidth", -1), -1);
-    accentColorType = getSetting("accentColorType", "secondary") || "secondary";
-    visualMode = getSetting("visualMode", getSetting("useSimplifiedPreview", false) ? "simplified" : "live") || "live";
-    previewMode = getSetting("previewMode", "live") || "live";
-    shaderPreset = getSetting("shaderPreset", "classic") || "classic";
-    shaderPresetStrength = parseFloatSetting(getSetting("shaderPresetStrength", 0.7), 0.7);
-    useSimplifiedPreview = visualMode !== "live";
-    titleStripMode = getSetting("titleStripMode", getSetting("showWindowTitleStrip", true) ? "auto" : "off") || "auto";
-    titleStripPosition = normalizeTitleStripPosition(getSetting("titleStripPosition", "overlay-top") || "overlay-top");
-    showWindowTitleStrip = titleStripMode !== "off";
-    titleStripHeight = parseIntSetting(getSetting("titleStripHeight", 20), 20);
-    titleStripMeta = getSetting("titleStripMeta", "class") || "class";
-    showWindowIcons = !!getSetting("showWindowIcons", true);
-    colorizeWindowIcons = !!getSetting("colorizeWindowIcons", false);
-    windowIconPlacement = getSetting("windowIconPlacement", "center");
-    showWorkspaceLabels = !!getSetting("showWorkspaceLabels", true);
-    workspaceLabelMode = getSetting("workspaceLabelMode", "number-name") || "number-name";
-    showFocusedWindowGlow = !!getSetting("showFocusedWindowGlow", true);
-    showUrgencyBadge = !!getSetting("showUrgencyBadge", true);
-    showFloatingBadge = !!getSetting("showFloatingBadge", true);
-    showFullscreenBadge = !!getSetting("showFullscreenBadge", false);
-    showMonitorBadge = !!getSetting("showMonitorBadge", false);
-    showLayoutBadge = !!getSetting("showLayoutBadge", true);
-    dimInactiveWorkspaces = parseFloatSetting(getSetting("dimInactiveWorkspaces", 0.35), 0.35);
-    inactiveWorkspaceSaturation = parseFloatSetting(getSetting("inactiveWorkspaceSaturation", 0.75), 0.75);
-    hoverLiftAmount = parseIntSetting(getSetting("hoverLiftAmount", 4), 4);
-    previewCornerMode = getSetting("previewCornerMode", "hyprland") || "hyprland";
-    previewFixedCornerRadius = parseIntSetting(getSetting("previewFixedCornerRadius", 10), 10);
-    useBorderGradient = !!getSetting("useBorderGradient", true);
-    dragPreviewMode = getSetting("dragPreviewMode", "smart") || "smart";
-    dragSnapThreshold = parseFloatSetting(getSetting("dragSnapThreshold", 0.33), 0.33);
-    previewWindowX = parseFloatSetting(getSetting("previewWindowX", -1), -1);
-    previewWindowY = parseFloatSetting(getSetting("previewWindowY", -1), -1);
-    var previewPositionMap = normalizePreviewPositionMap(getSetting("previewWindowPositions", ({})));
+    isSyncing = true;
+    var settings = SettingsSchema.normalizeSettings(pluginApi);
+    gridRows = settings.rows;
+    gridColumns = settings.columns;
+    gridScale = settings.scale;
+    hideEmptyRows = settings.hideEmptyRows;
+    showScratchpadWorkspaces = settings.showScratchpadWorkspaces;
+    gridSpacing = settings.gridSpacing;
+    overviewPosition = settings.position;
+    barMargin = settings.barMargin;
+    useSlideAnimation = settings.useSlideAnimation;
+    overviewBackgroundOpacityRatio = settings.overviewBackgroundOpacityRatio;
+    animationProfile = settings.animationProfile;
+    animationDurationMs = settings.animationDurationMs;
+    showRowColumnGuides = settings.showRowColumnGuides;
+    containerBorderWidth = settings.containerBorderWidth;
+    selectionBorderWidth = settings.selectionBorderWidth;
+    accentColorType = settings.accentColorType;
+    visualMode = settings.visualMode;
+    shaderPreset = settings.shaderPreset;
+    shaderPresetStrength = settings.shaderPresetStrength;
+    simplifiedPixelDensity = settings.simplifiedPixelDensity;
+    simplifiedColorDepth = settings.simplifiedColorDepth;
+    simplifiedSaturation = settings.simplifiedSaturation;
+    simplifiedContrast = settings.simplifiedContrast;
+    titleStripMode = settings.titleStripMode;
+    titleStripPosition = settings.titleStripPosition;
+    showWindowTitleStrip = settings.showWindowTitleStrip;
+    titleStripHeight = settings.titleStripHeight;
+    titleStripMeta = settings.titleStripMeta;
+    showWindowIcons = settings.showWindowIcons;
+    colorizeWindowIcons = settings.colorizeWindowIcons;
+    windowIconPlacement = settings.windowIconPlacement;
+    showWorkspaceLabels = settings.showWorkspaceLabels;
+    workspaceLabelMode = settings.workspaceLabelMode;
+    showFocusedWindowGlow = settings.showFocusedWindowGlow;
+    showUrgencyBadge = settings.showUrgencyBadge;
+    showFloatingBadge = settings.showFloatingBadge;
+    showFullscreenBadge = settings.showFullscreenBadge;
+    showMonitorIndicators = settings.showMonitorIndicators;
+    enableCrossMonitorDrag = settings.enableCrossMonitorDrag;
+    showLayoutBadge = settings.showLayoutBadge;
+    dimInactiveWorkspaces = settings.dimInactiveWorkspaces;
+    inactiveWorkspaceSaturation = settings.inactiveWorkspaceSaturation;
+    hoverLiftAmount = settings.hoverLiftAmount;
+    previewCornerMode = settings.previewCornerMode;
+    previewFixedCornerRadius = settings.previewFixedCornerRadius;
+    useBorderGradient = settings.useBorderGradient;
+    dragPreviewMode = settings.dragPreviewMode;
+    dragSnapThreshold = settings.dragSnapThreshold;
+    previewWindowX = settings.previewWindowX;
+    previewWindowY = settings.previewWindowY;
+    var previewPositionMap = normalizePreviewPositionMap(settings.previewWindowPositions);
     if (!previewPositionMapHasEntries(previewPositionMap) && previewWindowX >= 0 && previewWindowY >= 0)
       previewPositionMap[fallbackPreviewMonitorKey] = {
         "x": previewWindowX,
@@ -759,97 +723,80 @@ ColumnLayout {
       };
 
     previewWindowPositions = previewPositionMap;
-    retilePreviewOpacity = parseFloatSetting(getSetting("retilePreviewOpacity", 0.55), 0.55);
-    specialWorkspaceStyle = getSetting("specialWorkspaceStyle", "pill") || "pill";
-    simplifiedPixelDensity = parseFloatSetting(getSetting("simplifiedPixelDensity", 0.5), 0.5);
-    simplifiedColorDepth = parseFloatSetting(getSetting("simplifiedColorDepth", 6), 6);
-    simplifiedSaturation = parseFloatSetting(getSetting("simplifiedSaturation", 1.1), 1.1);
-    simplifiedContrast = parseFloatSetting(getSetting("simplifiedContrast", 1.1), 1.1);
-    enableGlassMode = !!getSetting("enableGlassMode", false);
-    glassTintStrength = parseFloatSetting(getSetting("glassTintStrength", 0.55), 0.55);
-    glassBorderOpacity = parseFloatSetting(getSetting("glassBorderOpacity", 0.75), 0.75);
-    enableBlur = !!getSetting("enableBlur", false);
-    showEmptyWorkspaceWallpaper = !!getSetting("showEmptyWorkspaceWallpaper", false);
-    emptyWorkspaceWallpaperPath = getSetting("emptyWorkspaceWallpaperPath", "") || "";
+    retilePreviewOpacity = settings.retilePreviewOpacity;
+    specialWorkspaceStyle = settings.specialWorkspaceStyle;
+    isSyncing = false;
   }
 
   function saveSettings() {
-    if (!pluginApi)
+    if (!pluginApi || isSyncing)
       return;
 
-    var previous = pluginApi.pluginSettings || {};
-    var settings = {};
-    for (var key in previous)
-      settings[key] = previous[key];
-    settings.rows = gridRows;
-    settings.columns = gridColumns;
-    settings.scale = gridScale;
-    settings.hideEmptyRows = hideEmptyRows;
-    settings.showScratchpadWorkspaces = showScratchpadWorkspaces;
-    settings.gridSpacing = gridSpacing;
-    settings.position = overviewPosition;
-    settings.barMargin = barMargin;
-    settings.useSlideAnimation = useSlideAnimation;
-    settings.overviewBackgroundOpacityRatio = overviewBackgroundOpacityRatio;
-    settings.animationProfile = animationProfile;
-    settings.animationDurationMs = animationDurationMs;
+    var nextSettings = {};
+    nextSettings.rows = gridRows;
+    nextSettings.columns = gridColumns;
+    nextSettings.scale = gridScale;
+    nextSettings.hideEmptyRows = hideEmptyRows;
+    nextSettings.showScratchpadWorkspaces = showScratchpadWorkspaces;
+    nextSettings.gridSpacing = gridSpacing;
+    nextSettings.position = overviewPosition;
+    nextSettings.barMargin = barMargin;
+    nextSettings.useSlideAnimation = useSlideAnimation;
+    nextSettings.overviewBackgroundOpacityRatio = overviewBackgroundOpacityRatio;
+    nextSettings.animationProfile = animationProfile;
+    nextSettings.animationDurationMs = animationDurationMs;
     var compatibilityPreviewPosition = getSavedPreviewPosition(previewMonitorKey);
     if (compatibilityPreviewPosition && compatibilityPreviewPosition.valid) {
-      settings.previewWindowX = compatibilityPreviewPosition.x;
-      settings.previewWindowY = compatibilityPreviewPosition.y;
+      nextSettings.previewWindowX = compatibilityPreviewPosition.x;
+      nextSettings.previewWindowY = compatibilityPreviewPosition.y;
     } else {
-      settings.previewWindowX = previewWindowX;
-      settings.previewWindowY = previewWindowY;
+      nextSettings.previewWindowX = previewWindowX;
+      nextSettings.previewWindowY = previewWindowY;
     }
-    settings.previewWindowPositions = normalizePreviewPositionMap(previewWindowPositions);
-    settings.showRowColumnGuides = showRowColumnGuides;
-    settings.containerBorderWidth = containerBorderWidth;
-    settings.selectionBorderWidth = selectionBorderWidth;
-    settings.accentColorType = accentColorType;
-    settings.visualMode = visualMode;
-    settings.previewMode = previewMode;
-    settings.shaderPreset = shaderPreset;
-    settings.shaderPresetStrength = shaderPresetStrength;
-    settings.useSimplifiedPreview = visualMode !== "live";
-    settings.titleStripMode = titleStripMode;
-    settings.titleStripPosition = normalizeTitleStripPosition(titleStripPosition);
-    settings.titleStripMeta = titleStripMeta;
-    settings.showWindowTitleStrip = showWindowTitleStrip;
-    settings.showWindowIcons = showWindowIcons;
-    settings.colorizeWindowIcons = colorizeWindowIcons;
-    settings.windowIconPlacement = windowIconPlacement;
-    settings.showWorkspaceLabels = showWorkspaceLabels;
-    settings.workspaceLabelMode = workspaceLabelMode;
-    settings.showFocusedWindowGlow = showFocusedWindowGlow;
-    settings.showUrgencyBadge = showUrgencyBadge;
-    settings.showFloatingBadge = showFloatingBadge;
-    settings.showFullscreenBadge = showFullscreenBadge;
-    settings.showMonitorBadge = showMonitorBadge;
-    settings.showLayoutBadge = showLayoutBadge;
-    settings.dimInactiveWorkspaces = dimInactiveWorkspaces;
-    settings.inactiveWorkspaceSaturation = inactiveWorkspaceSaturation;
-    settings.hoverLiftAmount = hoverLiftAmount;
-    settings.previewCornerMode = previewCornerMode;
-    settings.previewFixedCornerRadius = previewFixedCornerRadius;
-    settings.useBorderGradient = useBorderGradient;
-    settings.dragPreviewMode = dragPreviewMode;
-    settings.dragSnapThreshold = dragSnapThreshold;
-    settings.retilePreviewOpacity = retilePreviewOpacity;
-    settings.specialWorkspaceStyle = specialWorkspaceStyle;
-    settings.titleStripHeight = titleStripHeight;
-    settings.simplifiedPixelDensity = simplifiedPixelDensity;
-    settings.simplifiedColorDepth = simplifiedColorDepth;
-    settings.simplifiedSaturation = simplifiedSaturation;
-    settings.simplifiedContrast = simplifiedContrast;
-    settings.enableGlassMode = enableGlassMode;
-    settings.glassTintStrength = glassTintStrength;
-    settings.glassBorderOpacity = glassBorderOpacity;
-    settings.enableBlur = enableBlur;
-    settings.showEmptyWorkspaceWallpaper = showEmptyWorkspaceWallpaper;
-    settings.emptyWorkspaceWallpaperPath = emptyWorkspaceWallpaperPath;
+    nextSettings.previewWindowPositions = normalizePreviewPositionMap(previewWindowPositions);
+    nextSettings.showRowColumnGuides = showRowColumnGuides;
+    nextSettings.containerBorderWidth = containerBorderWidth;
+    nextSettings.selectionBorderWidth = selectionBorderWidth;
+    nextSettings.accentColorType = accentColorType;
+    nextSettings.visualMode = visualMode;
+    nextSettings.shaderPreset = shaderPreset;
+    nextSettings.shaderPresetStrength = shaderPresetStrength;
+    nextSettings.simplifiedPixelDensity = simplifiedPixelDensity;
+    nextSettings.simplifiedColorDepth = simplifiedColorDepth;
+    nextSettings.simplifiedSaturation = simplifiedSaturation;
+    nextSettings.simplifiedContrast = simplifiedContrast;
+    nextSettings.titleStripMode = titleStripMode;
+    nextSettings.titleStripPosition = normalizeTitleStripPosition(titleStripPosition);
+    nextSettings.titleStripMeta = titleStripMeta;
+    nextSettings.showWindowTitleStrip = showWindowTitleStrip;
+    nextSettings.showWindowIcons = showWindowIcons;
+    nextSettings.colorizeWindowIcons = colorizeWindowIcons;
+    nextSettings.windowIconPlacement = windowIconPlacement;
+    nextSettings.showWorkspaceLabels = showWorkspaceLabels;
+    nextSettings.workspaceLabelMode = workspaceLabelMode;
+    nextSettings.showFocusedWindowGlow = showFocusedWindowGlow;
+    nextSettings.showUrgencyBadge = showUrgencyBadge;
+    nextSettings.showFloatingBadge = showFloatingBadge;
+    nextSettings.showFullscreenBadge = showFullscreenBadge;
+    nextSettings.showMonitorIndicators = showMonitorIndicators;
+    nextSettings.enableCrossMonitorDrag = enableCrossMonitorDrag;
+    nextSettings.showLayoutBadge = showLayoutBadge;
+    nextSettings.dimInactiveWorkspaces = dimInactiveWorkspaces;
+    nextSettings.inactiveWorkspaceSaturation = inactiveWorkspaceSaturation;
+    nextSettings.hoverLiftAmount = hoverLiftAmount;
+    nextSettings.previewCornerMode = previewCornerMode;
+    nextSettings.previewFixedCornerRadius = previewFixedCornerRadius;
+    nextSettings.useBorderGradient = useBorderGradient;
+    nextSettings.dragPreviewMode = dragPreviewMode;
+    nextSettings.dragSnapThreshold = dragSnapThreshold;
+    nextSettings.retilePreviewOpacity = retilePreviewOpacity;
+    nextSettings.specialWorkspaceStyle = specialWorkspaceStyle;
+    nextSettings.titleStripHeight = titleStripHeight;
+    var settings = SettingsSchema.buildPersistedSettings(nextSettings);
     pluginApi.pluginSettings = settings;
     pluginApi.saveSettings();
-    pluginMain && pluginMain.refresh();
+    if (pluginMain)
+      pluginMain.refresh();
   }
 
   spacing: Style.marginM
@@ -866,9 +813,17 @@ ColumnLayout {
     ensureWorkspacePreviewSelection();
   }
 
+  Connections {
+    target: pluginApi
+
+    function onPluginSettingsChanged() {
+      root.syncFromPlugin();
+    }
+  }
+
   // Description
   NText {
-    text: tr("plugin.description", "Visual Hyprland overview with live window previews")
+    text: tr("plugin.description")
     wrapMode: Text.WordWrap
     color: Color.mOnSurface
   }
@@ -886,22 +841,22 @@ ColumnLayout {
     distributeEvenly: true
 
     NTabButton {
-      text: tr("settings.tabs.grid", "Grid")
+      text: tr("settings.tabs.grid")
       tabIndex: 0
       checked: tabBar.currentIndex === 0
     }
     NTabButton {
-      text: tr("settings.tabs.behavior", "Behavior")
+      text: tr("settings.tabs.behavior")
       tabIndex: 1
       checked: tabBar.currentIndex === 1
     }
     NTabButton {
-      text: tr("settings.tabs.layout", "Layout")
+      text: tr("settings.tabs.layout")
       tabIndex: 2
       checked: tabBar.currentIndex === 2
     }
     NTabButton {
-      text: tr("settings.tabs.appearance", "Appearance")
+      text: tr("settings.tabs.appearance")
       tabIndex: 3
       checked: tabBar.currentIndex === 3
     }
@@ -945,8 +900,8 @@ ColumnLayout {
 
             NSpinBox {
               Layout.fillWidth: true
-              label: tr("settings.grid.rows.label", "Rows")
-              description: tr("settings.grid.rows.description", "Number of workspace rows")
+              label: tr("settings.grid.rows.label")
+              description: tr("settings.grid.rows.description")
               from: 1
               to: 10
               value: root.gridRows
@@ -960,8 +915,8 @@ ColumnLayout {
 
             NSpinBox {
               Layout.fillWidth: true
-              label: tr("settings.grid.columns.label", "Columns")
-              description: tr("settings.grid.columns.description", "Number of workspace columns")
+              label: tr("settings.grid.columns.label")
+              description: tr("settings.grid.columns.description")
               from: 1
               to: 20
               value: root.gridColumns
@@ -976,42 +931,42 @@ ColumnLayout {
 
           NValueSlider {
             Layout.fillWidth: true
-            label: tr("settings.grid.scale.label", "Scale")
-            description: tr("settings.grid.scale.description", "Overview scale factor")
+            label: tr("settings.grid.scale.label")
+            description: tr("settings.grid.scale.description")
             from: 0.05
             to: 0.5
             stepSize: 0.01
             value: root.gridScale
             text: value.toFixed(2)
             onMoved: value => {
-                       if (Math.abs(root.gridScale - value) > 0.001) {
-                         root.gridScale = value;
-                         root.saveSettings();
-                       }
-                     }
+              if (Math.abs(root.gridScale - value) > 0.001) {
+                root.gridScale = value;
+                root.saveSettings();
+              }
+            }
           }
 
           NValueSlider {
             Layout.fillWidth: true
-            label: tr("settings.grid.spacing.label", "Grid Spacing")
-            description: tr("settings.grid.spacing.description", "Gap between workspace thumbnails")
+            label: tr("settings.grid.spacing.label")
+            description: tr("settings.grid.spacing.description")
             from: 0
             to: 50
             stepSize: 1
             value: root.gridSpacing
             text: value + "px"
             onMoved: value => {
-                       if (root.gridSpacing !== value) {
-                         root.gridSpacing = value;
-                         root.saveSettings();
-                       }
-                     }
+              if (root.gridSpacing !== value) {
+                root.gridSpacing = value;
+                root.saveSettings();
+              }
+            }
           }
 
           NText {
             text: {
               var total = root.gridRows * root.gridColumns;
-              return tr("settings.grid.total-workspaces", "{count} total workspaces").replace("{count}", total);
+              return tr("settings.grid.total-workspaces").replace("{count}", total);
             }
             color: Color.mOnSurfaceVariant
             pointSize: Style.fontSizeS
@@ -1020,7 +975,7 @@ ColumnLayout {
           // Warning when overview would be auto-shrunk to fit (predictive)
           NText {
             visible: root.willRequireFitScaling
-            text: tr("settings.grid.scale-warning", "Current settings exceed screen size. Overview will be scaled down to fit.")
+            text: tr("settings.grid.scale-warning")
             color: Color.mError
             wrapMode: Text.WordWrap
             pointSize: Style.fontSizeS
@@ -1029,27 +984,27 @@ ColumnLayout {
 
           NComboBox {
             Layout.fillWidth: true
-            label: tr("settings.grid.animationProfile.label", "Animation profile")
-            description: tr("settings.grid.animationProfile.description", "How quickly workspace cards and windows animate")
+            label: tr("settings.grid.animationProfile.label")
+            description: tr("settings.grid.animationProfile.description")
             model: [
               {
                 "key": "none",
-                "name": tr("settings.grid.animationProfile.none", "No animation")
+                "name": tr("settings.grid.animationProfile.none")
               },
               {
                 "key": "fast",
-                "name": tr("settings.grid.animationProfile.fast", "Fast")
+                "name": tr("settings.grid.animationProfile.fast")
               },
               {
                 "key": "hyprlike",
-                "name": tr("settings.grid.animationProfile.hyprlike", "Hyprlike")
+                "name": tr("settings.grid.animationProfile.hyprlike")
               }
             ]
             currentKey: root.animationProfile
             onSelected: key => {
-                          root.animationProfile = key;
-                          root.saveSettings();
-                        }
+              root.animationProfile = key;
+              root.saveSettings();
+            }
           }
         }
 
@@ -1080,66 +1035,90 @@ ColumnLayout {
           spacing: Style.marginL
 
           NToggle {
-            label: tr("settings.behavior.hide-empty-rows.label", "Hide empty rows")
-            description: tr("settings.behavior.hide-empty-rows.description", "Automatically hide workspace rows with no windows")
+            label: tr("settings.behavior.hide-empty-rows.label")
+            description: tr("settings.behavior.hide-empty-rows.description")
             checked: root.hideEmptyRows
             onToggled: checked => {
-                         root.hideEmptyRows = checked;
-                         root.saveSettings();
-                       }
+              root.hideEmptyRows = checked;
+              root.saveSettings();
+            }
           }
 
           NToggle {
-            label: tr("settings.behavior.show-scratchpad.label", "Show scratchpad windows")
-            description: tr("settings.behavior.show-scratchpad.description", "Include special/scratchpad workspace windows in the overview")
+            label: tr("settings.behavior.show-scratchpad.label")
+            description: tr("settings.behavior.show-scratchpad.description")
             checked: root.showScratchpadWorkspaces
             onToggled: checked => {
-                         root.showScratchpadWorkspaces = checked;
-                         root.saveSettings();
-                       }
+              root.showScratchpadWorkspaces = checked;
+              root.saveSettings();
+            }
           }
 
           NComboBox {
             Layout.fillWidth: true
-            label: tr("settings.behavior.dragPreviewMode.label", "Drag preview mode")
-            description: tr("settings.behavior.dragPreviewMode.description", "Controls retile/split guidance while dragging a window")
+            label: tr("settings.behavior.dragPreviewMode.label")
+            description: tr("settings.behavior.dragPreviewMode.description")
             model: [
               {
                 "key": "off",
-                "name": tr("settings.behavior.dragPreviewMode.off", "Off")
+                "name": tr("settings.behavior.dragPreviewMode.off")
               },
               {
                 "key": "basic",
-                "name": tr("settings.behavior.dragPreviewMode.basic", "Basic")
+                "name": tr("settings.behavior.dragPreviewMode.basic")
               },
               {
                 "key": "smart",
-                "name": tr("settings.behavior.dragPreviewMode.smart", "Smart")
+                "name": tr("settings.behavior.dragPreviewMode.smart")
               }
             ]
             currentKey: root.dragPreviewMode
             onSelected: key => {
-                          root.dragPreviewMode = key;
-                          root.saveSettings();
-                        }
+              root.dragPreviewMode = key;
+              root.saveSettings();
+            }
           }
 
           NValueSlider {
             visible: root.dragPreviewMode !== "off"
             Layout.fillWidth: true
-            label: tr("settings.behavior.retilePreviewOpacity.label", "Retile preview opacity")
-            description: tr("settings.behavior.retilePreviewOpacity.description", "Opacity multiplier for split/swap guidance overlays")
+            label: tr("settings.behavior.retilePreviewOpacity.label")
+            description: tr("settings.behavior.retilePreviewOpacity.description")
             from: 0.2
             to: 0.9
             stepSize: 0.05
             value: root.retilePreviewOpacity
             text: value.toFixed(2)
             onMoved: value => {
-                       if (Math.abs(root.retilePreviewOpacity - value) > 0.001) {
-                         root.retilePreviewOpacity = value;
-                         root.saveSettings();
-                       }
-                     }
+              if (Math.abs(root.retilePreviewOpacity - value) > 0.001) {
+                root.retilePreviewOpacity = value;
+                root.saveSettings();
+              }
+            }
+          }
+
+          NCollapsible {
+            label: tr("settings.behavior.advanced.label")
+            description: tr("settings.behavior.advanced.description")
+            expanded: false
+            Layout.fillWidth: true
+
+            NValueSlider {
+              Layout.fillWidth: true
+              label: tr("settings.behavior.dragSnapThreshold.label")
+              description: tr("settings.behavior.dragSnapThreshold.description")
+              from: 0.42
+              to: 0.49
+              stepSize: 0.01
+              value: root.dragSnapThreshold
+              text: value.toFixed(2)
+              onMoved: value => {
+                if (Math.abs(root.dragSnapThreshold - value) > 0.001) {
+                  root.dragSnapThreshold = value;
+                  root.saveSettings();
+                }
+              }
+            }
           }
         }
 
@@ -1171,132 +1150,159 @@ ColumnLayout {
 
           NComboBox {
             Layout.fillWidth: true
-            label: tr("settings.layout.position.label", "Position")
-            description: tr("settings.layout.position.description", "Where the overview appears on screen")
+            label: tr("settings.layout.position.label")
+            description: tr("settings.layout.position.description")
             model: [
               {
                 "key": "top",
-                "name": tr("settings.layout.position.top", "Top")
+                "name": tr("settings.layout.position.top")
               },
               {
                 "key": "center",
-                "name": tr("settings.layout.position.center", "Center")
+                "name": tr("settings.layout.position.center")
               },
               {
                 "key": "bottom",
-                "name": tr("settings.layout.position.bottom", "Bottom")
+                "name": tr("settings.layout.position.bottom")
               }
             ]
             currentKey: root.overviewPosition
             onSelected: key => {
-                          root.overviewPosition = key;
-                          root.saveSettings();
-                        }
+              root.overviewPosition = key;
+              root.saveSettings();
+            }
           }
 
           NValueSlider {
             Layout.fillWidth: true
-            label: tr("settings.layout.barMargin.label", "Bar Margin")
-            description: tr("settings.layout.barMargin.description", "Additional margin between overview and bar (when positioned at same edge)")
+            label: tr("settings.layout.barMargin.label")
+            description: tr("settings.layout.barMargin.description")
             from: 0
             to: 100
             stepSize: 1
             value: root.barMargin
             text: value + "px"
             onMoved: value => {
-                       if (root.barMargin !== value) {
-                         root.barMargin = value;
-                         root.saveSettings();
-                       }
-                     }
+              if (root.barMargin !== value) {
+                root.barMargin = value;
+                root.saveSettings();
+              }
+            }
           }
 
           NValueSlider {
             Layout.fillWidth: true
-            label: tr("settings.layout.backgroundOpacity.label", "Background opacity")
-            description: tr("settings.layout.backgroundOpacity.description", "Adjust the transparency of the overview backdrop")
+            label: tr("settings.layout.backgroundOpacity.label")
+            description: tr("settings.layout.backgroundOpacity.description")
             from: 0
             to: 1
             stepSize: 0.05
             value: root.overviewBackgroundOpacityRatio
             text: Math.round(value * 100) + "%"
             onMoved: value => {
-                       if (Math.abs(root.overviewBackgroundOpacityRatio - value) > 0.001) {
-                         root.overviewBackgroundOpacityRatio = value;
-                         root.saveSettings();
-                       }
-                     }
+              if (Math.abs(root.overviewBackgroundOpacityRatio - value) > 0.001) {
+                root.overviewBackgroundOpacityRatio = value;
+                root.saveSettings();
+              }
+            }
           }
 
           NToggle {
-            label: tr("settings.layout.slideAnimation.label", "Slide animation")
-            description: tr("settings.layout.slideAnimation.description", "Animate overview sliding in from the bar (disable for instant popup)")
+            label: tr("settings.layout.slideAnimation.label")
+            description: tr("settings.layout.slideAnimation.description")
             checked: root.useSlideAnimation
             onToggled: checked => {
-                         root.useSlideAnimation = checked;
-                         root.saveSettings();
-                       }
+              root.useSlideAnimation = checked;
+              root.saveSettings();
+            }
           }
 
           NToggle {
-            label: tr("settings.layout.workspaceLabels.label", "Workspace labels")
-            description: tr("settings.layout.workspaceLabels.description", "Show readable labels in each workspace thumbnail")
+            label: tr("settings.layout.workspaceLabels.label")
+            description: tr("settings.layout.workspaceLabels.description")
             checked: root.showWorkspaceLabels
             onToggled: checked => {
-                         root.showWorkspaceLabels = checked;
-                         root.saveSettings();
-                       }
+              root.showWorkspaceLabels = checked;
+              root.saveSettings();
+            }
           }
 
           NComboBox {
             visible: root.showWorkspaceLabels
             Layout.fillWidth: true
-            label: tr("settings.layout.workspaceLabelMode.label", "Workspace label format")
-            description: tr("settings.layout.workspaceLabelMode.description", "Choose whether labels use workspace number, name, or both")
+            label: tr("settings.layout.workspaceLabelMode.label")
+            description: tr("settings.layout.workspaceLabelMode.description")
             model: [
               {
                 "key": "number",
-                "name": tr("settings.layout.workspaceLabelMode.number", "Number")
+                "name": tr("settings.layout.workspaceLabelMode.number")
               },
               {
                 "key": "name",
-                "name": tr("settings.layout.workspaceLabelMode.name", "Name")
+                "name": tr("settings.layout.workspaceLabelMode.name")
               },
               {
                 "key": "number-name",
-                "name": tr("settings.layout.workspaceLabelMode.number-name", "Number + Name")
+                "name": tr("settings.layout.workspaceLabelMode.number-name")
               }
             ]
             currentKey: root.workspaceLabelMode
             onSelected: key => {
-                          root.workspaceLabelMode = key;
-                          root.saveSettings();
-                        }
+              root.workspaceLabelMode = key;
+              root.saveSettings();
+            }
           }
 
           NComboBox {
             Layout.fillWidth: true
-            label: tr("settings.layout.specialWorkspaceStyle.label", "Special workspace style")
-            description: tr("settings.layout.specialWorkspaceStyle.description", "How scratchpad workspace labels are rendered")
+            label: tr("settings.layout.specialWorkspaceStyle.label")
+            description: tr("settings.layout.specialWorkspaceStyle.description")
             model: [
               {
                 "key": "pill",
-                "name": tr("settings.layout.specialWorkspaceStyle.pill", "Pill")
+                "name": tr("settings.layout.specialWorkspaceStyle.pill")
               },
               {
                 "key": "chip",
-                "name": tr("settings.layout.specialWorkspaceStyle.chip", "Chip")
+                "name": tr("settings.layout.specialWorkspaceStyle.chip")
               },
               {
                 "key": "plain",
-                "name": tr("settings.layout.specialWorkspaceStyle.plain", "Plain")
+                "name": tr("settings.layout.specialWorkspaceStyle.plain")
               }
             ]
             currentKey: root.specialWorkspaceStyle
             onSelected: key => {
-                          root.specialWorkspaceStyle = key;
-                          root.saveSettings();
-                        }
+              root.specialWorkspaceStyle = key;
+              root.saveSettings();
+            }
+          }
+
+          NCollapsible {
+            label: tr("settings.layout.advanced.label")
+            description: tr("settings.layout.advanced.description")
+            expanded: false
+            Layout.fillWidth: true
+
+            NToggle {
+              label: tr("settings.layout.showLayoutBadge.label")
+              description: tr("settings.layout.showLayoutBadge.description")
+              checked: root.showLayoutBadge
+              onToggled: checked => {
+                root.showLayoutBadge = checked;
+                root.saveSettings();
+              }
+            }
+
+            NToggle {
+              label: tr("settings.layout.showRowColumnGuides.label")
+              description: tr("settings.layout.showRowColumnGuides.description")
+              checked: root.showRowColumnGuides
+              onToggled: checked => {
+                root.showRowColumnGuides = checked;
+                root.saveSettings();
+              }
+            }
           }
         }
 
@@ -1328,139 +1334,178 @@ ColumnLayout {
           width: appearanceSettingsFlickable.width
           spacing: Style.marginM
 
-          // --- Visual Mode ---
+          // --- Preview Style ---
           NCollapsible {
-            label: tr("settings.appearance.section.visualMode", "Visual Mode")
-            description: tr("settings.appearance.section.visualMode.desc", "Preview rendering and shader quality")
+            label: tr("settings.appearance.section.visualMode")
+            description: tr("settings.appearance.sectionDescriptions.visualMode")
             expanded: true
             Layout.fillWidth: true
 
             NComboBox {
               Layout.fillWidth: true
-              label: tr("settings.appearance.visualMode.label", "Visual mode")
-              description: tr("settings.appearance.visualMode.description", "Controls window preview rendering — choose live, stylized, or off for lowest resource usage")
+              label: tr("settings.appearance.visualMode.label")
+              description: tr("settings.appearance.visualMode.description")
               model: [
                 {
                   "key": "live",
-                  "name": tr("settings.appearance.visualMode.live", "Live")
+                  "name": tr("settings.appearance.visualMode.live")
                 },
                 {
                   "key": "simplified",
-                  "name": tr("settings.appearance.visualMode.simplified", "Simplified")
+                  "name": tr("settings.appearance.visualMode.simplified")
                 },
                 {
                   "key": "off",
-                  "name": tr("settings.appearance.visualMode.off", "Off")
+                  "name": tr("settings.appearance.visualMode.off")
                 }
               ]
               currentKey: root.visualMode
               onSelected: key => {
-                            root.visualMode = key;
-                            if (key === "off") {
-                              root.previewMode = "off";
-                              root.useSimplifiedPreview = false;
-                            } else if (key === "simplified") {
-                              root.previewMode = "event";
-                              root.useSimplifiedPreview = true;
-                            } else {
-                              root.previewMode = "live";
-                              root.useSimplifiedPreview = false;
-                            }
-                            root.saveSettings();
-                          }
+                root.visualMode = key;
+                root.saveSettings();
+              }
             }
 
-            Item {
+            NComboBox {
+              visible: root.visualMode === "simplified"
               Layout.fillWidth: true
-              Layout.maximumHeight: root.visualMode === "simplified" ? implicitHeight : 0
-              implicitHeight: pixelDensitySlider.implicitHeight
-              opacity: root.visualMode === "simplified" ? 1.0 : 0.0
-              visible: opacity > 0
-              clip: true
+              label: tr("settings.appearance.shaderPreset.label")
+              description: tr("settings.appearance.shaderPreset.description")
+              model: [
+                {
+                  "key": "pixelated",
+                  "name": tr("settings.appearance.shaderPreset.pixelated")
+                },
+                {
+                  "key": "mac",
+                  "name": tr("settings.appearance.shaderPreset.mac")
+                }
+              ]
+              currentKey: root.shaderPreset
+              onSelected: key => {
+                root.shaderPreset = key;
+                root.saveSettings();
+              }
+            }
 
-              Behavior on Layout.maximumHeight {
-                NumberAnimation {
-                  duration: Style.animationFast
-                  easing.type: Easing.OutCubic
+            NValueSlider {
+              visible: root.visualMode === "simplified"
+              Layout.fillWidth: true
+              label: tr("settings.appearance.pixelDensity.label")
+              description: tr("settings.appearance.pixelDensity.description")
+              from: 0.1
+              to: 1
+              stepSize: 0.05
+              value: root.simplifiedPixelDensity
+              text: value.toFixed(2)
+              onMoved: value => {
+                if (Math.abs(root.simplifiedPixelDensity - value) > 0.001) {
+                  root.simplifiedPixelDensity = value;
+                  root.saveSettings();
                 }
               }
-              Behavior on opacity {
-                NumberAnimation {
-                  duration: Style.animationFast
-                  easing.type: Easing.OutCubic
-                }
-              }
+            }
 
-              NValueSlider {
-                id: pixelDensitySlider
-                anchors.left: parent.left
-                anchors.right: parent.right
-                label: tr("settings.appearance.pixelDensity.label", "Pixel Density")
-                description: tr("settings.appearance.pixelDensity.description", "Controls pixelation level — higher values show more detail")
-                from: 0.1
-                to: 1
-                stepSize: 0.05
-                value: root.simplifiedPixelDensity
-                text: value.toFixed(2)
-                onMoved: value => {
-                           if (Math.abs(root.simplifiedPixelDensity - value) > 0.001) {
-                             root.simplifiedPixelDensity = value;
-                             root.saveSettings();
-                           }
-                         }
+            NValueSlider {
+              visible: root.visualMode === "simplified"
+              Layout.fillWidth: true
+              label: tr("settings.appearance.shaderPresetStrength.label")
+              description: tr("settings.appearance.shaderPresetStrength.description")
+              from: 0
+              to: 1
+              stepSize: 0.05
+              value: root.shaderPresetStrength
+              text: value.toFixed(2)
+              onMoved: value => {
+                if (Math.abs(root.shaderPresetStrength - value) > 0.001) {
+                  root.shaderPresetStrength = value;
+                  root.saveSettings();
+                }
               }
             }
           }
 
           // --- Window Icons ---
           NCollapsible {
-            label: tr("settings.appearance.section.windowIcons", "Window Icons")
-            description: tr("settings.appearance.section.windowIcons.desc", "Icon display and positioning")
+            label: tr("settings.appearance.section.windowIcons")
+            description: tr("settings.appearance.sectionDescriptions.windowIcons")
             expanded: true
             Layout.fillWidth: true
 
             NToggle {
-              label: tr("settings.appearance.windowIcons.label", "Window icons")
-              description: tr("settings.appearance.windowIcons.description", "Show app icons inside each window preview card")
+              label: tr("settings.appearance.windowIcons.label")
+              description: tr("settings.appearance.windowIcons.description")
               checked: root.showWindowIcons
               onToggled: checked => {
-                           root.showWindowIcons = checked;
-                           root.saveSettings();
-                         }
+                root.showWindowIcons = checked;
+                root.saveSettings();
+              }
+            }
+
+            NToggle {
+              label: tr("settings.appearance.colorizeWindowIcons.label")
+              description: tr("settings.appearance.colorizeWindowIcons.description")
+              checked: root.colorizeWindowIcons
+              onToggled: checked => {
+                root.colorizeWindowIcons = checked;
+                root.saveSettings();
+              }
+            }
+
+            NComboBox {
+              visible: root.showWindowIcons
+              Layout.fillWidth: true
+              label: tr("settings.appearance.windowIconPlacement.label")
+              description: tr("settings.appearance.windowIconPlacement.description")
+              model: [
+                {
+                  "key": "center",
+                  "name": tr("settings.appearance.windowIconPlacement.center")
+                },
+                {
+                  "key": "corner",
+                  "name": tr("settings.appearance.windowIconPlacement.corner")
+                }
+              ]
+              currentKey: root.windowIconPlacement
+              onSelected: key => {
+                root.windowIconPlacement = key;
+                root.saveSettings();
+              }
             }
           }
 
           // --- Title Strip ---
           NCollapsible {
-            label: tr("settings.appearance.section.titleStrip", "Title Strip")
-            description: tr("settings.appearance.section.titleStrip.desc", "Window title overlay appearance")
+            label: tr("settings.appearance.section.titleStrip")
+            description: tr("settings.appearance.sectionDescriptions.titleStrip")
             expanded: true
             Layout.fillWidth: true
 
             NComboBox {
               Layout.fillWidth: true
-              label: tr("settings.appearance.titleStripMode.label", "Title strip mode")
-              description: tr("settings.appearance.titleStripMode.description", "Control when the bottom title strip is displayed")
+              label: tr("settings.appearance.titleStripMode.label")
+              description: tr("settings.appearance.titleStripMode.description")
               model: [
                 {
                   "key": "off",
-                  "name": tr("settings.appearance.titleStripMode.off", "Off")
+                  "name": tr("settings.appearance.titleStripMode.off")
                 },
                 {
                   "key": "auto",
-                  "name": tr("settings.appearance.titleStripMode.auto", "Auto")
+                  "name": tr("settings.appearance.titleStripMode.auto")
                 },
                 {
                   "key": "always",
-                  "name": tr("settings.appearance.titleStripMode.always", "Always")
+                  "name": tr("settings.appearance.titleStripMode.always")
                 }
               ]
               currentKey: root.titleStripMode
               onSelected: key => {
-                            root.titleStripMode = key;
-                            root.showWindowTitleStrip = key !== "off";
-                            root.saveSettings();
-                          }
+                root.titleStripMode = key;
+                root.showWindowTitleStrip = key !== "off";
+                root.saveSettings();
+              }
             }
 
             Item {
@@ -1494,40 +1539,65 @@ ColumnLayout {
 
                 NComboBox {
                   Layout.fillWidth: true
-                  label: tr("settings.appearance.titleStripPosition.label", "Title strip position")
-                  description: tr("settings.appearance.titleStripPosition.description", "Where the title overlay is rendered")
+                  label: tr("settings.appearance.titleStripPosition.label")
+                  description: tr("settings.appearance.titleStripPosition.description")
                   model: [
                     {
                       "key": "overlay-top",
-                      "name": tr("settings.appearance.titleStripPosition.overlay-top", "Overlay (Top)")
+                      "name": tr("settings.appearance.titleStripPosition.overlay-top")
                     },
                     {
                       "key": "overlay-bottom",
-                      "name": tr("settings.appearance.titleStripPosition.overlay-bottom", "Overlay (Bottom)")
+                      "name": tr("settings.appearance.titleStripPosition.overlay-bottom")
                     }
                   ]
                   currentKey: root.titleStripPosition
                   onSelected: key => {
-                                root.titleStripPosition = root.normalizeTitleStripPosition(key);
-                                root.saveSettings();
-                              }
+                    root.titleStripPosition = root.normalizeTitleStripPosition(key);
+                    root.saveSettings();
+                  }
                 }
 
                 NValueSlider {
                   Layout.fillWidth: true
-                  label: tr("settings.appearance.titleStripHeight.label", "Title strip height")
-                  description: tr("settings.appearance.titleStripHeight.description", "Height of the window title strip before monitor scaling")
+                  label: tr("settings.appearance.titleStripHeight.label")
+                  description: tr("settings.appearance.titleStripHeight.description")
                   from: 12
                   to: 32
                   stepSize: 1
                   value: root.titleStripHeight
                   text: value + "px"
                   onMoved: value => {
-                             if (root.titleStripHeight !== value) {
-                               root.titleStripHeight = value;
-                               root.saveSettings();
-                             }
-                           }
+                    if (root.titleStripHeight !== value) {
+                      root.titleStripHeight = value;
+                      root.saveSettings();
+                    }
+                  }
+                }
+
+                NComboBox {
+                  Layout.fillWidth: true
+                  label: tr("settings.appearance.titleStripMeta.label")
+                  description: tr("settings.appearance.titleStripMeta.description")
+                  model: [
+                    {
+                      "key": "none",
+                      "name": tr("settings.appearance.titleStripMeta.none")
+                    },
+                    {
+                      "key": "class",
+                      "name": tr("settings.appearance.titleStripMeta.class")
+                    },
+                    {
+                      "key": "class-pid",
+                      "name": tr("settings.appearance.titleStripMeta.class-pid")
+                    }
+                  ]
+                  currentKey: root.titleStripMeta
+                  onSelected: key => {
+                    root.titleStripMeta = key;
+                    root.saveSettings();
+                  }
                 }
               }
             }
@@ -1535,108 +1605,152 @@ ColumnLayout {
 
           // --- Window Badges ---
           NCollapsible {
-            label: tr("settings.appearance.section.windowBadges", "Window Badges")
-            description: tr("settings.appearance.section.windowBadges.desc", "Status indicators on window previews")
+            label: tr("settings.appearance.section.windowBadges")
+            description: tr("settings.appearance.sectionDescriptions.windowBadges")
             expanded: true
             Layout.fillWidth: true
 
             NToggle {
-              label: tr("settings.appearance.urgencyBadge.label", "Urgency badge")
-              description: tr("settings.appearance.urgencyBadge.description", "Show a red badge when a window requests urgent attention")
+              label: tr("settings.appearance.urgencyBadge.label")
+              description: tr("settings.appearance.urgencyBadge.description")
               checked: root.showUrgencyBadge
               onToggled: checked => {
-                           root.showUrgencyBadge = checked;
-                           root.saveSettings();
-                         }
+                root.showUrgencyBadge = checked;
+                root.saveSettings();
+              }
             }
 
             NToggle {
-              label: tr("settings.appearance.floatingBadge.label", "Floating badge")
-              description: tr("settings.appearance.floatingBadge.description", "Show a badge on windows currently floating in Hyprland")
+              label: tr("settings.appearance.floatingBadge.label")
+              description: tr("settings.appearance.floatingBadge.description")
               checked: root.showFloatingBadge
               onToggled: checked => {
-                           root.showFloatingBadge = checked;
-                           root.saveSettings();
-                         }
+                root.showFloatingBadge = checked;
+                root.saveSettings();
+              }
+            }
+
+            NToggle {
+              label: tr("settings.appearance.fullscreenBadge.label")
+              description: tr("settings.appearance.fullscreenBadge.description")
+              checked: root.showFullscreenBadge
+              onToggled: checked => {
+                root.showFullscreenBadge = checked;
+                root.saveSettings();
+              }
             }
 
             NText {
-              text: tr("settings.appearance.section.multiMonitor", "Multi-Monitor")
+              text: tr("settings.appearance.section.multiMonitor")
               font.weight: Font.Bold
             }
 
             NToggle {
-              label: tr("settings.appearance.showMonitorIndicators.label", "Show monitor indicators")
-              description: tr("settings.appearance.showMonitorIndicators.description", "Show monitor badges on workspace cells for workspaces bound to other monitors")
+              label: tr("settings.appearance.showMonitorIndicators.label")
+              description: tr("settings.appearance.showMonitorIndicators.description")
               checked: root.showMonitorIndicators
               onToggled: checked => {
-                           root.showMonitorIndicators = checked;
-                           root.saveSettings();
-                         }
+                root.showMonitorIndicators = checked;
+                root.saveSettings();
+              }
             }
 
             NToggle {
-              label: tr("settings.appearance.enableCrossMonitorDrag.label", "Cross-monitor drag")
-              description: tr("settings.appearance.enableCrossMonitorDrag.description", "Enable dragging windows to workspaces on other monitors, migrating the window to that monitor")
+              label: tr("settings.appearance.enableCrossMonitorDrag.label")
+              description: tr("settings.appearance.enableCrossMonitorDrag.description")
               checked: root.enableCrossMonitorDrag
               onToggled: checked => {
-                           root.enableCrossMonitorDrag = checked;
-                           root.saveSettings();
-                         }
+                root.enableCrossMonitorDrag = checked;
+                root.saveSettings();
+              }
             }
           }
 
           // --- Dimming & Focus ---
           NCollapsible {
-            label: tr("settings.appearance.section.dimmingFocus", "Dimming & Focus")
-            description: tr("settings.appearance.section.dimmingFocus.desc", "Inactive workspace dimming")
+            label: tr("settings.appearance.section.dimmingFocus")
+            description: tr("settings.appearance.sectionDescriptions.dimmingFocus")
             expanded: true
             Layout.fillWidth: true
 
             NValueSlider {
               Layout.fillWidth: true
-              label: tr("settings.appearance.dimInactive.label", "Inactive workspace dim")
-              description: tr("settings.appearance.dimInactive.description", "How much previews are dimmed when not on the active workspace")
+              label: tr("settings.appearance.dimInactive.label")
+              description: tr("settings.appearance.dimInactive.description")
               from: 0
               to: 0.8
               stepSize: 0.05
               value: root.dimInactiveWorkspaces
               text: value.toFixed(2)
               onMoved: value => {
-                         if (Math.abs(root.dimInactiveWorkspaces - value) > 0.001) {
-                           root.dimInactiveWorkspaces = value;
-                           root.saveSettings();
-                         }
-                       }
+                if (Math.abs(root.dimInactiveWorkspaces - value) > 0.001) {
+                  root.dimInactiveWorkspaces = value;
+                  root.saveSettings();
+                }
+              }
+            }
+
+            NValueSlider {
+              Layout.fillWidth: true
+              label: tr("settings.appearance.inactiveSaturation.label")
+              description: tr("settings.appearance.inactiveSaturation.description")
+              from: 0.3
+              to: 1
+              stepSize: 0.05
+              value: root.inactiveWorkspaceSaturation
+              text: value.toFixed(2)
+              onMoved: value => {
+                if (Math.abs(root.inactiveWorkspaceSaturation - value) > 0.001) {
+                  root.inactiveWorkspaceSaturation = value;
+                  root.saveSettings();
+                }
+              }
+            }
+
+            NValueSlider {
+              Layout.fillWidth: true
+              label: tr("settings.appearance.hoverLift.label")
+              description: tr("settings.appearance.hoverLift.description")
+              from: 0
+              to: 12
+              stepSize: 1
+              value: root.hoverLiftAmount
+              text: value + "px"
+              onMoved: value => {
+                if (root.hoverLiftAmount !== value) {
+                  root.hoverLiftAmount = value;
+                  root.saveSettings();
+                }
+              }
             }
           }
 
           // --- Borders & Corners ---
           NCollapsible {
-            label: tr("settings.appearance.section.bordersCorners", "Borders & Corners")
-            description: tr("settings.appearance.section.bordersCorners.desc", "Preview corner rounding")
+            label: tr("settings.appearance.section.bordersCorners")
+            description: tr("settings.appearance.sectionDescriptions.bordersCorners")
             expanded: true
             Layout.fillWidth: true
 
             NComboBox {
               Layout.fillWidth: true
-              label: tr("settings.appearance.cornerMode.label", "Corner mode")
-              description: tr("settings.appearance.cornerMode.description", "Use Hyprland rounding or force a fixed radius for previews")
+              label: tr("settings.appearance.cornerMode.label")
+              description: tr("settings.appearance.cornerMode.description")
               model: [
                 {
                   "key": "hyprland",
-                  "name": tr("settings.appearance.cornerMode.hyprland", "Hyprland")
+                  "name": tr("settings.appearance.cornerMode.hyprland")
                 },
                 {
                   "key": "fixed",
-                  "name": tr("settings.appearance.cornerMode.fixed", "Fixed")
+                  "name": tr("settings.appearance.cornerMode.fixed")
                 }
               ]
               currentKey: root.previewCornerMode
               onSelected: key => {
-                            root.previewCornerMode = key;
-                            root.saveSettings();
-                          }
+                root.previewCornerMode = key;
+                root.saveSettings();
+              }
             }
 
             Item {
@@ -1666,42 +1780,86 @@ ColumnLayout {
 
                 anchors.left: parent.left
                 anchors.right: parent.right
-                label: tr("settings.appearance.fixedCornerRadius.label", "Fixed corner radius")
-                description: tr("settings.appearance.fixedCornerRadius.description", "Corner radius applied when corner mode is set to Fixed")
+                label: tr("settings.appearance.fixedCornerRadius.label")
+                description: tr("settings.appearance.fixedCornerRadius.description")
                 from: 0
                 to: 32
                 stepSize: 1
                 value: root.previewFixedCornerRadius
                 text: value + "px"
                 onMoved: value => {
-                           if (root.previewFixedCornerRadius !== value) {
-                             root.previewFixedCornerRadius = value;
-                             root.saveSettings();
-                           }
-                         }
+                  if (root.previewFixedCornerRadius !== value) {
+                    root.previewFixedCornerRadius = value;
+                    root.saveSettings();
+                  }
+                }
+              }
+            }
+
+            NToggle {
+              label: tr("settings.appearance.useBorderGradient.label")
+              description: tr("settings.appearance.useBorderGradient.description")
+              checked: root.useBorderGradient
+              onToggled: checked => {
+                root.useBorderGradient = checked;
+                root.saveSettings();
+              }
+            }
+
+            NValueSlider {
+              Layout.fillWidth: true
+              label: tr("settings.appearance.containerBorderWidth.label")
+              description: tr("settings.appearance.containerBorderWidth.description")
+              from: -1
+              to: 6
+              stepSize: 1
+              value: root.containerBorderWidth
+              text: value < 0 ? tr("settings.common.default") : value + "px"
+              onMoved: value => {
+                if (root.containerBorderWidth !== value) {
+                  root.containerBorderWidth = value;
+                  root.saveSettings();
+                }
+              }
+            }
+
+            NValueSlider {
+              Layout.fillWidth: true
+              label: tr("settings.appearance.selectionBorderWidth.label")
+              description: tr("settings.appearance.selectionBorderWidth.description")
+              from: -1
+              to: 8
+              stepSize: 1
+              value: root.selectionBorderWidth
+              text: value < 0 ? tr("settings.common.default") : value + "px"
+              onMoved: value => {
+                if (root.selectionBorderWidth !== value) {
+                  root.selectionBorderWidth = value;
+                  root.saveSettings();
+                }
               }
             }
           }
 
           NComboBox {
             Layout.fillWidth: true
-            label: tr("settings.appearance.accentColor.label", "Accent color")
-            description: tr("settings.appearance.accentColor.description", "Color used for selection indicator and special workspaces")
+            label: tr("settings.appearance.accentColor.label")
+            description: tr("settings.appearance.accentColor.description")
             model: [
               {
                 "key": "secondary",
-                "name": tr("settings.appearance.accentColor.secondary", "Secondary")
+                "name": tr("settings.appearance.accentColor.secondary")
               },
               {
                 "key": "primary",
-                "name": tr("settings.appearance.accentColor.primary", "Primary")
+                "name": tr("settings.appearance.accentColor.primary")
               }
             ]
             currentKey: root.accentColorType
             onSelected: key => {
-                          root.accentColorType = key;
-                          root.saveSettings();
-                        }
+              root.accentColorType = key;
+              root.saveSettings();
+            }
           }
         }
 
@@ -1732,11 +1890,11 @@ ColumnLayout {
     pluginWindowX: root.previewSavedPosition.valid ? root.previewSavedPosition.x : -1
     pluginWindowY: root.previewSavedPosition.valid ? root.previewSavedPosition.y : -1
     onPositionSaved: (monitorKey, xPos, yPos) => {
-                       root.setSavedPreviewPosition(monitorKey, xPos, yPos);
-                       root.previewWindowX = xPos;
-                       root.previewWindowY = yPos;
-                       root.saveSettings();
-                     }
+      root.setSavedPreviewPosition(monitorKey, xPos, yPos);
+      root.previewWindowX = xPos;
+      root.previewWindowY = yPos;
+      root.saveSettings();
+    }
     // Bindings to active UI state to allow live previewing of un-saved tweaks
     visualMode: root.visualMode
     shaderPreset: root.shaderPreset
@@ -1753,7 +1911,7 @@ ColumnLayout {
     showUrgencyBadge: root.showUrgencyBadge
     showFloatingBadge: root.showFloatingBadge
     showFullscreenBadge: root.showFullscreenBadge
-    showMonitorBadge: root.showMonitorBadge
+    showMonitorBadge: root.showMonitorIndicators
     dimInactiveWorkspaces: root.dimInactiveWorkspaces
     inactiveWorkspaceSaturation: root.inactiveWorkspaceSaturation
     hoverLiftAmount: root.hoverLiftAmount

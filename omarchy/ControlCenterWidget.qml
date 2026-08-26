@@ -1,4 +1,5 @@
 import Quickshell
+import "PluginUi.js" as PluginUi
 import qs.Commons
 import qs.Widgets
 
@@ -9,28 +10,17 @@ NIconButtonHot {
   readonly property var pluginMain: pluginApi?.mainInstance
   readonly property bool isActive: pluginApi?.pluginSettings?.active === true
   readonly property bool isAvailable: pluginMain?.available === true
+  readonly property bool isBusy: pluginMain?.isBusy === true
 
   icon: "palette"
   colorFg: (!isActive || !isAvailable) ? Color.mOnSurface : Color.mPrimary
-  tooltipText: {
-    if (!isActive)
-      return pluginApi?.tr("tooltips.inactive");
-    if (!isAvailable)
-      return pluginApi?.tr("tooltips.not-available");
-
-    const template = pluginApi?.tr("tooltips.active");
-    return (typeof template === "string" ? template : "").replace("{theme}", pluginMain?.themeDisplayName || "");
-  }
+  tooltipText: PluginUi.omarchyTooltip(pluginApi, isBusy, isActive, isAvailable, pluginMain?.themeDisplayName || "")
 
   onClicked: {
-    if (!isActive) {
-      if (isAvailable)
-        pluginMain?.activate();
-      else
-        pluginApi?.togglePanel(screen, this);
-      return;
-    }
-
-    pluginApi?.togglePanel(screen, this);
+    const action = PluginUi.primaryAction(isActive, isAvailable);
+    if (action === "activate")
+      pluginMain?.activate();
+    else
+      pluginApi?.togglePanel(screen, this);
   }
 }

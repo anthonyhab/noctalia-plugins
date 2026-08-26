@@ -1,101 +1,101 @@
 {
-  "title": "Omarchy",
-  "status": {
-    "available": "Omarchy detected",
-    "not-available": "Omarchy not found",
-    "active": "Active",
-    "inactive": "Inactive",
-    "applying": "Applying...",
-    "no-location": "Location-based scheduling is not enabled in Noctalia settings",
-    "daytime": "Currently: Daytime",
-    "nighttime": "Currently: Nighttime"
-  },
-  "actions": {
-    "refresh": "Refresh",
-    "activate": "Activate",
-    "deactivate": "Deactivate",
-    "apply": "Apply current theme",
-    "open": "Open",
-    "cycle": "Cycle theme",
-    "random": "Random theme"
-  },
-  "fields": {
-    "config-dir": "Omarchy config dir",
-    "theme-set-command": "Theme-set command",
-    "theme": {
-      "label": "Theme",
-      "placeholder": "Select...",
-      "available": "Available themes"
-    },
-    "show-theme-name": {
-      "label": "Show theme name in bar widget",
-      "desc": "If disabled, only the Omarchy icon is shown in the bar."
-    },
-    "show-search-input": {
-      "label": "Show search input in panel",
-      "desc": "If enabled, a search field will appear in the panel to filter themes."
-    },
-    "debug-logging": {
-      "label": "Enable debug logging",
-      "desc": "Logs extra diagnostics to help troubleshoot theme parsing and scheme application."
-    },
-    "time-based-filtering": {
-      "label": "Enable time-based theme filtering",
-      "desc": "Random theme selection will only pick light themes during daytime and dark themes at night."
-    },
-    "filtering-mode": {
-      "label": "Apply filtering to"
-    }
-  },
-  "filtering-mode": {
-    "random-only": "Random theme only",
-    "random-and-cycle": "Random and cycle"
-  },
-  "filters": {
-    "all": "All",
-    "light": "Light",
-    "dark": "Dark"
-  },
-  "tooltips": {
-    "close": "Close",
-    "inactive": "Omarchy is inactive\nLeft: Activate | Right: Settings",
-    "not-available": "Omarchy not available\nInstall omarchy and configure themes",
-    "active": "Theme: {theme}\nLeft: Panel | Right: Settings | Middle: Random",
-    "random-theme": "Random theme",
-    "widget-settings": "Widget settings"
-  },
-  "errors": {
-    "missing-config": "Omarchy config not found",
-    "failed-read": "Failed to read theme colors",
-    "failed-apply": "Failed to apply scheme",
-    "failed-theme-set": "Failed to switch theme",
-    "no-themes": "No themes found",
-    "theme-not-found": "Theme not found: {theme}"
-  },
-  "notices": {
-    "applied": "Omarchy scheme applied",
-    "theme-switched": "Switched to theme: {theme}",
-    "auto-applying": "Auto-applying Omarchy theme"
-  },
-  "panel": {
-    "settings-hint": "Configure Omarchy paths via Settings -> Plugins -> Omarchy.",
-    "search-placeholder": "Search themes...",
-    "inactive-title": "Omarchy sync is off",
-    "inactive-description": "Activate the plugin to apply Omarchy themes from this panel."
-  },
-  "settings": {
-    "description": "Set how Noctalia locates Omarchy and manage the plugin state.",
-    "paths-hint": "Point the fields below at your Omarchy install; leave blank to use the defaults.",
-    "tabs": {
-      "general": "General",
-      "configuration": "Configuration"
-    },
-    "controls": {
-      "title": "Plugin controls"
-    },
-    "time-filtering": {
-      "title": "Time-based Theme Filtering",
-      "desc": "Automatically filter themes based on time of day using your location settings."
-    }
-  }
+   "title": "Omarchy",
+   "status": {
+      "available": "Omarchy detected",
+      "not-available": "Omarchy not found or not executable",
+      "active": "Active",
+      "inactive": "Inactive",
+      "applying": "Applying...",
+      "no-location": "Location-based scheduling is not enabled in Noctalia settings",
+      "daytime": "Currently: Daytime",
+      "nighttime": "Currently: Nighttime"
+   },
+   "actions": {
+      "refresh": "Refresh",
+      "activate": "Activate",
+      "deactivate": "Deactivate",
+      "apply": "Apply current theme",
+      "open": "Open",
+      "cycle": "Cycle theme",
+      "random": "Random theme"
+   },
+   "fields": {
+      "config-dir": "Omarchy config dir",
+      "theme-set-command": "Custom theme-set executable",
+      "theme": {
+         "label": "Theme",
+         "placeholder": "Select...",
+         "available": "Available themes"
+      },
+      "show-theme-name": {
+         "label": "Show theme name in bar widget",
+         "desc": "If disabled, only the Omarchy icon is shown in the bar."
+      },
+      "show-search-input": {
+         "label": "Show search input in panel",
+         "desc": "If enabled, a search field will appear in the panel to filter themes."
+      },
+      "debug-logging": {
+         "label": "Enable debug logging",
+         "desc": "Logs extra diagnostics to help troubleshoot theme parsing and scheme application."
+      },
+      "time-based-filtering": {
+         "label": "Enable time-based theme filtering",
+         "desc": "Random theme selection will only pick light themes during daytime and dark themes at night."
+      },
+      "filtering-mode": {
+         "label": "Apply filtering to"
+      }
+   },
+   "filtering-mode": {
+      "random-only": "Random theme only",
+      "random-and-cycle": "Random and cycle"
+   },
+   "filters": {
+      "all": "All",
+      "light": "Light",
+      "dark": "Dark"
+   },
+   "tooltips": {
+      "close": "Close",
+      "inactive": "Omarchy is inactive\nLeft: Activate | Right: Settings",
+      "not-available": "Omarchy not available\nInstall Omarchy or make the `omarchy` command available, then configure themes",
+      "active": "Theme: {theme}\nLeft: Panel | Right: Settings | Middle: Random",
+      "random-theme": "Random theme",
+      "widget-settings": "Widget settings"
+   },
+   "errors": {
+      "missing-config": "Omarchy config not found",
+      "failed-read": "Failed to read theme colors",
+      "failed-apply": "Failed to apply scheme",
+      "failed-theme-set": "Failed to switch theme",
+      "no-themes": "No themes found",
+      "theme-not-found": "Theme not found: {theme}"
+   },
+   "notices": {
+      "applied": "Omarchy scheme applied",
+      "theme-switched": "Switched to theme: {theme}",
+      "auto-applying": "Auto-applying Omarchy theme"
+   },
+   "panel": {
+      "settings-hint": "Configure Omarchy paths via Settings -> Plugins -> Omarchy.",
+      "search-placeholder": "Search themes...",
+      "inactive-title": "Omarchy sync is off",
+      "inactive-description": "Activate the plugin to apply Omarchy themes from this panel."
+   },
+   "settings": {
+      "description": "Manage Omarchy theme sync and optional command overrides.",
+      "paths-hint": "Leave the custom executable blank to use `omarchy theme set`. Set a custom config directory or wrapper only if you need one.",
+      "tabs": {
+         "general": "General",
+         "configuration": "Configuration"
+      },
+      "controls": {
+         "title": "Plugin controls"
+      },
+      "time-filtering": {
+         "title": "Time-based Theme Filtering",
+         "desc": "Automatically filter themes based on time of day using your location settings."
+      }
+   }
 }

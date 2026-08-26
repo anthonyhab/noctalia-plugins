@@ -2,7 +2,7 @@
 
 This file is the operational guide for working in this repository.
 
-For API details, widget properties, and deep QML patterns, use the dedicated references and skills listed below.
+For API details, widget properties, and deep QML patterns, use the references and project rules below.
 
 ## Scope
 
@@ -22,21 +22,6 @@ For API details, widget properties, and deep QML patterns, use the dedicated ref
 - `main` is stable distribution only.
 - WIP plugins belong in dedicated branches (`dev/<plugin-id>` or `feature/<topic>`).
 - Do not add WIP plugins to `registry.json`.
-
-## Required Skill Usage
-
-When touching plugin code, load relevant skills before editing:
-
-1. `noctalia-plugin` for core plugin rules and known pitfalls.
-2. Entry-point skill as needed (`plugin-main`, `plugin-bar-widget`, `plugin-panel`, `plugin-settings`).
-3. `plugin-api` when using `pluginApi` features.
-4. `plugin-i18n` when changing translation keys or behavior.
-
-If guidance conflicts, follow repository policy in this order:
-
-1. User instructions
-2. This file and `docs/MAINTENANCE.md`
-3. Skill guidance
 
 ## Core Engineering Rules
 
@@ -110,5 +95,3 @@ Do not keep nested worktrees or scratch artifacts inside plugin directories.
 - `README.md`
 - `docs/MAINTENANCE.md`
 - `docs/NOCTALIA_API.md`
-- `.claude/skills/` (tracked skill source-of-truth)
-- `.opencode/skills/` (local runtime links/wrappers)

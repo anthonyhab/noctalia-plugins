@@ -15,6 +15,23 @@
     "actions": {
         "settings": "Settings"
     },
+    "dropIntent": {
+        "splitLeft": "Split left",
+        "splitRight": "Split right",
+        "splitTop": "Split top",
+        "splitBottom": "Split bottom",
+        "tiledSplit": "Split window",
+        "tiledSwap": "Swap windows",
+        "layoutReorder": "Reorder layout",
+        "workspaceMove": "Move to workspace",
+        "specialMove": "Move to scratchpad",
+        "floatingPlace": "Place window",
+        "floatingMoveAndPlace": "Move and place",
+        "deckCycle": "Cycle deck",
+        "noop": "Unavailable",
+        "draggedSlot": "Dragged window lands here",
+        "targetSlot": "Target shrinks here"
+    },
     "settings": {
         "title": "Hypr Overview Settings",
         "tabs": {
@@ -73,10 +90,24 @@
             "retilePreviewOpacity": {
                 "label": "Retile preview opacity",
                 "description": "Opacity multiplier for split/swap guidance overlays"
+            },
+            "advanced": {
+                "label": "Advanced drag behavior",
+                "description": "Fine tune drag thresholds and retiling behavior"
+            },
+            "dragSnapThreshold": {
+                "label": "Split target size",
+                "description": "How much of a target window is dedicated to split previews before the center swaps"
             }
         },
         "common": {
             "default": "Default"
+        },
+        "previewWindow": {
+            "title": "Live Preview",
+            "workspace": "Workspace",
+            "workspace-prefix": "WS ",
+            "empty": "Open windows to preview styles"
         },
         "layout": {
             "title": "Layout",
@@ -116,45 +147,64 @@
                 "pill": "Pill",
                 "chip": "Chip",
                 "plain": "Plain"
+            },
+            "advanced": {
+                "label": "Advanced layout controls",
+                "description": "Optional layout badges and workspace grid guides"
+            },
+            "showLayoutBadge": {
+                "label": "Layout badge",
+                "description": "Show the current Hyprland layout badge on each workspace"
+            },
+            "showRowColumnGuides": {
+                "label": "Row and column guides",
+                "description": "Draw subtle center guides in workspace thumbnails"
             }
         },
         "appearance": {
             "title": "Appearance",
             "section": {
-                "visualMode": "Visual Mode",
-                "visualMode.desc": "Choose how window previews are rendered and balanced for performance.",
+                "visualMode": "Preview Style",
                 "windowIcons": "Window Icons",
-                "windowIcons.desc": "Configure if and where application icons appear in previews.",
                 "titleStrip": "Title Strip",
-                "titleStrip.desc": "Tune title strip visibility, placement, and sizing.",
                 "windowBadges": "Window Badges",
-                "windowBadges.desc": "Control urgency, floating, fullscreen, and monitor indicator badges.",
                 "dimmingFocus": "Dimming and Focus",
-                "dimmingFocus.desc": "Adjust inactive workspace dimming and hover emphasis.",
                 "bordersCorners": "Borders and Corners",
-                "bordersCorners.desc": "Customize border gradients, widths, and preview corner behavior.",
                 "multiMonitor": "Multi-Monitor"
+            },
+            "sectionDescriptions": {
+                "visualMode": "Choose live previews or the stylized pixel shader pipeline.",
+                "windowIcons": "Configure if and where application icons appear in previews.",
+                "titleStrip": "Tune title strip visibility, placement, and sizing.",
+                "windowBadges": "Control urgency, floating, fullscreen, and monitor indicator badges.",
+                "dimmingFocus": "Adjust inactive workspace dimming and hover emphasis.",
+                "bordersCorners": "Customize border gradients, widths, and preview corner behavior."
             },
             "previewWorkspace": {
                 "label": "Preview workspace",
                 "no-windows": "Open windows in this workspace to preview styles"
             },
             "visualMode": {
-                "label": "Visual mode",
-                "description": "Controls window preview rendering \u2014 choose live, stylized, or off for lowest resource usage",
+                "label": "Preview mode",
+                "description": "Choose between live screencopy, the pixel shader look, or preview placeholders",
                 "live": "Live",
-                "simplified": "Simplified",
+                "simplified": "Pixel shader",
                 "off": "Off"
             },
-
-
-            "pixelDensity": {
-                "label": "Pixel Density",
-                "description": "Controls pixelation level (higher = more detail)"
+            "shaderPreset": {
+                "label": "Shader preset",
+                "description": "Style used by the pixel shader preview",
+                "pixelated": "Pixelated",
+                "mac": "Mac Classic dither"
             },
-
-
-
+            "shaderPresetStrength": {
+                "label": "Dither strength",
+                "description": "How strongly the selected shader preset stylizes the preview"
+            },
+            "pixelDensity": {
+                "label": "Pixel density",
+                "description": "Higher values keep more live preview detail"
+            },
             "accentColor": {
                 "label": "Accent color",
                 "description": "Color used for selection indicator and special workspaces",
@@ -164,6 +214,16 @@
             "windowIcons": {
                 "label": "Window icons",
                 "description": "Show app icons inside each window preview card"
+            },
+            "colorizeWindowIcons": {
+                "label": "Colorize icons",
+                "description": "Tint non-Steam window icons with the accent color"
+            },
+            "windowIconPlacement": {
+                "label": "Icon placement",
+                "description": "Where app icons appear inside window previews",
+                "center": "Center",
+                "corner": "Corner"
             },
 
 
@@ -184,6 +244,13 @@
                 "label": "Title strip height",
                 "description": "Height of the window title strip before monitor scaling"
             },
+            "titleStripMeta": {
+                "label": "Title metadata",
+                "description": "Secondary text shown in the title strip",
+                "none": "None",
+                "class": "App class",
+                "class-pid": "App class and PID"
+            },
 
 
             "urgencyBadge": {
@@ -194,11 +261,19 @@
                 "label": "Floating badge",
                 "description": "Show a badge on windows currently floating in Hyprland"
             },
+            "fullscreenBadge": {
+                "label": "Fullscreen badge",
+                "description": "Show a badge for fullscreen and maximized windows"
+            },
 
 
             "dimInactive": {
                 "label": "Inactive workspace dim",
                 "description": "How much previews are dimmed when not on the active workspace"
+            },
+            "inactiveSaturation": {
+                "label": "Inactive saturation",
+                "description": "How much color remains on inactive workspace previews"
             },
 
             "hoverLift": {
@@ -215,6 +290,18 @@
                 "label": "Fixed corner radius",
                 "description": "Corner radius applied when corner mode is set to Fixed"
             },
+            "useBorderGradient": {
+                "label": "Border gradient",
+                "description": "Use accent gradients for focused preview borders"
+            },
+            "containerBorderWidth": {
+                "label": "Container border width",
+                "description": "Override the overview container border width"
+            },
+            "selectionBorderWidth": {
+                "label": "Selection border width",
+                "description": "Override the active workspace indicator width"
+            },
             "showMonitorIndicators": {
                 "label": "Show monitor indicators",
                 "description": "Show monitor badges on workspace cells for workspaces bound to other monitors"
@@ -222,9 +309,6 @@
             "enableCrossMonitorDrag": {
                 "label": "Cross-monitor drag",
                 "description": "Enable dragging windows to workspaces on other monitors, migrating the window to that monitor"
-            },
-            "crossMonitorDragStyle": {
-                "label": "Drag indicator style"
             },
             "workspaceMonitorBadge": {
                 "tooltip": "Workspace on monitor %1"
@@ -237,6 +321,11 @@
     "overview": {
         "title": {
             "unknown": "Unknown"
+        },
+        "badges": {
+            "urgent": "URGENT",
+            "floating": "FLOAT",
+            "fullscreen": "FULL"
         },
         "tooltip": {
             "xwayland": "XWayland",

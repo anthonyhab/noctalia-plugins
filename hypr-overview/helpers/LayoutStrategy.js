@@ -15,6 +15,35 @@ function clamp(v, min, max) {
     return v
 }
 
+function isIntent(ctx, typeName) {
+    return !!ctx && ctx.source && ctx.target && ctx.layout && (!typeName || ctx.type === typeName)
+}
+
+function sourceAddressFrom(ctx) {
+    if (isIntent(ctx))
+        return ctx.source.address || ""
+
+    return (ctx && ctx.sourceAddress) || ""
+}
+
+function workspaceIdFrom(ctx) {
+    if (isIntent(ctx))
+        return ctx.source.workspaceId
+
+    return (ctx && ctx.wsId) || -1
+}
+
+function previewFrom(ctx) {
+    if (isIntent(ctx))
+        return ctx.preview || null
+
+    return (ctx && ctx.retilingInfo) || null
+}
+
+function noopAction() {
+    return { type: "noop", commands: [], refresh: false }
+}
+
 // All known layout names in display order.
 var allLayouts = ["dwindle", "master", "scroll", "monocle"]
 
@@ -47,33 +76,40 @@ var dwindleStrategy = {
 
     // Intra-workspace retile: directional preselect + move-to-9999-and-back, or swapwindow.
     getDropAction: function(ctx) {
-        if (!ctx || !ctx.retilingInfo || !ctx.retilingInfo.targetAddress)
-            return { type: "noop", commands: [] }
+        if (isIntent(ctx) && ctx.type !== "tiledSplit" && ctx.type !== "tiledSwap")
+            return noopAction()
 
-        var info = ctx.retilingInfo
+        var info = previewFrom(ctx)
+        if (!ctx || !info || !info.targetAddress)
+            return noopAction()
+
+        var sourceAddress = sourceAddressFrom(ctx)
+        var wsId = workspaceIdFrom(ctx)
         if (info.isNoop)
-            return { type: "noop", commands: [] }
+            return noopAction()
 
-        if (info.direction === "swap") {
+        if (info.direction === "swap" || (isIntent(ctx) && ctx.type === "tiledSwap")) {
             return {
-                type: "retile",
+                type: "tiledSwap",
                 commands: [
-                    "focuswindow address:" + ctx.sourceAddress,
+                    "focuswindow address:" + sourceAddress,
                     "swapwindow address:" + info.targetAddress
-                ]
+                ],
+                refresh: true
             }
         }
 
         // Directional split
         return {
-            type: "retile",
+            type: "tiledSplit",
             commands: [
+                "movetoworkspacesilent 9999, address:" + sourceAddress,
                 "focuswindow address:" + info.targetAddress,
                 "layoutmsg preselect " + info.direction,
-                "movetoworkspacesilent 9999, address:" + ctx.sourceAddress,
-                "movetoworkspacesilent " + ctx.wsId + ", address:" + ctx.sourceAddress,
+                "movetoworkspacesilent " + wsId + ", address:" + sourceAddress,
                 "layoutmsg preselect 0"
-            ]
+            ],
+            refresh: true
         }
     },
 
@@ -92,20 +128,44 @@ var masterStrategy = {
 
     // Master layout: swap with any window. Drop onto master → swapwithmaster.
     getDropAction: function(ctx) {
-        if (!ctx || !ctx.retilingInfo || !ctx.retilingInfo.targetAddress)
-            return { type: "noop", commands: [] }
+        if (isIntent(ctx) && ctx.type !== "layoutReorder")
+            return noopAction()
 
-        var info = ctx.retilingInfo
+        var sourceAddress = sourceAddressFrom(ctx)
+        var info = previewFrom(ctx)
+        if (!sourceAddress)
+            return noopAction()
+
+        if (isIntent(ctx) && (!info || !info.targetAddress)) {
+            var dx = toNumber(ctx.preview && ctx.preview.dragDeltaX, 0)
+            var dy = toNumber(ctx.preview && ctx.preview.dragDeltaY, 0)
+            if (Math.max(Math.abs(dx), Math.abs(dy)) < 5)
+                return noopAction()
+
+            return {
+                type: "layoutReorder",
+                commands: [
+                    "focuswindow address:" + sourceAddress,
+                    "layoutmsg swapwithmaster"
+                ],
+                refresh: true
+            }
+        }
+
+        if (!ctx || !info || !info.targetAddress)
+            return noopAction()
+
         if (info.isNoop)
-            return { type: "noop", commands: [] }
+            return noopAction()
 
         // For any drop, swap the two windows.
         return {
-            type: "reorder",
+            type: "layoutReorder",
             commands: [
-                "focuswindow address:" + ctx.sourceAddress,
+                "focuswindow address:" + sourceAddress,
                 "swapwindow address:" + info.targetAddress
-            ]
+            ],
+            refresh: true
         }
     },
 
@@ -211,14 +271,18 @@ var scrollStrategy = {
 
     // Scroll layout: reorder columns via layoutmsg movewindow.
     getDropAction: function(ctx) {
-        if (!ctx || !ctx.sourceAddress)
-            return { type: "noop", commands: [] }
+        if (isIntent(ctx) && ctx.type !== "layoutReorder")
+            return noopAction()
 
-        var dx = toNumber(ctx.dragDeltaX, 0)
-        var dy = toNumber(ctx.dragDeltaY, 0)
+        var sourceAddress = sourceAddressFrom(ctx)
+        if (!ctx || !sourceAddress)
+            return noopAction()
+
+        var dx = isIntent(ctx) ? toNumber(ctx.preview && ctx.preview.dragDeltaX, 0) : toNumber(ctx.dragDeltaX, 0)
+        var dy = isIntent(ctx) ? toNumber(ctx.preview && ctx.preview.dragDeltaY, 0) : toNumber(ctx.dragDeltaY, 0)
 
         // Determine scroll direction for this workspace
-        var scrollDir = (ctx.scrollDirection || "right")
+        var scrollDir = isIntent(ctx) ? (ctx.layout.scrollDirection || "right") : (ctx.scrollDirection || "right")
         var isVertical = (scrollDir === "up" || scrollDir === "down")
 
         var moveDir
@@ -231,14 +295,15 @@ var scrollStrategy = {
         // Require minimum drag distance to avoid accidental reorders
         var delta = isVertical ? Math.abs(dy) : Math.abs(dx)
         if (delta < 5)
-            return { type: "noop", commands: [] }
+            return noopAction()
 
         return {
-            type: "reorder",
+            type: "layoutReorder",
             commands: [
-                "focuswindow address:" + ctx.sourceAddress,
+                "focuswindow address:" + sourceAddress,
                 "layoutmsg movewindow " + moveDir
-            ]
+            ],
+            refresh: true
         }
     },
 
@@ -277,7 +342,9 @@ var monocleStrategy = {
         for (var mid in byWs) {
             var mwins = byWs[mid]
             mwins.sort(function(a, b) {
-                return (a.focusHistoryID || 9999) - (b.focusHistoryID || 9999)
+                var rankA = (a.focusHistoryID !== undefined && a.focusHistoryID !== null) ? a.focusHistoryID : 9999
+                var rankB = (b.focusHistoryID !== undefined && b.focusHistoryID !== null) ? b.focusHistoryID : 9999
+                return rankA - rankB
             })
             for (var j = 0; j < mwins.length; j++) {
                 result[mwins[j].address] = {
@@ -291,19 +358,24 @@ var monocleStrategy = {
 
     // Monocle: cycle through stack. Primary use is cross-workspace moves (handled by OverviewGrid).
     getDropAction: function(ctx) {
-        if (!ctx || !ctx.sourceAddress)
-            return { type: "noop", commands: [] }
+        if (isIntent(ctx) && ctx.type !== "layoutReorder")
+            return noopAction()
 
-        var dy = toNumber(ctx.dragDeltaY, 0)
+        var sourceAddress = sourceAddressFrom(ctx)
+        if (!ctx || !sourceAddress)
+            return noopAction()
+
+        var dy = isIntent(ctx) ? toNumber(ctx.preview && ctx.preview.dragDeltaY, 0) : toNumber(ctx.dragDeltaY, 0)
         if (Math.abs(dy) < 5)
-            return { type: "noop", commands: [] }
+            return noopAction()
 
         return {
-            type: "cycle",
+            type: "layoutReorder",
             commands: [
-                "focuswindow address:" + ctx.sourceAddress,
+                "focuswindow address:" + sourceAddress,
                 dy < 0 ? "cyclenext" : "cycleprev"
-            ]
+            ],
+            refresh: true
         }
     },
 

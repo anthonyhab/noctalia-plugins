@@ -1,9 +1,8 @@
 import QtQuick
 import QtQuick.Layouts
 import Quickshell
+import "PluginUi.js" as PluginUi
 import qs.Commons
-import qs.Modules.Bar.Extras
-import qs.Modules.Panels.Settings
 import qs.Services.UI
 import qs.Widgets
 
@@ -20,7 +19,7 @@ Item {
   readonly property var pluginMain: pluginApi?.mainInstance
   readonly property bool isActive: pluginApi?.pluginSettings?.active === true
   readonly property bool isAvailable: pluginMain?.available === true
-  readonly property bool isLoading: pluginMain?.operationInProgress === true
+  readonly property bool isLoading: pluginMain?.isBusy === true
 
   readonly property string barPosition: Settings.getBarPositionForScreen(screen?.name)
   readonly property bool isBarVertical: barPosition === "left" || barPosition === "right"
@@ -40,51 +39,13 @@ Item {
     return "palette";
   }
 
-  readonly property string tooltipText: {
-    if (isLoading)
-      return pluginApi?.tr("status.applying");
-    if (!isActive)
-      return pluginApi?.tr("tooltips.inactive");
-    if (!isAvailable)
-      return pluginApi?.tr("tooltips.not-available");
-
-    const template = pluginApi?.tr("tooltips.active");
-    return (typeof template === "string" ? template : "").replace("{theme}", themeDisplayName || "");
-  }
+  readonly property string tooltipText: PluginUi.omarchyTooltip(pluginApi, isLoading, isActive, isAvailable, themeDisplayName)
 
   readonly property int iconSize: Style.toOdd(capsuleHeight * 0.48)
   readonly property int verticalSize: Style.toOdd(capsuleHeight * 0.85)
   readonly property int maxWidth: 150
 
-  readonly property var contextMenuModel: {
-    if (!isActive) {
-      return [
-            {
-              "label": pluginApi?.tr("actions.activate"),
-              "action": "activate",
-              "icon": "player-play"
-            },
-            {
-              "label": pluginApi?.tr("tooltips.widget-settings"),
-              "action": "settings",
-              "icon": "settings"
-            }
-          ];
-    }
-
-    return [
-          {
-            "label": pluginApi?.tr("tooltips.random-theme"),
-            "action": "random",
-            "icon": "dice-3"
-          },
-          {
-            "label": pluginApi?.tr("tooltips.widget-settings"),
-            "action": "settings",
-            "icon": "settings"
-          }
-        ];
-  }
+  readonly property var contextMenuModel: PluginUi.contextMenuModel(pluginApi, isActive)
 
   readonly property bool shouldShowText: showThemeName && isActive && isAvailable && themeDisplayName !== ""
 
@@ -127,17 +88,17 @@ Item {
     model: contextMenuModel
 
     onTriggered: action => {
-                   contextMenu.close();
-                   PanelService.closeContextMenu(screen);
+      contextMenu.close();
+      PanelService.closeContextMenu(screen);
 
-                   if (action === "activate") {
-                     pluginMain?.activate();
-                   } else if (action === "random") {
-                     selectRandomTheme();
-                   } else if (action === "settings") {
-                     openPluginSettings();
-                   }
-                 }
+      if (action === "activate") {
+        pluginMain?.activate();
+      } else if (action === "random") {
+        selectRandomTheme();
+      } else if (action === "settings") {
+        openPluginSettings();
+      }
+    }
   }
 
   Rectangle {
@@ -214,7 +175,6 @@ Item {
       }
 
       Item {
-        id: verticalLayout
 
         visible: isBarVertical
         width: Style.toOdd(verticalSize)
@@ -255,22 +215,19 @@ Item {
     onExited: TooltipService.hide()
 
     onClicked: mouse => {
-                 TooltipService.hide();
-                 if (mouse.button === Qt.LeftButton) {
-                   if (!isActive) {
-                     if (isAvailable)
-                     pluginMain?.activate();
-                     else
-                     pluginApi?.togglePanel(root.screen, container);
-                   } else {
-                     pluginApi?.togglePanel(root.screen, container);
-                   }
-                 } else if (mouse.button === Qt.RightButton) {
-                   PanelService.showContextMenu(contextMenu, container, screen);
-                 } else if (mouse.button === Qt.MiddleButton) {
-                   selectRandomTheme();
-                 }
-               }
+      TooltipService.hide();
+      if (mouse.button === Qt.LeftButton) {
+        const action = PluginUi.primaryAction(isActive, isAvailable);
+        if (action === "activate")
+          pluginMain?.activate();
+        else
+          pluginApi?.togglePanel(root.screen, container);
+      } else if (mouse.button === Qt.RightButton) {
+        PanelService.showContextMenu(contextMenu, container, screen);
+      } else if (mouse.button === Qt.MiddleButton) {
+        selectRandomTheme();
+      }
+    }
   }
 
   function openPluginSettings() {

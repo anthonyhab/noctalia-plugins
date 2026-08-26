@@ -1,18 +1,16 @@
 # Noctalia Plugins
 
+> **Archived:** This repository is no longer maintained for Noctalia v5. Current plugin development has moved to the private [Omarchy plugins repository](https://github.com/anthonyhab/omarchy-plugins).
+
 Curated plugins for [Noctalia Shell](https://github.com/noctalia-dev/noctalia-shell) on Hyprland and Wayland. Built and maintained by habibe.
 
 This repo focuses on stable, installable plugins with polished bar widgets, panels, and shell integrations.
 
 Work-in-progress plugins are developed on dedicated branches and merged into `main` when release-ready.
 
-## Install
+## Current repository
 
-Add this repo in the Noctalia plugin UI:
-
-1. Open `Settings -> Plugins -> Sources`
-2. Click `Add custom repository`
-3. Add `https://github.com/anthonyhab/noctalia-plugins/`
+The maintained plugins are now developed in the private [Omarchy plugins repository](https://github.com/anthonyhab/omarchy-plugins). Access to that repository is required.
 
 ## Stable Plugins
 
@@ -40,11 +38,11 @@ Add this repo in the Noctalia plugin UI:
 
 ---
 
-### SWWW Wallpaper Picker
+### AWWW Wallpaper Picker
 
-[![SWWW Wallpaper Picker](swww-picker/preview.png)](swww-picker/README.md)
+[![AWWW Wallpaper Picker](swww-picker/preview.png)](swww-picker/README.md)
 
-[SWWW Wallpaper Picker](swww-picker/README.md) manages wallpapers through `swww` with next/previous/random actions, auto-rotation, shuffle, history, and configurable transitions.
+[AWWW Wallpaper Picker](swww-picker/README.md) manages wallpapers through `awww` with next/previous/random actions, auto-rotation, shuffle, history, and configurable transitions.
 
 ---
 
